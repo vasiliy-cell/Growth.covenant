@@ -1,45 +1,57 @@
 import numpy as np
 import random
 
-EMPTY = 0
-FOOD = 1
-DANGER = 2
+from objects import OBJECTS
+
 
 class Map:
-    def __init__(self, size=8):
+    def __init__(self, size=8, empty_ratio=0.8):
         self.size = size
+        self.empty_ratio = empty_ratio
+        self.object_ids = list(OBJECTS.keys())
+
         self.grid = self._generate()
 
     def _generate(self):
         total_cells = self.size * self.size
 
-        # считаем сколько каких клеток  
-        empty_count = int(total_cells * 0.7)
+        # --- 1. считаем пустые клетки ---
+        empty_count = int(total_cells * self.empty_ratio)
+
+        # --- 2. НЕ пустые объекты ---
+        non_empty_ids = [obj for obj in self.object_ids if obj != 0]
+
         remaining = total_cells - empty_count
 
-        # делим оставшиеся между объектами
-        food_count = remaining // 2
-        danger_count = remaining - food_count
+        # --- 3. создаём базовый список ---
+        cells = [0] * empty_count
 
-        # создаём список всех клеток  
-        cells = (
-            [EMPTY] * empty_count +
-            [FOOD] * food_count +
-            [DANGER] * danger_count
-        )
+        # --- 4. распределяем остальные строго по количеству ---
+        if non_empty_ids:
+            per_object = remaining // len(non_empty_ids)
+            remainder = remaining % len(non_empty_ids)
 
-        # 3. гарантия наличия всех типов 
-        # (на случай очень маленькой карты)
-        if FOOD not in cells:
-            cells[random.randint(0, total_cells - 1)] = FOOD
+            for obj in non_empty_ids:
+                count = per_object
+                if remainder > 0:
+                    count += 1
+                    remainder -= 1
 
-        if DANGER not in cells:
-            cells[random.randint(0, total_cells - 1)] = DANGER
+                cells.extend([obj] * count)
 
-        #   4. перемешиваем  
+        # --- 5. ЖЁСТКИЙ ФИКС: обрезаем лишнее ---
+        cells = cells[:total_cells]
+
+        # --- 6. гарантия наличия каждого объекта ---
+        for obj in non_empty_ids:
+            if obj not in cells:
+                idx = random.randint(0, total_cells - 1)
+                cells[idx] = obj
+
+        # --- 7. перемешиваем ---
         random.shuffle(cells)
 
-        #   5. превращаем в grid  
+        # --- 8. reshape ---
         grid = np.array(cells).reshape((self.size, self.size))
 
         return grid
@@ -48,6 +60,12 @@ class Map:
         return self.grid[y, x]
 
     def print_map(self):
-        print(self.grid)
+        for row in self.grid:
+            print(" ".join(map(str, row)))
 
+
+if __name__ == "__main__":
+    m = Map(size=8)
+    print("Generated map:")
+    m.print_map()
 
