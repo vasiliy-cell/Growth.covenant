@@ -1,4 +1,6 @@
 
+(current CURRENT STAGE IS 1)
+
 ---
 
 # Growth.covenant
@@ -167,56 +169,17 @@ Grid World → Sandbox
 
 ---
 
-### Step 5 — Language Layer
+### Next Steps — Flexible Direction
 
-Agents gain the ability to communicate:
+In the following stages, the project may expand in multiple directions depending on experimental results, constraints, and emerging ideas.
 
-* Communication via **strings**
-* Rewards for successful communication
+This includes the introduction of communication between agents, where interaction may evolve from simple signals into structured language. The system may incorporate neural architectures such as Transformer-based models, allowing agents to develop their own communication protocols.
 
-Key idea:
+Further development may move toward biologically inspired systems, including genome-based representations, evolutionary pressure, reproduction mechanisms, and more advanced selection dynamics.
 
-> First create a situation where agents **need language**, then introduce it.
+There is also interest in exploring more realistic forms of computation, such as lightweight spiking neural networks, aiming to approximate biologically plausible behavior without unnecessary complexity.
 
-Plan:
-
-* Implement a **Transformer-based model**
-* Let agents **invent their own language from scratch**
-
----
-
-### Step 6 — Biological Foundation
-
-Introduce more realistic evolution:
-
-1. **Agent Genome**
-
-   * Encodes strategies or parameters
-   * Examples:
-
-     * neural network weights
-     * reward preferences
-     * behavioral biases
-
-2. **Reproduction Mechanisms**
-
-   * Selection
-   * Mutation
-   * Optional crossover
-
-3. **Environment Pressure**
-
-   * Defines fitness function (what it means to survive)
-
-4. **Evolutionary Algorithms**
-
----
-
-### Step 7 — Spiking Neural Systems
-
-* Implement a **lightweight spiking neural network library (Python)**
-* Explore biologically plausible computation
-* Keep implementation simple (no overengineering)
+The exact order, depth, and priority of these directions are intentionally left undefined and may change over time as the project evolves.
 
 ---
 
