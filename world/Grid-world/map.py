@@ -64,8 +64,8 @@ class Map:
             print(" ".join(map(str, row)))
 
 
-if __name__ == "__main__":
-    m = Map(size=8)
-    print("Generated map:")
-    m.print_map()
+# if __name__ == "__main__":
+#     m = Map(size=8)
+#     print("Generated map:")
+#     m.print_map()
 
