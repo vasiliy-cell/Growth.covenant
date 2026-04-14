@@ -14,7 +14,7 @@ def get_available_movements(position, world_size):
     x, y = position
 
     available = []
-
+    
     for move_id, (dx, dy) in MOVEMENTS.items():
         new_x = x + dx
         new_y = y + dy

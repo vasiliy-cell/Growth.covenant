@@ -1,6 +1,4 @@
-
 from Agent.Actions.movement.available_movements import MOVEMENTS
-
 
 def apply_movement(position, movement_id):
     dx, dy = MOVEMENTS[movement_id]

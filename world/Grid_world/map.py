@@ -1,8 +1,7 @@
 import numpy as np
 import random
 
-from objects import OBJECTS
-
+from world.Grid_world.objects import OBJECTS
 
 class Map:
     def __init__(self, size=8, empty_ratio=0.8):
