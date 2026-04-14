@@ -12,7 +12,6 @@ def main():
 
     logger = Logger()
 
-    print("=== START ===")
     world.print()
 
     for step in range(10):
@@ -23,9 +22,7 @@ def main():
         agent.move(action)
 
         position = agent.get_position()
-
-        # пока reward можно заглушкой (позже world reward)
-        reward = 0
+        reward = world.get_reward(position)
 
         logger.log_step(
             step=step,
@@ -38,6 +35,7 @@ def main():
         print(f"step {step}: pos={position}, action={action}")
 
     logger.end_episode()
+
 
 
 if __name__ == "__main__":

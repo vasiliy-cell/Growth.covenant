@@ -9,7 +9,7 @@ class Logger:
         os.makedirs(self.log_dir, exist_ok=True)
 
         if episode_name is None:
-            episode_name = datetime.now().strftime("episode_%Y%m%d_%H%M%S")
+            episode_name = datetime.now().strftime("episode_%Y-%m-%d_%H-%M-%S")
 
         self.file_path = os.path.join(self.log_dir, f"{episode_name}.jsonl")
 

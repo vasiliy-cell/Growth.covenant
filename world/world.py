@@ -1,4 +1,5 @@
 from world.Grid_world.map import Map
+from world.Grid_world.reward_for_objects import REWARDS
 
 class World:
     def __init__(self, size=8):
@@ -11,6 +12,10 @@ class World:
     def get_cell(self, position):
         x, y = position
         return self.map.get_cell(x, y)
+
+    def get_reward(self, position):
+        cell = self.get_cell(position)
+        return REWARDS[cell]
 
     def print(self):
         if self.map:
