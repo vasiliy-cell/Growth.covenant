@@ -3,38 +3,51 @@ from Agent.agent import Agent
 from Brain.brain import Brain
 from utils.logger import Logger
 
-def main():
-    world = World(size=8)
-    world.generate()
 
-    agent = Agent(world)
+EPISODE_STEPS = 10
+
+
+def main():
+
+    episodes = int(input("Enter number of episodes: "))
+
+    world = World(size=8)
     brain = Brain()
 
-    logger = Logger()
 
-    world.print()
+    for episode in range(episodes):
 
-    for step in range(10):
+        world.generate()
+        agent = Agent(world)
 
-        observation = agent.get_state()
-        action = brain.choose_action(observation)
+        # ✔ ВАЖНО: уникальный логгер
+        logger = Logger()
 
-        agent.move(action)
+        total_reward = 0
 
-        position = agent.get_position()
-        reward = world.get_reward(position)
+        for step in range(EPISODE_STEPS):
 
-        logger.log_step(
-            step=step,
-            position=position,
-            action=action,
-            reward=reward,
-            available_actions=observation.available_actions
-        )
+            observation = agent.get_state()
+            action = brain.choose_action(observation)
 
-        print(f"step {step}: pos={position}, action={action}")
+            agent.move(action)
 
-    logger.end_episode()
+            position = agent.get_position()
+            reward = world.get_reward(position)
+
+            total_reward += reward
+
+            logger.log_step(
+                step=step,
+                position=position,
+                action=action,
+                reward=reward,
+                available_actions=observation.available_actions
+            )
+
+        logger.end_episode()
+
+        print(f"Episode {episode + 1}/{episodes} | total_reward={total_reward}")
 
 
 
