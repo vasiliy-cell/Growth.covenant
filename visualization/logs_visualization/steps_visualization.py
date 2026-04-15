@@ -9,7 +9,8 @@ LOG_DIR = "logs"
 
 def get_log_files():
     files = sorted(
-        [f for f in os.listdir(LOG_DIR) if f.endswith(".jsonl")]
+        [f for f in os.listdir(LOG_DIR) if f.endswith(".jsonl")],
+        key=lambda x: os.path.getmtime(os.path.join(LOG_DIR, x))
     )
     return files
 
@@ -76,7 +77,7 @@ def main():
 
     steps = load_steps(selected_files)
 
-    episodes = np.arange(len(steps))
+    episodes = np.arange(1, len(steps) + 1)
 
     plt.figure()
     plt.plot(episodes, steps, marker="o")

@@ -10,7 +10,8 @@ GRID_SIZE = 8
 
 def get_log_files():
     files = sorted(
-        [f for f in os.listdir(LOG_DIR) if f.endswith(".jsonl")]
+        [f for f in os.listdir(LOG_DIR) if f.endswith(".jsonl")],
+        key=lambda x: os.path.getmtime(os.path.join(LOG_DIR, x))
     )
     return files
 
