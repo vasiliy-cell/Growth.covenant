@@ -20,13 +20,13 @@ def load_positions():
                     if data["type"] == "step":
                         x, y = data["position"]
 
-                        #  защита от вложенных списков
                         if isinstance(x, list):
                             x, y = x
 
                         x = int(x)
                         y = int(y)
 
+                        # 🧠 НИКАКИХ flip — сразу экранная система
                         grid[x][y] += 1
 
     return grid
@@ -35,16 +35,10 @@ def load_positions():
 def main():
     heatmap = load_positions()
 
-    # приводим к системе:
-    # (0,0) = верхний левый
-    heatmap = np.flipud(heatmap)
-
-    # чуть выше окно, но не раздуваем
     fig, ax = plt.subplots(figsize=(6, 7))
 
-    im = ax.imshow(heatmap)
+    im = ax.imshow(heatmap)  # без flip, чистая логика
 
-    #  X сверху (как ты хотел)
     ax.xaxis.tick_top()
     ax.xaxis.set_label_position('top')
 
@@ -58,8 +52,7 @@ def main():
 
     fig.colorbar(im)
 
-    plt.tight_layout()  #  чтобы ничего не резалось
-
+    plt.tight_layout()
     plt.show()
 
 

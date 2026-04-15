@@ -17,8 +17,10 @@ def load_actions():
                     data = json.loads(line)
 
                     if data["type"] == "step":
-                        action = str(data["action"])
-                        counter[action] += 1
+                        action = data["action"]
+
+                        # 🧠 приводим к строке безопасно
+                        counter[str(action)] += 1
 
     return counter
 
@@ -26,7 +28,11 @@ def load_actions():
 def main():
     counter = load_actions()
 
-    actions = sorted(counter.keys())
+    if not counter:
+        print("❌ No actions found in logs")
+        return
+
+    actions = list(counter.keys())   # 👈 НЕ ломаем порядок
     counts = [counter[a] for a in actions]
 
     plt.figure()
@@ -37,6 +43,7 @@ def main():
     plt.ylabel("Count")
 
     plt.grid(axis="y")
+
     plt.show()
 
 
