@@ -693,3 +693,51 @@
 03:35:55 | DEBUG | [Episode 11 | Step 9] State=Observation(position=(4, 0), available_actions=[1, 2, 3, 6, 7]) | Action=3
 03:35:55 | INFO | [Ep 11 | Step 9] Position=(5, 0)
 03:35:56 | INFO | === Episode 11 finished ===
+03:37:39 | INFO | Simulation started
+03:37:39 | INFO | === Episode 1 started ===
+03:37:39 | DEBUG | [Episode 1 | Step 0] State=Observation(position=(1, 1), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=1
+03:37:39 | INFO | [Ep 1 | Step 0] Position=(1, 2)
+03:37:39 | DEBUG | [Episode 1 | Step 1] State=Observation(position=(1, 2), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=7
+03:37:39 | INFO | [Ep 1 | Step 1] Position=(2, 3)
+03:37:39 | DEBUG | [Episode 1 | Step 2] State=Observation(position=(2, 3), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=4
+03:37:39 | INFO | [Ep 1 | Step 2] Position=(1, 2)
+03:37:40 | DEBUG | [Episode 1 | Step 3] State=Observation(position=(1, 2), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=2
+03:37:40 | INFO | [Ep 1 | Step 3] Position=(0, 2)
+03:37:40 | DEBUG | [Episode 1 | Step 4] State=Observation(position=(0, 2), available_actions=[0, 1, 3, 5, 7]) | Action=7
+03:37:40 | INFO | [Ep 1 | Step 4] Position=(1, 3)
+03:37:40 | DEBUG | [Episode 1 | Step 5] State=Observation(position=(1, 3), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=6
+03:37:40 | INFO | [Ep 1 | Step 5] Position=(0, 4)
+03:37:40 | DEBUG | [Episode 1 | Step 6] State=Observation(position=(0, 4), available_actions=[0, 1, 3, 5, 7]) | Action=7
+03:37:40 | INFO | [Ep 1 | Step 6] Position=(1, 5)
+03:37:41 | DEBUG | [Episode 1 | Step 7] State=Observation(position=(1, 5), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=2
+03:37:41 | INFO | [Ep 1 | Step 7] Position=(0, 5)
+03:37:41 | DEBUG | [Episode 1 | Step 8] State=Observation(position=(0, 5), available_actions=[0, 1, 3, 5, 7]) | Action=7
+03:37:41 | INFO | [Ep 1 | Step 8] Position=(1, 6)
+03:37:41 | DEBUG | [Episode 1 | Step 9] State=Observation(position=(1, 6), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=0
+03:37:41 | INFO | [Ep 1 | Step 9] Position=(1, 5)
+03:37:42 | INFO | === Episode 1 finished ===
+03:37:44 | INFO | Simulation finished
+03:39:00 | INFO | Simulation started
+03:39:00 | INFO | === Episode 1 started ===
+03:39:00 | DEBUG | [Episode 1 | Step 0] State=Observation(position=(1, 1), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=7
+03:39:00 | INFO | [Ep 1 | Step 0] Position=(2, 2)
+03:39:01 | DEBUG | [Episode 1 | Step 1] State=Observation(position=(2, 2), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=7
+03:39:01 | INFO | [Ep 1 | Step 1] Position=(3, 3)
+03:39:01 | DEBUG | [Episode 1 | Step 2] State=Observation(position=(3, 3), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=3
+03:39:01 | INFO | [Ep 1 | Step 2] Position=(4, 3)
+03:39:01 | DEBUG | [Episode 1 | Step 3] State=Observation(position=(4, 3), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=7
+03:39:01 | INFO | [Ep 1 | Step 3] Position=(5, 4)
+03:39:02 | DEBUG | [Episode 1 | Step 4] State=Observation(position=(5, 4), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=1
+03:39:02 | INFO | [Ep 1 | Step 4] Position=(5, 5)
+03:39:02 | DEBUG | [Episode 1 | Step 5] State=Observation(position=(5, 5), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=6
+03:39:02 | INFO | [Ep 1 | Step 5] Position=(4, 6)
+03:39:02 | DEBUG | [Episode 1 | Step 6] State=Observation(position=(4, 6), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=6
+03:39:02 | INFO | [Ep 1 | Step 6] Position=(3, 7)
+03:39:03 | DEBUG | [Episode 1 | Step 7] State=Observation(position=(3, 7), available_actions=[0, 2, 3, 4, 5]) | Action=4
+03:39:03 | INFO | [Ep 1 | Step 7] Position=(2, 6)
+03:39:03 | DEBUG | [Episode 1 | Step 8] State=Observation(position=(2, 6), available_actions=[0, 1, 2, 3, 4, 5, 6, 7]) | Action=1
+03:39:03 | INFO | [Ep 1 | Step 8] Position=(2, 7)
+03:39:03 | DEBUG | [Episode 1 | Step 9] State=Observation(position=(2, 7), available_actions=[0, 2, 3, 4, 5]) | Action=3
+03:39:03 | INFO | [Ep 1 | Step 9] Position=(3, 7)
+03:39:03 | INFO | === Episode 1 finished ===
+03:39:04 | INFO | Simulation finished
