@@ -19,7 +19,7 @@ def load_actions():
                     if data["type"] == "step":
                         action = data["action"]
 
-                        # 🧠 приводим к строке безопасно
+                        #  приводим к строке безопасно
                         counter[str(action)] += 1
 
     return counter
@@ -29,10 +29,10 @@ def main():
     counter = load_actions()
 
     if not counter:
-        print("❌ No actions found in logs")
+        print("No actions found in logs")
         return
 
-    actions = list(counter.keys())   # 👈 НЕ ломаем порядок
+    actions = list(counter.keys())   #  ломаем порядок
     counts = [counter[a] for a in actions]
 
     plt.figure()
