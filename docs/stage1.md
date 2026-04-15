@@ -1,5 +1,5 @@
 
-
+![Alt-текст](./pictures/grid_world.png)
 
 ### Stage 1 — Foundation (Environment + Learning Core)
 
