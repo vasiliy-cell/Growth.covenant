@@ -13,3 +13,4 @@ htmlcov/
 .cache/
 
 logs/
+simulation.log
