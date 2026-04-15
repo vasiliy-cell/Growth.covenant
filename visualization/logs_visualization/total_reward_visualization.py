@@ -7,28 +7,74 @@ import numpy as np
 LOG_DIR = "logs"
 
 
-def load_rewards():
+def get_log_files():
+    files = sorted(
+        [f for f in os.listdir(LOG_DIR) if f.endswith(".jsonl")]
+    )
+    return files
+
+
+def choose_files():
+    files = get_log_files()
+
+    if not files:
+        print("No log files found")
+        return []
+
+    print("\nSelect mode:")
+    print("1 - All logs")
+    print("2 - Last log only")
+    print("3 - Last N logs")
+
+    choice = input("Enter choice: ").strip()
+
+    if choice == "1":
+        return files
+
+    elif choice == "2":
+        return [files[-1]]
+
+    elif choice == "3":
+        try:
+            n = int(input("Enter number of last logs: "))
+            return files[-n:]
+        except:
+            print("Invalid input")
+            return []
+
+    else:
+        print("Unknown choice")
+        return []
+
+
+def load_rewards(selected_files):
     rewards = []
 
-    files = sorted(os.listdir(LOG_DIR))
+    for file in selected_files:
+        total_reward = 0
 
-    for file in files:
-        if file.endswith(".jsonl"):
-            total_reward = 0
+        with open(os.path.join(LOG_DIR, file)) as f:
+            for line in f:
+                data = json.loads(line)
+                if data["type"] == "step":
+                    total_reward += data["reward"]
 
-            with open(os.path.join(LOG_DIR, file)) as f:
-                for line in f:
-                    data = json.loads(line)
-                    if data["type"] == "step":
-                        total_reward += data["reward"]
-
-            rewards.append(total_reward)
+        rewards.append(total_reward)
 
     return rewards
 
 
 def main():
-    rewards = load_rewards()
+    selected_files = choose_files()
+
+    if not selected_files:
+        return
+
+    print(f"\nUsing {len(selected_files)} log file(s):")
+    for f in selected_files:
+        print(f" - {f}")
+
+    rewards = load_rewards(selected_files)
 
     episodes = np.arange(len(rewards))
 
@@ -39,7 +85,7 @@ def main():
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
 
-    plt.xticks(episodes)  
+    plt.xticks(episodes)
 
     plt.grid()
     plt.show()
