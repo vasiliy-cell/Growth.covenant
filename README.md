@@ -30,80 +30,28 @@ Instead of starting with a powerful neural network, the system evolves through s
 
 ---
 
-##  Stage 1 — Foundation (Grid World + Q-Table)
+### Stage 1 — Foundation (Environment + Learning Core)
 
-At the first stage, the project implements a classic **grid-world environment**.
+The goal of this stage is to build a reliable environment where learning actually works.
 
-### World Generation
+Before introducing a real AI, I need to be sure that:
 
-* The map is procedurally generated
-* It consists of **64 cells**
-* Each cell contains a number
-* Numbers are mapped to objects:
+- the world makes sense
+- rewards are meaningful
+- and the system naturally pushes the agent to learn
 
-  ```
-  number → object
-  ```
+Otherwise, it becomes impossible to tell whether problems come from the model or the environment.
 
-* **80% of the map is empty space**
+At this stage, I build:
 
-* There is a **guarantee that all object types are spawned at least once**
+- a simple grid-world with basic interactions (reward, danger, empty space)
+- a reward and logging system
+- a minimal agent (movement, state, observations)
+- a basic learning core: Q-table + policy
 
-This ensures both randomness and coverage of all possible interactions.
+This is not the final intelligence, but a **temporary learning mechanism** used to validate the system.
 
----
-
-###  Agent Structure
-
-Each agent consists of:
-
-* **Body**
-* **State**
-* **List of available actions**
-
-There is also a **global action space**, but:
-
-> The agent cannot always perform all actions (e.g. movement depends on position)
-
----
-
-###  Brain Architecture
-
-The agent’s “brain” is divided into two main components:
-
-#### 1. Q-Table (temporary component)
-
-* Takes the **current state**
-* Returns a score for each possible action:
-
-  ```
-  Q(state, action) → value
-  ```
-
-* Represents how “good” an action is
-* Updated using a learning formula during training
-
----
-
-#### 2. Policy (long-term component)
-
-The policy decides **which action to take**, based on Q-values.
-
-* Default behavior: choose the best action
-* Sometimes uses **ε-greedy strategy**:
-
-  * explore (random action)
-  * exploit (best known action)
-
----
-
-###  Learning Features
-
-* **Curiosity-driven learning** (planned)
-* Reward system (basic at this stage)
-* Exploration vs exploitation balance
-
----
+If learning doesn’t emerge here, the issue is in the environment, not the “brain”.
 
 ##  Roadmap
 
