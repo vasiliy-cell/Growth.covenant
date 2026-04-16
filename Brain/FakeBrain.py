@@ -1,12 +1,9 @@
 import random
 
-# Brain/FakeBrain.py
 class FakeBrain:
-    def choose_action(self, observation):
-        # Достаем список действий из атрибута объекта Observation
-        actions = observation.available_actions
-        
-        if not actions:
+    def choose_action(self, state, available_actions):
+
+        if not available_actions:
             raise ValueError("No available actions")
 
-        return random.choice(actions)
+        return random.choice(available_actions)

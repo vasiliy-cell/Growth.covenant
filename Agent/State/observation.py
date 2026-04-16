@@ -1,17 +1,7 @@
-
 class Observation:
-    def __init__(self, position, available_actions):
+    def __init__(self, position, local_view):
         self.position = position
-        self.available_actions = available_actions
-
-    def to_dict(self):
-        return {
-            "position": self.position,
-            "available_actions": self.available_actions
-        }
+        self.local_view = local_view
 
     def __repr__(self):
-        return (
-            f"Observation(position={self.position}, "
-            f"available_actions={self.available_actions})"
-        )
+        return f"Observation(position={self.position})"
