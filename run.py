@@ -1,56 +1,43 @@
-from world.world import World
-from Agent.agent import Agent
+from environment.env import GridWorldEnv
 from Brain.brain import Brain
 from utils.logger import Logger
-
-
-EPISODE_STEPS = 10
 
 
 def main():
 
     episodes = int(input("Enter number of episodes: "))
 
-    world = World(size=8)
+    env = GridWorldEnv(size=8, max_steps=10)
     brain = Brain()
-
-    print("\n=== SIMULATION START ===\n")
 
     for episode in range(episodes):
 
-        world.generate()
-        agent = Agent(world)
+        observation = env.reset()
         logger = Logger()
 
         total_reward = 0
+        done = False
+        step = 0
 
-        for step in range(EPISODE_STEPS):
+        while not done:
 
-            # perception
-            observation = agent.get_state()
+            available_actions = env.agent.get_available_actions()
 
-            # action space
-            available_actions = agent.get_available_actions()
-
-            # decision
             action = brain.choose_action(observation, available_actions)
 
-            # environment step
-            agent.move(action)
-
-            position = agent.get_position()
-            reward = world.get_reward(position)
+            observation, reward, done, info = env.step(action)
 
             total_reward += reward
 
-            # logging
             logger.log_step(
                 step=step,
-                position=position,
+                position=info["position"],
                 action=action,
                 reward=reward,
-                available_actions=available_actions
+                available_actions=info["available_actions"]
             )
+
+            step += 1
 
         logger.end_episode()
 
