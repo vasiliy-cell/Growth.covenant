@@ -1,13 +1,16 @@
 from world.Grid_world.map import Map
 from world.Grid_world.reward_for_objects import REWARDS
 
+
 class World:
     def __init__(self, size=8):
         self.size = size
         self.map = None
 
-    def generate(self):
-        self.map = Map(size=self.size)
+    # --- generate world using provided RNG ---
+    def generate(self, rng):
+        # World is responsible for creating its map
+        self.map = Map(size=self.size, rng=rng)
 
     def get_cell(self, position):
         x, y = position

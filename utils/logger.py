@@ -14,11 +14,19 @@ class Logger:
 
         self.file = open(self.file_path, "w", encoding="utf-8")
 
-        # episode stats
         self.total_reward = 0
         self.steps = 0
 
-    # --- лог одного шага ---
+    # --- лог seed ---
+    def log_seed(self, seed, episode_seed):
+        data = {
+            "type": "seed_info",
+            "global_seed": seed,
+            "episode_seed": episode_seed
+        }
+        self.file.write(json.dumps(data) + "\n")
+
+    # --- лог шага ---
     def log_step(self, step, position, action, reward, available_actions=None):
         self.total_reward += reward
         self.steps += 1
