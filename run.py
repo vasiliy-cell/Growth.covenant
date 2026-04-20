@@ -58,8 +58,9 @@ def main():
         while not done:
 
             available_actions = env.agent.get_available_actions()
+            state = observation
 
-            action = brain.choose_action(observation, available_actions)
+            action = brain.choose_action(state, available_actions)
 
             observation, reward, done, info = env.step(action)
 
