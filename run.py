@@ -1,7 +1,10 @@
 from environment.env import GridWorldEnv
-from Brain.brain import Brain
 from utils.logger import Logger
 
+from Brain.brain import Brain
+from Brain.q_table.q_function import QFunction
+
+import yaml
 import random
 import time
 
@@ -35,15 +38,24 @@ def main():
 
     print(f"Using SEED: {seed}")
 
-    # --- main RNG ---
+    # --- RNG ---
     master_rng = random.Random(seed)
 
+    # --- ENV ---
     env = GridWorldEnv(size=8, max_steps=10, rng=master_rng)
-    brain = Brain()
 
+    # --- LOAD CONFIG ---
+    with open("Brain/config.yml", "r") as f:
+        config = yaml.safe_load(f)
+
+    # --- INIT Q SYSTEM ---
+    q_function = QFunction(config)
+    brain = Brain(q_function)
+
+
+    #        TRAIN LOOP
     for episode in range(episodes):
 
-        #  разные сиды на эпизоды
         episode_seed = master_rng.randint(0, 1_000_000)
 
         observation = env.reset(seed=episode_seed)
@@ -57,15 +69,28 @@ def main():
 
         while not done:
 
-            available_actions = env.agent.get_available_actions()
             state = observation
+            available_actions = env.agent.get_available_actions()
 
+            # --- choose action ---
             action = brain.choose_action(state, available_actions)
 
-            observation, reward, done, info = env.step(action)
+            # --- step env ---
+            next_observation, reward, done, info = env.step(action)
 
+            # --- LEARNING ---
+            brain.learn(
+                state=state,
+                action=action,
+                reward=reward,
+                next_state=next_observation,
+                done=done
+            )
+
+            observation = next_observation
             total_reward += reward
 
+            # --- logging ---
             logger.log_step(
                 step=step,
                 position=info["position"],
@@ -79,6 +104,11 @@ def main():
         logger.end_episode()
 
         print(f"Episode {episode + 1}/{episodes} | total_reward={total_reward}")
+
+    # --- SAVE MODEL ---
+    q_function.save()
+
+    print("\nTraining finished. Q-table saved.")
 
 
 if __name__ == "__main__":
