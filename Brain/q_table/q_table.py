@@ -4,6 +4,10 @@ import numpy as np
 
 class QTable:
     def __init__(self, action_size=8, checkpoint_path="Brain/models/qtable_checkpoint.npy"):
+
+        if isinstance(action_size, dict):
+            action_size = action_size.get("action_size", 8)
+
         self.action_size = action_size
         self.checkpoint_path = checkpoint_path
 

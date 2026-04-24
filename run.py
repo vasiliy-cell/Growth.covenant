@@ -42,7 +42,7 @@ def main():
     master_rng = random.Random(seed)
 
     # --- ENV ---
-    env = GridWorldEnv(size=8, max_steps=10, rng=master_rng)
+    env = GridWorldEnv(size=8, max_steps=20, rng=master_rng)
 
     # --- LOAD CONFIG ---
     with open("Brain/config.yml", "r") as f:

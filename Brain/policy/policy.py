@@ -1,25 +1,32 @@
 from Brain.policy.argmax import argmax
+from Brain.policy.epsilon_greedy import epsilon_greedy
 
 
 class Policy:
-    def __init__(self, mode="argmax"):
+    def __init__(self, config):
         """
-        mode:
-            - "argmax" (default)
-            - later: "epsilon_greedy", etc.
+        Policy is a strategy dispatcher.
+        It does NOT contain magic numbers.
+        Everything comes from config.
         """
-        self.mode = mode
+
+        self.mode = config["policy"]
+        self.epsilon = config["epsilon"]
 
     def select_action(self, q_values, available_actions):
         """
-        q_values: array of Q-values for current state
-        available_actions: allowed actions
-
-        returns: action
+        Delegates action selection to specific strategy
         """
 
         if self.mode == "argmax":
             return argmax(q_values, available_actions)
+
+        elif self.mode == "epsilon_greedy":
+            return epsilon_greedy(
+                q_values=q_values,
+                available_actions=available_actions,
+                epsilon=self.epsilon
+            )
 
         else:
             raise ValueError(f"Unknown policy mode: {self.mode}")

@@ -6,18 +6,29 @@ from Brain.q_table.q_table_rewriter import QTableRewriter
 class QFunction:
     def __init__(self, config):
 
+        # -----------------------------
+        # QTABLE (FIX: pass full config safely)
+        # -----------------------------
         self.q_table = QTable(
-            action_size=config.get("action_size", 8)
+            action_size=config.get("action_size", 8),
+            checkpoint_path=config.get(
+                "checkpoint_path",
+                "Brain/models/qtable_checkpoint.npy"
+            )
         )
 
+        # -----------------------------
+        # REWRITER
+        # -----------------------------
         self.rewriter = QTableRewriter(
             self.q_table,
             config
         )
 
-        self.policy = Policy(
-            mode=config.get("policy", "argmax")
-        )
+        # -----------------------------
+        # POLICY
+        # -----------------------------
+        self.policy = Policy(config)
 
     # -----------------------------
     # ACTION SELECTION
@@ -25,15 +36,12 @@ class QFunction:
     def select_action(self, state, available_actions):
 
         state_key = state.to_key()
-
         q_values = self.q_table.get_row(state_key)
 
-        action = self.policy.select_action(
+        return self.policy.select_action(
             q_values,
             available_actions
         )
-
-        return action
 
     # -----------------------------
     # LEARNING
