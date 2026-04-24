@@ -4,4 +4,4 @@ gamma: 0.99
 
 
 policy: epsilon_greedy
-epsilon: 1
+epsilon: 0.1

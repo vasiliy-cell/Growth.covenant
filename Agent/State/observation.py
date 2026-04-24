@@ -8,3 +8,11 @@ class Observation:
             self.position,
             tuple(tuple(row) for row in self.local_view)
         )
+
+    def __repr__(self):
+        return (
+            f"Observation("
+            f"pos={self.position}, "
+            f"local_shape={len(self.local_view)}x{len(self.local_view[0])}"
+            f")"
+        )

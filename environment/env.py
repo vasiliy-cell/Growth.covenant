@@ -53,7 +53,6 @@ class GridWorldEnv:
             "position": position,
             "available_actions": self.agent.get_available_actions()
         }
-
         return observation, reward, done, info
 
     # --- action space ---

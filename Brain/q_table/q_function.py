@@ -37,7 +37,6 @@ class QFunction:
 
         state_key = state.to_key()
         q_values = self.q_table.get_row(state_key)
-
         return self.policy.select_action(
             q_values,
             available_actions

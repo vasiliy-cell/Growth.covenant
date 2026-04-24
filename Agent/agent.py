@@ -53,7 +53,6 @@ class Agent:
             pos,
             size=7
         )
-
         return Observation(pos, local)
 
     # -----------------------------
