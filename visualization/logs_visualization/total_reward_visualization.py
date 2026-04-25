@@ -26,6 +26,7 @@ def choose_files():
     print("1 - All logs")
     print("2 - Last log only")
     print("3 - Last N logs")
+    print("4 - First N logs")
 
     choice = input("Enter choice: ").strip()
 
@@ -39,6 +40,14 @@ def choose_files():
         try:
             n = int(input("Enter number of last logs: "))
             return files[-n:]
+        except:
+            print("Invalid input")
+            return []
+
+    elif choice == "4":
+        try:
+            n = int(input("Enter number of first logs: "))
+            return files[:n]
         except:
             print("Invalid input")
             return []
@@ -79,6 +88,8 @@ def main():
 
     episodes = np.arange(len(rewards))
 
+    avg_reward = np.mean(rewards) if rewards else 0
+
     plt.figure()
     plt.plot(episodes, rewards, marker="o")
 
@@ -87,6 +98,15 @@ def main():
     plt.ylabel("Total Reward")
 
     plt.xticks(episodes)
+
+    # average reward text
+    plt.text(
+        0.02,
+        0.95,
+        f"Avg Reward: {avg_reward:.2f}",
+        transform=plt.gca().transAxes,
+        verticalalignment='top'
+    )
 
     plt.grid()
     plt.show()
