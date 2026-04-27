@@ -4,11 +4,16 @@ from utils.logger import Logger
 from Brain.brain import Brain
 from Brain.q_table.q_function import QFunction
 
+from visualization.renderer import Renderer
+
 import yaml
 import random
 import time
 
 
+# -----------------------------
+# SEED UTILS
+# -----------------------------
 def make_seed():
     return int(time.time() * 1e6)
 
@@ -26,11 +31,14 @@ def choose_seed():
         return make_seed()
 
 
+# -----------------------------
+# MAIN LOOP
+# -----------------------------
 def main():
 
     episodes = int(input("Enter number of episodes: "))
 
-    # --- choose seed ---
+    # --- seed ---
     if episodes == 1:
         seed = choose_seed()
     else:
@@ -38,22 +46,25 @@ def main():
 
     print(f"Using SEED: {seed}")
 
-    # --- RNG ---
     master_rng = random.Random(seed)
 
     # --- ENV ---
     env = GridWorldEnv(size=8, max_steps=20, rng=master_rng)
 
-    # --- LOAD CONFIG ---
-    with open("Brain/config.yml", "r") as f:
+    # --- CONFIG ---
+    with open("src/Brain/config.yml", "r") as f:
         config = yaml.safe_load(f)
 
-    # --- INIT Q SYSTEM ---
+    # --- BRAIN ---
     q_function = QFunction(config)
     brain = Brain(q_function)
 
+    # --- RENDERER ---
+    renderer = Renderer()
 
-    #        TRAIN LOOP
+    # =============================
+    # TRAIN LOOP
+    # =============================
     for episode in range(episodes):
 
         episode_seed = master_rng.randint(0, 1_000_000)
@@ -67,18 +78,20 @@ def main():
         done = False
         step = 0
 
+        print(f"\n=== Episode {episode + 1} ===")
+
         while not done:
 
             state = observation
-            available_actions = env.agent.get_available_actions()
+            available_actions = env.get_action_space()
 
             # --- choose action ---
             action = brain.choose_action(state, available_actions)
 
-            # --- step env ---
+            # --- environment step ---
             next_observation, reward, done, info = env.step(action)
 
-            # --- LEARNING ---
+            # --- learning ---
             brain.learn(
                 state=state,
                 action=action,
@@ -99,11 +112,16 @@ def main():
                 available_actions=info["available_actions"]
             )
 
+            # --- VISUALIZATION ---
+            renderer.render(env.world.map.grid, info["position"])
+
             step += 1
 
         logger.end_episode()
 
-        print(f"Episode {episode + 1}/{episodes} | total_reward={total_reward}")
+        print(f"Episode {episode + 1} | total_reward={total_reward}")
+
+    renderer.close()
 
     # --- SAVE MODEL ---
     q_function.save()
@@ -113,5 +131,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
