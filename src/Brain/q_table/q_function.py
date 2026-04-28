@@ -13,7 +13,7 @@ class QFunction:
             action_size=config.get("action_size", 8),
             checkpoint_path=config.get(
                 "checkpoint_path",
-                "Brain/models/qtable_checkpoint.npy"
+                "models/qtable_checkpoint.npy"
             )
         )
 
