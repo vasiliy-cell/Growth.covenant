@@ -26,9 +26,29 @@ class Logger:
         }
         self.file.write(json.dumps(data) + "\n")
 
-    # --- лог шага ---
-    def log_step(self, step, position, action, reward, available_actions=None):
-        self.total_reward += reward
+        # --- лог шага ---
+    def log_step(
+        self,
+        step,
+        position,
+        action,
+        reward,
+        shaped_reward=None,
+        intrinsic_reward=None,
+        available_actions=None
+    ):
+        """
+        Logs a single step.
+
+        reward: environment reward
+        shaped_reward: total reward after shaping (optional)
+        intrinsic_reward: curiosity reward (optional)
+        """
+
+        # choose what to accumulate as total reward
+        used_reward = shaped_reward if shaped_reward is not None else reward
+
+        self.total_reward += used_reward
         self.steps += 1
 
         data = {
@@ -39,6 +59,13 @@ class Logger:
             "reward": reward,
             "available_actions": available_actions
         }
+
+        # optional fields (only if provided)
+        if shaped_reward is not None:
+            data["shaped_reward"] = shaped_reward
+
+        if intrinsic_reward is not None:
+            data["intrinsic_reward"] = intrinsic_reward
 
         self.file.write(json.dumps(data) + "\n")
 

@@ -4,6 +4,9 @@ from utils.logger import Logger
 from Brain.brain import Brain
 from Brain.q_table.q_function import QFunction
 
+from Brain.reward_shaping.reward_shaping import RewardShaping
+from Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
+
 import yaml
 import random
 import time
@@ -52,6 +55,12 @@ def main():
     q_function = QFunction(config)
     brain = Brain(q_function)
 
+    # --- INIT CURIOSITY ---
+    curiosity = None
+    if "curiosity" in config:
+        curiosity = Curiosity(config["curiosity"])
+
+    reward_shaping = RewardShaping(curiosity=curiosity)
 
     #        TRAIN LOOP
     for episode in range(episodes):
@@ -67,6 +76,9 @@ def main():
         done = False
         step = 0
 
+        # reset intrinsic modules (important!)
+        reward_shaping.reset()
+
         while not done:
 
             state = observation
@@ -76,26 +88,34 @@ def main():
             action = brain.choose_action(state, available_actions)
 
             # --- step env ---
-            next_observation, reward, done, info = env.step(action)
+            next_observation, env_reward, done, info = env.step(action)
 
-            # --- LEARNING ---
+            # --- REWARD SHAPING ---
+            shaped_reward, intrinsic_reward = reward_shaping.compute(
+                next_observation,
+                env_reward
+            )
+
+            # --- LEARNING (uses shaped reward) ---
             brain.learn(
                 state=state,
                 action=action,
-                reward=reward,
+                reward=shaped_reward,
                 next_state=next_observation,
                 done=done
             )
 
             observation = next_observation
-            total_reward += reward
+            total_reward += shaped_reward
 
             # --- logging ---
             logger.log_step(
                 step=step,
                 position=info["position"],
                 action=action,
-                reward=reward,
+                reward=env_reward,
+                shaped_reward=shaped_reward,
+                intrinsic_reward=intrinsic_reward,
                 available_actions=info["available_actions"]
             )
 
@@ -113,5 +133,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

@@ -1,7 +1,8 @@
-
 learning_rate: 0.1
 gamma: 0.99
 
-
 policy: epsilon_greedy
 epsilon: 0.1
+
+curiosity:
+  beta: 1.0
