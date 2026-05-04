@@ -77,7 +77,7 @@ def main():
         step = 0
 
         # reset intrinsic modules (important!)
-        reward_shaping.reset()
+        # reward_shaping.reset()
 
         while not done:
 

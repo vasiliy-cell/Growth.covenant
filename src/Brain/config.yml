@@ -5,4 +5,5 @@ policy: epsilon_greedy
 epsilon: 0.1
 
 curiosity:
-  beta: 1.0
+  beta: 4.0
+  decay: 0.995

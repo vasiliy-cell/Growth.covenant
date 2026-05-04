@@ -5,33 +5,53 @@ from collections import defaultdict
 class Curiosity:
     def __init__(self, config: dict):
         """
-        config: curiosity config section
+        config:
+            beta  - initial curiosity strength
+            decay - decay per episode (optional)
         """
-        self.beta = config["beta"]  
+        self.beta_start = config["beta"]
+        self.beta = self.beta_start
 
+        self.decay = config.get("decay", 1.0)
+
+        # state visit counter
         self.visit_counts = defaultdict(int)
 
+    # -----------------------------
+    # STATE → KEY
+    # -----------------------------
     def _state_to_key(self, state):
         """
-        Преобразует состояние в хешируемый ключ.
-        ВАЖНО: зависит от того, что у тебя state (position / observation)
+        Convert state into a hashable key
+        Priority:
+        1. state.to_key()  (best, consistent with Q-table)
+        2. numpy array → tuple
+        3. fallback → string
         """
-        # если numpy массив (например observation)
+
+        # preferred way (your system already uses this)
+        if hasattr(state, "to_key"):
+            return state.to_key()
+
+        # numpy observation
         if isinstance(state, np.ndarray):
             return tuple(state.flatten())
 
         # fallback
         return str(state)
 
+    # -----------------------------
+    # STEP
+    # -----------------------------
     def step(self, state):
         """
-        Вызывается на каждом шаге.
-        Возвращает intrinsic reward.
+        Called each step.
+        Returns intrinsic reward.
         """
 
         key = self._state_to_key(state)
 
-        # увеличиваем счетчик
+        # increment visit count
         self.visit_counts[key] += 1
         N = self.visit_counts[key]
 
@@ -40,10 +60,16 @@ class Curiosity:
 
         return r_curiosity
 
+    # -----------------------------
+    # RESET (per episode)
+    # -----------------------------
     def reset(self):
         """
-        эпизодическая curiosity
+        Called at the start of each episode
         """
+
+        # clear episodic memory
         self.visit_counts.clear()
 
-
+        # apply decay once per episode
+        self.beta *= self.decay
