@@ -29,8 +29,7 @@ def choose_seed():
         return make_seed()
 
 
-def main():
-
+def main(render_fn=None): 
     episodes = int(input("Enter number of episodes: "))
 
     # --- choose seed ---
@@ -89,6 +88,10 @@ def main():
 
             # --- step env ---
             next_observation, env_reward, done, info = env.step(action)
+
+            #GYM-STYLE HOOK
+            if render_fn is not None:
+                render_fn(env, info)
 
             # --- REWARD SHAPING ---
             shaped_reward, intrinsic_reward = reward_shaping.compute(

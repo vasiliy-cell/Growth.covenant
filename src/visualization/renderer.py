@@ -36,7 +36,7 @@ class Renderer:
         self.ax.clear()
         self.ax.imshow(image)
 
-        # агент (фиолетовый)
+        # агент 
         ax_x, ax_y = agent_pos
         self.ax.scatter(ax_x, ax_y, c="#F5C542", s=100)
 
