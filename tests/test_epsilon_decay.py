@@ -1,5 +1,5 @@
 import random
-from Brain.policy.argmax import argmax
+from src.Brain.policy.argmax import argmax
 
 
 class EpsilonGreedy:
@@ -19,18 +19,6 @@ class EpsilonGreedy:
         if self.epsilon < self.epsilon_min:
             self.epsilon = self.epsilon_min
 
-    # -----------------------------
-    # called each episode
-    # -----------------------------
-    def next_episode(self):
-        self.episode += 1
-
-        self.epsilon = self.epsilon_start * (self.decay_rate ** self.episode)
-        self.epsilon = max(self.epsilon_min, self.epsilon)
-
-    # -----------------------------
-    # action selection
-    # -----------------------------
     def select_action(self, q_values, available_actions):
         if not available_actions:
             raise ValueError("No available actions")
