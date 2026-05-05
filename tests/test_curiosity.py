@@ -1,9 +1,5 @@
-import sys
-import os
+from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
-
-from Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 def test_new_state_has_high_reward():
     config = {"beta": 1.0}
     c = Curiosity(config)
