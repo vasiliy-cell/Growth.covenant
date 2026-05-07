@@ -1,8 +1,8 @@
-from Agent.State.position import Position
-from Agent.State.observation import Observation
+from src.Agent.State.position import Position
+from src.Agent.State.observation import Observation
 
-from Agent.Actions.movement.available_movements import get_available_movements
-from Agent.Actions.movement.movements import MOVEMENTS
+from src.Agent.Actions.movement.available_movements import get_available_movements
+from src.Agent.Actions.movement.movements import MOVEMENTS
 
 
 class Agent:
