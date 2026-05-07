@@ -5,28 +5,28 @@ import matplotlib.pyplot as plt
 import yaml
 
 # ---------------------------------------------------
-# FIX: add project root to Python path
+# PROJECT ROOT
 # ---------------------------------------------------
 PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../")
 )
 sys.path.append(PROJECT_ROOT)
 
-from Brain.q_table.q_function import QFunction
+from src.Brain.q_table.q_function import QFunction
 
 
 # ---------------------------------------------------
-# ACTIONS (same as environment)
+# ACTIONS
 # ---------------------------------------------------
 ACTIONS = {
-    0: (0, -1),   # up
-    1: (0, 1),    # down
-    2: (-1, 0),   # left
-    3: (1, 0),    # right
-    4: (-1, -1),  # up-left
-    5: (1, -1),   # up-right
-    6: (-1, 1),   # down-left
-    7: (1, 1),    # down-right
+    0: (0, -1),
+    1: (0, 1),
+    2: (-1, 0),
+    3: (1, 0),
+    4: (-1, -1),
+    5: (1, -1),
+    6: (-1, 1),
+    7: (1, 1),
 }
 
 
@@ -34,7 +34,8 @@ ACTIONS = {
 # VISUALIZATION
 # ---------------------------------------------------
 def visualize_q_values(q_table, grid_size=8):
-    plt.figure(figsize=(6, 6))
+
+    fig, ax = plt.subplots(figsize=(8, 8))
 
     states_drawn = 0
 
@@ -47,30 +48,45 @@ def visualize_q_values(q_table, grid_size=8):
             continue
 
         best_action = int(np.argmax(q_values))
-        dx, dy = ACTIONS[best_action]
-        best_q = q_values[best_action]
+        best_q = np.max(q_values)
 
-        plt.arrow(
-            x, y,
-            dx * 0.3,
-            dy * 0.3,
-            head_width=0.2,
-            head_length=0.2,
+        dx, dy = ACTIONS[best_action]
+
+        ax.arrow(
+            y,
+            x,
+            dy * 0.35,
+            dx * 0.35,
+            head_width=0.12,
+            head_length=0.12,
             fc="black",
             ec="black",
             length_includes_head=True
         )
 
+        ax.text(
+            y,
+            x,
+            f"{best_q:.1f}",
+            fontsize=7,
+            ha="center",
+            va="center"
+        )
+
         states_drawn += 1
 
-    plt.title(f"Q-Policy Visualization | states={states_drawn}")
-    plt.xlim(-0.5, grid_size - 0.5)
-    plt.ylim(-0.5, grid_size - 0.5)
-    plt.gca().invert_yaxis()
-    plt.grid(True)
+    ax.set_title(f"Q Policy | states={states_drawn}")
+
+    ax.set_xlim(-0.5, grid_size - 0.5)
+    ax.set_ylim(-0.5, grid_size - 0.5)
+
+    ax.set_xticks(range(grid_size))
+    ax.set_yticks(range(grid_size))
+
+    ax.invert_yaxis()
+    ax.grid(True)
 
     plt.show()
-
 
 # ---------------------------------------------------
 # ENTRY POINT
