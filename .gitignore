@@ -11,6 +11,6 @@ ENV/
 .coverage.*
 htmlcov/
 .cache/
-
+.pytest_cache
 logs/
 simulation.log

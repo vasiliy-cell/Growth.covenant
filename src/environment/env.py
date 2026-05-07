@@ -1,7 +1,7 @@
 import random
 
-from world.world import World
-from Agent.agent import Agent
+from src.world.world import World
+from src.Agent.agent import Agent
 
 
 class GridWorldEnv:

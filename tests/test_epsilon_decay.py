@@ -1,31 +1,19 @@
-import random
-from src.Brain.policy.argmax import argmax
+from src.Brain.policy.epsilon_greedy import EpsilonGreedy
 
 
-class EpsilonGreedy:
-    def __init__(self, config):
-        self.epsilon_start = config["epsilon"]
-        self.decay = config["epsilon_decay"]
-        self.epsilon_min = config.get("epsilon_min", 0.01)
+def test_epsilon_decay():
+    config = {
+        "epsilon": 1.0,
+        "epsilon_decay": 0.5,
+        "epsilon_min": 0.1
+    }
 
-        self.episode = 0
-        self.epsilon = self.epsilon_start
+    policy = EpsilonGreedy(config)
 
-    def next_episode(self):
-        self.episode += 1
+    assert policy.epsilon == 1.0
 
-        self.epsilon = self.epsilon_start * (self.decay ** self.episode)
+    policy.next_episode()
+    assert policy.epsilon == 0.5
 
-        if self.epsilon < self.epsilon_min:
-            self.epsilon = self.epsilon_min
-
-    def select_action(self, q_values, available_actions):
-        if not available_actions:
-            raise ValueError("No available actions")
-
-        # exploration
-        if random.random() < self.epsilon:
-            return random.choice(available_actions)
-
-        # exploitation
-        return argmax(q_values, available_actions)
+    policy.next_episode()
+    assert policy.epsilon == 0.25

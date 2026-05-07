@@ -1,5 +1,5 @@
-from Brain.policy.argmax import argmax
-from Brain.policy.epsilon_greedy import epsilon_greedy
+from src.Brain.policy.argmax import argmax
+from src.Brain.policy.epsilon_greedy import epsilon_greedy
 
 
 class Policy:

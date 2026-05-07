@@ -1,11 +1,11 @@
-from environment.env import GridWorldEnv
-from utils.logger import Logger
+from src.environment.env import GridWorldEnv
+from src.utils.logger import Logger
 
-from Brain.brain import Brain
-from Brain.q_table.q_function import QFunction
+from src.Brain.brain import Brain
+from src.Brain.q_table.q_function import QFunction
 
-from Brain.reward_shaping.reward_shaping import RewardShaping
-from Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
+from src.Brain.reward_shaping.reward_shaping import RewardShaping
+from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 
 import yaml
 import random

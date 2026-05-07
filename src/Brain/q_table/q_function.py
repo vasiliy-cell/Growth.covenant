@@ -1,6 +1,6 @@
-from Brain.policy.policy import Policy
-from Brain.q_table.q_table import QTable
-from Brain.q_table.q_table_rewriter import QTableRewriter
+from src.Brain.policy.policy import Policy
+from src.Brain.q_table.q_table import QTable
+from src.Brain.q_table.q_table_rewriter import QTableRewriter
 
 
 class QFunction:

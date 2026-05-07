@@ -1,5 +1,5 @@
-from world.Grid_world.map import Map
-from world.Grid_world.reward_for_objects import REWARDS
+from src.world.Grid_world.map import Map
+from src.world.Grid_world.reward_for_objects import REWARDS
 
 
 class World:
