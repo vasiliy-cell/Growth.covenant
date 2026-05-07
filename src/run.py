@@ -7,6 +7,8 @@ from src.Brain.q_table.q_function import QFunction
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 
+from src.utils.td_estimator import TDErrorLogger, TDTransition
+
 import yaml
 import random
 import time
@@ -54,6 +56,11 @@ def main(render_fn=None):
     q_function = QFunction(config)
     brain = Brain(q_function)
 
+    # --- INIT TD LOGGER (NEW) ---
+    td_logger = TDErrorLogger(
+        gamma=config["gamma"]
+    )
+
     # --- INIT CURIOSITY ---
     curiosity = None
     if "curiosity" in config:
@@ -89,7 +96,7 @@ def main(render_fn=None):
             # --- step env ---
             next_observation, env_reward, done, info = env.step(action)
 
-            #GYM-STYLE HOOK
+            # GYM-STYLE HOOK
             if render_fn is not None:
                 render_fn(env, info)
 
@@ -108,10 +115,24 @@ def main(render_fn=None):
                 done=done
             )
 
+            # --- TD ERROR (NEW, MINIMAL ADDITION) ---
+            transition = TDTransition(
+                state=state,
+                action=action,
+                reward=env_reward,
+                next_state=next_observation,
+                done=done,
+            )
+
+            td_error = td_logger.compute_q_table_td_error(
+                transition=transition,
+                q_table=q_function.q_table
+            )
+
             observation = next_observation
             total_reward += shaped_reward
 
-            # --- logging ---
+            # --- logging (ONLY ADD td_error) ---
             logger.log_step(
                 step=step,
                 position=info["position"],
@@ -119,6 +140,7 @@ def main(render_fn=None):
                 reward=env_reward,
                 shaped_reward=shaped_reward,
                 intrinsic_reward=intrinsic_reward,
+                td_error=td_error,
                 available_actions=info["available_actions"]
             )
 

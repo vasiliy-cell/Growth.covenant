@@ -37,14 +37,28 @@ class Logger:
         reward,
         shaped_reward=None,
         intrinsic_reward=None,
+        td_error=None,
         available_actions=None
     ):
         """
         Logs a single step.
 
-        reward: environment reward
-        shaped_reward: total reward after shaping (optional)
-        intrinsic_reward: curiosity reward (optional)
+        Parameters
+        ----------
+        reward :
+            Environment reward.
+
+        shaped_reward :
+            Total reward after reward shaping.
+
+        intrinsic_reward :
+            Curiosity / intrinsic reward.
+
+        td_error :
+            Temporal Difference error.
+
+        available_actions :
+            Actions available in current state.
         """
 
         # choose what to accumulate as total reward
@@ -62,12 +76,16 @@ class Logger:
             "available_actions": available_actions
         }
 
-        # optional fields (only if provided)
+        # optional fields
         if shaped_reward is not None:
             data["shaped_reward"] = shaped_reward
 
         if intrinsic_reward is not None:
             data["intrinsic_reward"] = intrinsic_reward
+
+        if td_error is not None:
+            data["td_error"] = td_error
+            data["abs_td_error"] = abs(td_error)
 
         self.file.write(json.dumps(data) + "\n")
 

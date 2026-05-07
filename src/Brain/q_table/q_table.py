@@ -35,6 +35,12 @@ class QTable:
         if state_key not in self.q_table:
             self.q_table[state_key] = np.zeros(self.action_size)
         return self.q_table[state_key]
+    
+    def get_q_value(self, state_key, action):
+        return self.get_row(state_key)[action]
+
+    def get_all_q_values(self, state_key):
+        return self.get_row(state_key)
 
     # -----------------------------
     # SET
