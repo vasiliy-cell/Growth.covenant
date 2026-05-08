@@ -115,7 +115,7 @@ def main(render_fn=None):
                 done=done
             )
 
-            # --- TD ERROR (NEW, MINIMAL ADDITION) ---
+            # --- TD ERROR ---
             transition = TDTransition(
                 state=state,
                 action=action,
