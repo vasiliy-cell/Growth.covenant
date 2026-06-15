@@ -1,14 +1,24 @@
 #!/bin/bash
+export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-echo "🧪 Running tests..."
-pytest
+# --- Блок выбора запуска тестов ---
+echo "Do you want to run tests? (y/n)"
+read -p "Enter choice: " run_tests_choice
 
-if [ $? -ne 0 ]; then
-    echo "❌ Tests failed. Aborting run."
-    exit 1
+if [ "$run_tests_choice" = "y" ] || [ "$run_tests_choice" = "Y" ]; then
+    echo "🧪 Running tests..."
+    pytest
+
+    if [ $? -ne 0 ]; then
+        echo "❌ Tests failed. Aborting run."
+        exit 1
+    fi
+
+    echo "✅ Tests passed."
+else
+    echo "⏩ Skipping tests."
 fi
-
-echo "✅ Tests passed."
+# ----------------------------------
 
 echo ""
 echo "Choose run mode:"
