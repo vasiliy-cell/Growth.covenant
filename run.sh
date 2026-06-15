@@ -1,7 +1,6 @@
 #!/bin/bash
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-# --- Блок выбора запуска тестов ---
 echo "Do you want to run tests? (y/n)"
 read -p "Enter choice: " run_tests_choice
 

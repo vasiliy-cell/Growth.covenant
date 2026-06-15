@@ -9,16 +9,16 @@ class Renderer:
         
         
         # ставим фон
-        bg = [0.212, 0.227, 0.310]
+        bg = [0.051, 0.067, 0.090]
         self.fig.patch.set_facecolor(bg)
         self.ax.set_facecolor(bg)
 
 
 
         self.colors = {
-            0: [0.212, 0.227, 0.310],  # empty
-            1: [0.651, 0.855, 0.584],  # reward
-            2: [0.929, 0.529, 0.588],  # danger
+            0: [0.051, 0.067, 0.090],  # empty
+            1: [0.165, 0.835, 0.345],  # reward (#2ad558)
+            2: [0.831, 0.169, 0.247],  # danger (#d42b3f)
         }
 
 
@@ -38,12 +38,12 @@ class Renderer:
 
         # агент 
         ax_x, ax_y = agent_pos
-        self.ax.scatter(ax_x, ax_y, c="#F5C542", s=100)
+        self.ax.scatter(ax_x, ax_y, c="#692ad5", s=100)
 
         # сетка
         self.ax.set_xticks(np.arange(-0.5, size, 1))
         self.ax.set_yticks(np.arange(-0.5, size, 1))
-        self.ax.grid(color="black", linestyle='-', linewidth=0.5)
+        self.ax.grid(color="#30363d", linestyle='-', linewidth=0.5)
 
         # убираем цифры
         self.ax.set_xticklabels([])
