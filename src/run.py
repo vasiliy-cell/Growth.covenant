@@ -1,15 +1,13 @@
 from src.environment.env import GridWorldEnv
-from src.utils.logger import Logger
 
 from src.Brain.brain import Brain
-
 from src.Brain.q_estimater.mlp import MLP
 from src.Brain.q_estimater.trainer import DQNTrainer
 
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 
-from src.utils.td_estimator import TDErrorLogger, TDTransition
+from src.utils.td_estimator import TDErrorLogger
 
 import yaml
 import random
@@ -24,7 +22,7 @@ def make_seed():
 def choose_seed():
     user_input = input("Enter seed (number or 'r' for random): ").strip()
 
-    if user_input.lower() == "r" or user_input == "":
+    if user_input.lower() in ["r", ""]:
         return make_seed()
 
     try:
@@ -43,11 +41,12 @@ def encode_observation(obs):
 
     return torch.tensor([x, y] + flat, dtype=torch.float32)
 
+
 def main(render_fn=None):
     episodes = int(input("Enter number of episodes: "))
 
     seed = choose_seed() if episodes == 1 else make_seed()
-    print(f"Using SEED: {seed}")
+    print(f"SEED: {seed}")
 
     master_rng = random.Random(seed)
     env = GridWorldEnv(size=8, max_steps=20, rng=master_rng)
@@ -58,10 +57,7 @@ def main(render_fn=None):
     dummy_obs = env.reset(seed=0)
     obs_size = len(encode_observation(dummy_obs))
 
-    mlp = MLP(
-        obs_size=obs_size,
-        action_size=8
-    )
+    mlp = MLP(obs_size=obs_size, action_size=8)
 
     trainer = DQNTrainer(
         model=mlp,
@@ -72,17 +68,15 @@ def main(render_fn=None):
 
     brain = Brain(trainer)
 
-    td_logger = TDErrorLogger(gamma=config["gamma"])
-
-    curiosity = Curiosity(config["curiosity"]) if "curiosity" in config else None
-    reward_shaping = RewardShaping(curiosity=curiosity)
+    reward_shaping = RewardShaping(
+        curiosity=Curiosity(config["curiosity"]) if "curiosity" in config else None
+    )
 
     for episode in range(episodes):
 
         observation = env.reset(seed=master_rng.randint(0, 1_000_000))
 
         done = False
-        step = 0
         total_reward = 0
 
         while not done:
@@ -96,31 +90,27 @@ def main(render_fn=None):
 
             next_obs, env_reward, done, info = env.step(action)
 
-            shaped_reward, intrinsic_reward = reward_shaping.compute(
-                next_obs,
-                env_reward
-            )
-
-            next_state = encode_observation(next_obs)
+            shaped_reward, _ = reward_shaping.compute(next_obs, env_reward)
 
             brain.learn(
                 state=state,
                 action=action,
                 reward=shaped_reward,
-                next_state=next_state,
+                next_state=encode_observation(next_obs),
                 done=done
             )
 
             total_reward += shaped_reward
             observation = next_obs
 
-            # 🧠 IMPORTANT: RENDER HERE
             if render_fn is not None:
                 render_fn(env, info)
-
-            step += 1
 
         print(f"Episode {episode+1} | reward={total_reward}")
 
     trainer.save()
     print("Training finished")
+
+
+if __name__ == "__main__":
+    main()
