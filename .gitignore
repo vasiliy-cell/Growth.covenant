@@ -1,16 +1,43 @@
+# --- Окружение Python (Ваши исходные + дополнения) ---
 venv/
-__pycache__/
-
 .venv/
 env/
 .env/
 ENV/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
+# --- Тестирование и логи (Ваши исходные) ---
 .pytest_cache/
+.cache/
 .coverage
 .coverage.*
 htmlcov/
-.cache/
-.pytest_cache
 logs/
 simulation.log
+
+# --- Зависимости и библиотеки (matplotlib, numpy, torch и др.) ---
+# Исключаем локально установленные пакеты, если они находятся в корне проекта
+matplotlib/
+numpy/
+pytest/
+pyyaml/
+torch/
+torchvision/
+torchaudio/
+
+# Исключаем скачанные веса моделей, датасеты и чекпоинты (для PyTorch)
+*.pt
+*.pth
+*.ckpt
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# --- Системные файлы macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride

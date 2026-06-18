@@ -31,7 +31,7 @@ class TDErrorLogger:
         """
         Computes TD-error for tabular Q-learning.
 
-        δ = r + γ * max(Q(s')) - Q(s)
+        δ =  γ max Q(s',a') - Q(s,a)- Q(s)
 
         If episode is done:
         δ = r - Q(s)
