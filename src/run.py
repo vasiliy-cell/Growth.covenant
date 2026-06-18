@@ -43,7 +43,6 @@ def encode_observation(obs):
 
     return torch.tensor([x, y] + flat, dtype=torch.float32)
 
-
 def main(render_fn=None):
     episodes = int(input("Enter number of episodes: "))
 
@@ -59,10 +58,9 @@ def main(render_fn=None):
     dummy_obs = env.reset(seed=0)
     obs_size = len(encode_observation(dummy_obs))
 
-    action_size = 8
     mlp = MLP(
         obs_size=obs_size,
-        action_size=action_size
+        action_size=8
     )
 
     trainer = DQNTrainer(
@@ -83,17 +81,21 @@ def main(render_fn=None):
 
         observation = env.reset(seed=master_rng.randint(0, 1_000_000))
 
-        logger = Logger()
-        logger.log_seed(seed=seed, episode_seed=0)
-
         done = False
         step = 0
         total_reward = 0
 
         while not done:
+
             state = encode_observation(observation)
-            action = brain.choose_action(state, env.agent.get_available_actions())
+
+            action = brain.choose_action(
+                state,
+                env.agent.get_available_actions()
+            )
+
             next_obs, env_reward, done, info = env.step(action)
+
             shaped_reward, intrinsic_reward = reward_shaping.compute(
                 next_obs,
                 env_reward
@@ -109,30 +111,15 @@ def main(render_fn=None):
                 done=done
             )
 
-            td_error = td_logger.compute_from_values(
-                reward=env_reward,
-                current_q=0.0,
-                next_q=0.0,
-                done=done
-            )
-
             total_reward += shaped_reward
-
-            logger.log_step(
-                step=step,
-                position=info["position"],
-                action=action,
-                reward=env_reward,
-                shaped_reward=shaped_reward,
-                intrinsic_reward=intrinsic_reward,
-                td_error=td_error,
-                available_actions=info["available_actions"]
-            )
-
             observation = next_obs
+
+            # 🧠 IMPORTANT: RENDER HERE
+            if render_fn is not None:
+                render_fn(env, info)
+
             step += 1
 
-        logger.end_episode()
         print(f"Episode {episode+1} | reward={total_reward}")
 
     trainer.save()
