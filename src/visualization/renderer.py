@@ -25,6 +25,13 @@ class Renderer:
     def render(self, grid, agent_pos):
         size = grid.shape[0]
 
+
+
+
+        def render(env, info):
+            print("RENDER CALL", info["position"])
+            print(env.world.map.grid)
+            renderer.render(env.world.map.grid, info["position"])
         # создаём RGB картинку
         image = np.zeros((size, size, 3))
 

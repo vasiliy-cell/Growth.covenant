@@ -1,36 +1,49 @@
-from src.Brain.policy.argmax import argmax
-from src.Brain.policy.epsilon_greedy import EpsilonGreedy
+import torch
 
 
 class Policy:
-    def __init__(self, config):
-        """
-        Policy is a strategy dispatcher.
-        It does NOT contain magic numbers.
-        Everything comes from config.
-        """
 
-        policy_cfg = config["policy"]
+    def __init__(
+        self,
+        epsilon=1.0,
+        epsilon_decay=0.995,
+        epsilon_min=0.01
+    ):
+        self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
+        self.epsilon_min = epsilon_min
 
-        self.mode = policy_cfg["mode"]
-        self.epsilon = policy_cfg["epsilon"]
+    def next_episode(self):
 
-        # FIX: создаём объект стратегии один раз
-        self.epsilon_greedy = EpsilonGreedy(policy_cfg)
+        self.epsilon *= self.epsilon_decay
 
-    def select_action(self, q_values, available_actions):
-        """
-        Delegates action selection to specific strategy
-        """
+        if self.epsilon < self.epsilon_min:
+            self.epsilon = self.epsilon_min
 
-        if self.mode == "argmax":
-            return argmax(q_values, available_actions)
+    def select_action(
+        self,
+        q_values,
+        available_actions
+    ):
 
-        elif self.mode == "epsilon_greedy":
-            return self.epsilon_greedy.select_action(
-                q_values,
-                available_actions
-            )
+        if not available_actions:
+            raise ValueError("No available actions")
 
-        else:
-            raise ValueError(f"Unknown policy mode: {self.mode}")
+        # exploration
+        if torch.rand(1).item() < self.epsilon:
+
+            random_index = torch.randint(
+                len(available_actions),
+                (1,)
+            ).item()
+
+            return available_actions[random_index]
+
+        # exploitation
+        available_q = q_values[available_actions]
+
+        best_index = torch.argmax(
+            available_q
+        ).item()
+
+        return available_actions[best_index]
