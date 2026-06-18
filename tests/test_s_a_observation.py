@@ -1,79 +1,63 @@
 from src.Brain.brain import Brain
 
 
-class FakeQ:
-    """
-    Фейковая Q-функция для тестирования Brain.
-    Мы не хотим использовать реальную QTable,
-    нам важно только отследить вызовы.
-    """
-
+class FakeModel:
     def __init__(self):
         self.called = False
-        self.received_state = None
-        self.received_actions = None
+        self.last_state = None
 
-    def select_action(self, state, actions):
+    def __call__(self, state):
         self.called = True
-        self.received_state = state
-        self.received_actions = actions
-        return 1  # фиксированный ответ для предсказуемости
+        self.last_state = state
+        return [0.0, 1.0, 0.5]
 
 
-class FakeQWithUpdate:
-    """
-    Отдельный фейк для проверки метода learn()
-    """
-
+class FakeTrainer:
     def __init__(self):
+        self.model = FakeModel()
         self.last_update = None
 
-    def update(self, **kwargs):
-        self.last_update = kwargs
+    def update(self, state, action, reward, next_state, done):
+        self.last_update = {
+            "state": state,
+            "action": action,
+            "reward": reward,
+            "next_state": next_state,
+            "done": done
+        }
 
 
-# -----------------------------
-# TESTS
-# -----------------------------
+def test_brain_calls_model():
+    trainer = FakeTrainer()
+    brain = Brain(trainer, epsilon=0.0)  # 🔥 важно
+
+    brain.choose_action("test", [0, 1, 2])
+
+    assert trainer.model.called is True
 
 
-def test_brain_calls_q_function():
-    fake_q = FakeQ()
-    brain = Brain(fake_q)
+def test_brain_passes_state_to_model():
+    trainer = FakeTrainer()
+    brain = Brain(trainer, epsilon=0.0)  # 🔥 важно
 
-    state = "test_state"
-    actions = [0, 1, 2]
+    state = "X"
+    brain.choose_action(state, [0, 1, 2])
 
-    brain.choose_action(state, actions)
-
-    assert fake_q.called is True
+    assert trainer.model.last_state == state
 
 
-def test_brain_passes_correct_data_to_q():
-    fake_q = FakeQ()
-    brain = Brain(fake_q)
-
-    state = "test_state"
-    actions = [0, 1, 2]
-
-    brain.choose_action(state, actions)
-
-    assert fake_q.received_state == state
-    assert fake_q.received_actions == actions
-
-
-def test_brain_returns_action_from_q():
-    fake_q = FakeQ()
-    brain = Brain(fake_q)
+def test_brain_returns_best_action():
+    trainer = FakeTrainer()
+    brain = Brain(trainer, epsilon=0.0)
 
     action = brain.choose_action("state", [0, 1, 2])
 
     assert action == 1
 
 
-def test_brain_learn_passes_experience_correctly():
-    fake_q = FakeQWithUpdate()
-    brain = Brain(fake_q)
+def test_brain_learn_calls_update():
+    trainer = FakeTrainer()
+    brain = Brain(trainer)
 
     brain.learn(
         state="s",
@@ -83,7 +67,7 @@ def test_brain_learn_passes_experience_correctly():
         done=False
     )
 
-    assert fake_q.last_update == {
+    assert trainer.last_update == {
         "state": "s",
         "action": 2,
         "reward": 5,
