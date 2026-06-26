@@ -16,7 +16,10 @@ class Logger:
         self.file_path = os.path.join(self.log_dir, f"{episode_name}.jsonl")
         self.file = open(self.file_path, "w", encoding="utf-8")
 
-        self.total_reward = 0
+        # totals for episode
+        self.env_reward = 0.0
+        self.training_reward = 0.0
+        self.intrinsic_reward = 0.0
         self.steps = 0
 
     def log_seed(self, seed, episode_seed):
@@ -39,7 +42,13 @@ class Logger:
     ):
         used_reward = shaped_reward if shaped_reward is not None else reward
 
-        self.total_reward += used_reward
+        # accumulate totals
+        self.env_reward += reward
+        self.training_reward += used_reward
+
+        if intrinsic_reward is not None:
+            self.intrinsic_reward += intrinsic_reward
+
         self.steps += 1
 
         data = {
@@ -66,7 +75,9 @@ class Logger:
     def end_episode(self):
         self.file.write(json.dumps({
             "type": "episode_summary",
-            "total_reward": self.total_reward,
+            "env_reward": self.env_reward,
+            "training_reward": self.training_reward,
+            "intrinsic_reward": self.intrinsic_reward,
             "steps": self.steps
         }) + "\n")
 

@@ -9,6 +9,8 @@ from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curio
 
 from src.utils.td_estimator import TDErrorLogger
 
+from src.utils.logger import Logger
+
 import yaml
 import random
 import time
@@ -74,10 +76,18 @@ def main(render_fn=None):
 
     for episode in range(episodes):
 
+        # Новый Logger -> новый файл .jsonl на КАЖДЫЙ эпизод.
+        # Имя файла генерируется внутри Logger по таймстампу,
+        # так что коллизий между эпизодами не будет.
+        logger = Logger()
+
         observation = env.reset(seed=master_rng.randint(0, 1_000_000))
+
+        logger.log_seed(seed, episode_seed=episode)
 
         done = False
         total_reward = 0
+        step_counter = 0
 
         while not done:
 
@@ -90,7 +100,7 @@ def main(render_fn=None):
 
             next_obs, env_reward, done, info = env.step(action)
 
-            shaped_reward, _ = reward_shaping.compute(next_obs, env_reward)
+            shaped_reward, intrinsic_reward = reward_shaping.compute(next_obs, env_reward)
 
             brain.learn(
                 state=state,
@@ -100,13 +110,24 @@ def main(render_fn=None):
                 done=done
             )
 
+            logger.log_step(
+                step=step_counter,
+                position=observation.position,
+                action=action,
+                reward=env_reward,
+                shaped_reward=shaped_reward,
+                intrinsic_reward=intrinsic_reward
+            )
+
             total_reward += shaped_reward
             observation = next_obs
+            step_counter += 1
 
             if render_fn is not None:
                 render_fn(env, info)
 
         print(f"Episode {episode+1} | reward={total_reward}")
+        logger.end_episode()  # пишет summary и закрывает файл этого эпизода
 
     trainer.save()
     print("Training finished")
