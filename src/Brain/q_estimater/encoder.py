@@ -3,7 +3,7 @@ import torch
 
 class ObservationEncoder:
 
-    def __init__(self, grid_size=3):
+    def __init__(self, grid_size=8):
         self.grid_size = grid_size
 
     def encode(self, obs):

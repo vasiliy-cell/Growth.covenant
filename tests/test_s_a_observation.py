@@ -1,4 +1,6 @@
+import torch
 from src.Brain.brain import Brain
+from src.Brain.policy.policy import Policy
 
 
 class FakeModel:
@@ -9,7 +11,9 @@ class FakeModel:
     def __call__(self, state):
         self.called = True
         self.last_state = state
-        return [0.0, 1.0, 0.5]
+        # Policy.select_action делает q_values[available_actions] —
+        # это тензорная индексация, обычный список тут не подходит.
+        return torch.tensor([0.0, 1.0, 0.5])
 
 
 class FakeTrainer:
@@ -29,36 +33,35 @@ class FakeTrainer:
 
 def test_brain_calls_model():
     trainer = FakeTrainer()
-    brain = Brain(trainer, epsilon=0.0)  # 🔥 важно
-
+    # epsilon=0.0 -> чистый exploitation, без рандома
+    policy = Policy(epsilon=0.0)
+    brain = Brain(trainer, policy)
     brain.choose_action("test", [0, 1, 2])
-
     assert trainer.model.called is True
 
 
 def test_brain_passes_state_to_model():
     trainer = FakeTrainer()
-    brain = Brain(trainer, epsilon=0.0)  # 🔥 важно
-
+    policy = Policy(epsilon=0.0)
+    brain = Brain(trainer, policy)
     state = "X"
     brain.choose_action(state, [0, 1, 2])
-
     assert trainer.model.last_state == state
 
 
 def test_brain_returns_best_action():
     trainer = FakeTrainer()
-    brain = Brain(trainer, epsilon=0.0)
-
+    policy = Policy(epsilon=0.0)
+    brain = Brain(trainer, policy)
+    # q_values = [0.0, 1.0, 0.5] -> argmax среди доступных [0,1,2] это индекс 1
     action = brain.choose_action("state", [0, 1, 2])
-
     assert action == 1
 
 
 def test_brain_learn_calls_update():
     trainer = FakeTrainer()
-    brain = Brain(trainer)
-
+    policy = Policy(epsilon=0.0)
+    brain = Brain(trainer, policy)
     brain.learn(
         state="s",
         action=2,
@@ -66,7 +69,6 @@ def test_brain_learn_calls_update():
         next_state="s2",
         done=False
     )
-
     assert trainer.last_update == {
         "state": "s",
         "action": 2,
