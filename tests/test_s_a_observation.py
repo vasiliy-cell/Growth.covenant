@@ -18,7 +18,7 @@ class FakeModel:
 
 class FakeTrainer:
     def __init__(self):
-        self.model = FakeModel()
+        self.policy_net = FakeModel()
         self.last_update = None
 
     def update(self, state, action, reward, next_state, done):
@@ -37,7 +37,7 @@ def test_brain_calls_model():
     policy = Policy(epsilon=0.0)
     brain = Brain(trainer, policy)
     brain.choose_action("test", [0, 1, 2])
-    assert trainer.model.called is True
+    assert trainer.policy_net.called is True
 
 
 def test_brain_passes_state_to_model():
@@ -46,7 +46,7 @@ def test_brain_passes_state_to_model():
     brain = Brain(trainer, policy)
     state = "X"
     brain.choose_action(state, [0, 1, 2])
-    assert trainer.model.last_state == state
+    assert trainer.policy_net.last_state == state
 
 
 def test_brain_returns_best_action():
