@@ -3,12 +3,12 @@ import torch.nn as nn
 
 
 class MLP(nn.Module):
-
+ 
     def __init__(
         self,
         obs_size,
         hidden_size=64,
-        action_size=8
+        action_size=8 
     ):
         super().__init__()
 

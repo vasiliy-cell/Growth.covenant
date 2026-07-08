@@ -53,9 +53,10 @@ def main(render_fn=None):
     mlp = MLP(obs_size=obs_size, action_size=8)
     trainer = DQNTrainer(
         model=mlp,
-        lr=config.get("lr", 0.001),
-        gamma=config["gamma"],
-        save_path="models/mlp.pth"
+        config=config
+        # lr=config.get("lr", 0.001),
+        # gamma=config["gamma"],
+        # save_path="models/mlp.pth"
     )
 
     # epsilon-параметры берутся из config.yml, если они там есть,

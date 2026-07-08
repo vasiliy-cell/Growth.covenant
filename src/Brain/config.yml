@@ -10,3 +10,8 @@ policy:
 curiosity:
   beta: 4.0
   decay: 0.995
+
+trainer:
+  gamma: 0.99
+  target_update_freq: 1000
+  save_path: "models/mlp.pth"
