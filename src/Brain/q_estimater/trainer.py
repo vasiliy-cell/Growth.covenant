@@ -17,9 +17,6 @@ class DQNTrainer:
         self.target_update_freq = config["trainer"]["target_update_freq"]
         self.save_path = config["trainer"]["save_path"]
 
-
-        print("TRAINER-1")
-
         self.policy_net = model
         self.target_net = deepcopy(self.policy_net)
         self.target_net.eval()
@@ -27,21 +24,15 @@ class DQNTrainer:
             param.requires_grad = False
 
 
-        print("TRAINER-2")
 
         self.loss_fn = nn.MSELoss()
 
-        print("TRAINER-3")
-
         self.optimizer = optim.Adam(
             self.policy_net.parameters(),
+            lr=config.get("learning_rate", 0.001)
+
         )
-
-        print("TRAINER-4")
-
         self._load_model()
-
-        print("TRAINER-5")
 
     # -------------------------
     # LOAD MODEL
@@ -89,9 +80,11 @@ class DQNTrainer:
         current_q = q_values[action]
 
         # max Q(s')
+        # Double DQN: policy_net ВЫБИРАЕТ лучшее действие, target_net ОЦЕНИВАЕТ его
         with torch.no_grad():
+            next_action = self.policy_net(next_state).argmax()
             next_q_values = self.target_net(next_state)
-            next_q = torch.max(next_q_values)
+            next_q = next_q_values[next_action]
 
         # target
         if done:
@@ -100,6 +93,13 @@ class DQNTrainer:
             target_q = reward + self.gamma * next_q
 
         current_q = current_q.squeeze()
+
+        # Превращаем тензоры в обычные float (берём только число)
+        curr_val = current_q.item()
+        targ_val = target_q.item() if hasattr(target_q, 'item') else float(target_q)
+
+        # Выводим чисто числа с фиксированной точкой (без e+12)
+        print(f"current_q: {curr_val:<20.4f} | target_q: {targ_val:.4f}")
 
         loss = self.loss_fn(current_q, target_q)
 
@@ -118,3 +118,5 @@ class DQNTrainer:
         self.target_net.load_state_dict(
             self.policy_net.state_dict()
     )
+
+ 

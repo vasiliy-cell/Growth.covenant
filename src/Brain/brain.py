@@ -16,4 +16,4 @@ class Brain:
         return self.policy.select_action(q_values, available_actions)
 
     def learn(self, state, action, reward, next_state, done):
-        self.trainer.update(state, action, reward, next_state, done)
+        return self.trainer.update(state, action, reward, next_state, done)

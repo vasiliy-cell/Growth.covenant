@@ -106,7 +106,17 @@ def main(render_fn=None):
                 done=done
             )
 
+            loss = brain.learn(
+                state=state,
+                action=action,
+                reward=shaped_reward,
+                next_state=encode_observation(next_obs),
+                done=done
+            )
+
+
             logger.log_step(
+                loss=loss,
                 step=step_counter,
                 position=observation.position,
                 action=action,
@@ -124,7 +134,9 @@ def main(render_fn=None):
 
         print(f"Episode {episode+1} | reward={total_reward} | epsilon={policy.epsilon:.4f}")
 
-        logger.end_episode()  # пишет summary и закрывает файл этого эпизода
+        logger.end_episode(
+            beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
+        )
 
         # ВАЖНО: без этого вызова epsilon никогда не убывает — Policy
         # сам по себе не знает, когда эпизод закончился.
