@@ -18,7 +18,12 @@ def make_seed():
 
 
 def choose_seed():
-    user_input = input("Enter seed (number or 'r' for random): ").strip()
+    """
+    Спрашивает seed один раз, независимо от числа эпизодов.
+    'r' / пусто -> случайный. Число -> фиксированный seed для всего прогона
+    (нужно для воспроизводимых экспериментов с несколькими эпизодами подряд).
+    """
+    user_input = input("Enter global seed (number or 'r' for random): ").strip()
     if user_input.lower() in ["r", ""]:
         return make_seed()
     try:
@@ -38,7 +43,13 @@ def encode_observation(obs):
 
 def main(render_fn=None):
     episodes = int(input("Enter number of episodes: "))
-    seed = choose_seed() if episodes == 1 else make_seed()
+
+    # Раньше seed спрашивался только при episodes == 1, а при множестве
+    # эпизодов всегда брался случайный. Теперь можно задать фиксированный
+    # global seed для ЛЮБОГО количества эпизодов — нужно для воспроизводимых
+    # экспериментов (например, сравнить два прогона гиперпараметров на
+    # одинаковой последовательности seed'ов).
+    seed = choose_seed()
     print(f"SEED: {seed}")
 
     master_rng = random.Random(seed)
@@ -54,9 +65,6 @@ def main(render_fn=None):
     trainer = DQNTrainer(
         model=mlp,
         config=config
-        # lr=config.get("lr", 0.001),
-        # gamma=config["gamma"],
-        # save_path="models/mlp.pth"
     )
 
     # epsilon-параметры берутся из config.yml, если они там есть,
@@ -98,31 +106,29 @@ def main(render_fn=None):
 
             shaped_reward, intrinsic_reward = reward_shaping.compute(next_obs, env_reward)
 
-            brain.learn(
+            # ОДИН вызов learn() на шаг — раньше здесь было два подряд
+            # с одинаковыми аргументами, что означало два градиентных
+            # обновления на одном и том же transition за шаг.
+            metrics = brain.learn(
                 state=state,
                 action=action,
                 reward=shaped_reward,
                 next_state=encode_observation(next_obs),
                 done=done
             )
-
-            loss = brain.learn(
-                state=state,
-                action=action,
-                reward=shaped_reward,
-                next_state=encode_observation(next_obs),
-                done=done
-            )
-
 
             logger.log_step(
-                loss=loss,
                 step=step_counter,
                 position=observation.position,
                 action=action,
                 reward=env_reward,
                 shaped_reward=shaped_reward,
-                intrinsic_reward=intrinsic_reward
+                intrinsic_reward=intrinsic_reward,
+                loss=metrics["loss"],
+                td_error=metrics["td_error"],
+                grad_norm=metrics["grad_norm"],
+                target_q=metrics["target_q"],
+                q_prediction=metrics["q_prediction"],
             )
 
             total_reward += shaped_reward

@@ -22,11 +22,23 @@ class Logger:
         self.intrinsic_reward = 0.0
         self.steps = 0
 
-        # loss копится отдельно: не на каждом env-шаге обязательно есть
-        # train-update (например, пока буфер не заполнен), поэтому считаем
-        # среднее только по шагам, где loss реально был передан.
+        # Все метрики ниже копятся одинаково: не на каждом шаге обязательно
+        # есть train-update (например, пока буфер не заполнен), поэтому
+        # среднее считаем только по шагам, где значение реально было передано.
         self._loss_sum = 0.0
         self._loss_count = 0
+
+        self._td_error_sum = 0.0
+        self._td_error_count = 0
+
+        self._grad_norm_sum = 0.0
+        self._grad_norm_count = 0
+
+        self._target_q_sum = 0.0
+        self._target_q_count = 0
+
+        self._q_prediction_sum = 0.0
+        self._q_prediction_count = 0
 
     def log_seed(self, seed, episode_seed):
         self.file.write(json.dumps({
@@ -45,7 +57,9 @@ class Logger:
         intrinsic_reward=None,
         td_error=None,
         loss=None,
-        available_actions=None
+        grad_norm=None,
+        target_q=None,
+        q_prediction=None,
     ):
         used_reward = shaped_reward if shaped_reward is not None else reward
 
@@ -60,6 +74,22 @@ class Logger:
             self._loss_sum += loss
             self._loss_count += 1
 
+        if td_error is not None:
+            self._td_error_sum += abs(td_error)
+            self._td_error_count += 1
+
+        if grad_norm is not None:
+            self._grad_norm_sum += grad_norm
+            self._grad_norm_count += 1
+
+        if target_q is not None:
+            self._target_q_sum += target_q
+            self._target_q_count += 1
+
+        if q_prediction is not None:
+            self._q_prediction_sum += q_prediction
+            self._q_prediction_count += 1
+
         self.steps += 1
 
         data = {
@@ -68,7 +98,6 @@ class Logger:
             "position": position,
             "action": action,
             "reward": reward,
-            "available_actions": available_actions
         }
 
         if shaped_reward is not None:
@@ -80,6 +109,12 @@ class Logger:
             data["abs_td_error"] = abs(td_error)
         if loss is not None:
             data["loss"] = loss
+        if grad_norm is not None:
+            data["grad_norm"] = grad_norm
+        if target_q is not None:
+            data["target_q"] = target_q
+        if q_prediction is not None:
+            data["q_prediction"] = q_prediction
 
         self.file.write(json.dumps(data) + "\n")
 
@@ -94,12 +129,29 @@ class Logger:
         summary = {
             "type": "episode_summary",
             "env_reward": self.env_reward,
+            "episode_reward": self.training_reward,  # суммарная shaped-награда за эпизод
             "training_reward": self.training_reward,
             "intrinsic_reward": self.intrinsic_reward,
             "steps": self.steps,
             "avg_loss": (
                 self._loss_sum / self._loss_count
                 if self._loss_count > 0 else None
+            ),
+            "avg_td_error": (
+                self._td_error_sum / self._td_error_count
+                if self._td_error_count > 0 else None
+            ),
+            "avg_grad_norm": (
+                self._grad_norm_sum / self._grad_norm_count
+                if self._grad_norm_count > 0 else None
+            ),
+            "avg_target_q": (
+                self._target_q_sum / self._target_q_count
+                if self._target_q_count > 0 else None
+            ),
+            "avg_q_prediction": (
+                self._q_prediction_sum / self._q_prediction_count
+                if self._q_prediction_count > 0 else None
             ),
         }
 

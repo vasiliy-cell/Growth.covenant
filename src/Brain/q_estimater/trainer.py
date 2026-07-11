@@ -70,6 +70,7 @@ class DQNTrainer:
 
         print("[MLP] Saved.")
 
+
     # -------------------------
     # DQN UPDATE
     # -------------------------
@@ -79,7 +80,6 @@ class DQNTrainer:
         q_values = self.policy_net(state)
         current_q = q_values[action]
 
-        # max Q(s')
         # Double DQN: policy_net ВЫБИРАЕТ лучшее действие, target_net ОЦЕНИВАЕТ его
         with torch.no_grad():
             next_action = self.policy_net(next_state).argmax()
@@ -94,29 +94,37 @@ class DQNTrainer:
 
         current_q = current_q.squeeze()
 
-        # Превращаем тензоры в обычные float (берём только число)
-        curr_val = current_q.item()
-        targ_val = target_q.item() if hasattr(target_q, 'item') else float(target_q)
-
-        # Выводим чисто числа с фиксированной точкой (без e+12)
-        print(f"current_q: {curr_val:<20.4f} | target_q: {targ_val:.4f}")
+        td_error = (target_q - current_q).item()
 
         loss = self.loss_fn(current_q, target_q)
 
         self.optimizer.zero_grad()
         loss.backward()
+
+        # считаем норму градиента ДО optimizer.step(), max_norm=1e10 —
+        # практически без ограничения, просто чтобы получить число.
+        # Если позже решишь реально клиппить градиенты — поставь сюда
+        # разумное значение (например 1.0 или 10.0) вместо 1e10.
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            self.policy_net.parameters(), max_norm=1e10
+        ).item()
+
         self.optimizer.step()
 
         self.training_step += 1
 
         if self.training_step % self.target_update_freq == 0:
             self.update_target_network()
-        
 
-        return loss.item()
+        return {
+            "loss": loss.item(),
+            "td_error": td_error,
+            "grad_norm": grad_norm,
+            "target_q": target_q.item(),
+            "q_prediction": current_q.item(),
+        }
+
     def update_target_network(self):
         self.target_net.load_state_dict(
             self.policy_net.state_dict()
-    )
-
- 
+        )
