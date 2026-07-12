@@ -21,15 +21,14 @@ class FakeTrainer:
         self.policy_net = FakeModel()
         self.last_update = None
 
-    def update(self, state, action, reward, next_state, done):
+    def update(self, states, actions, rewards, next_states, dones):
         self.last_update = {
-            "state": state,
-            "action": action,
-            "reward": reward,
-            "next_state": next_state,
-            "done": done
+            "states": states,
+            "actions": actions,
+            "rewards": rewards,
+            "next_states": next_states,
+            "dones": dones
         }
-
 
 def test_brain_calls_model():
     trainer = FakeTrainer()
@@ -63,16 +62,16 @@ def test_brain_learn_calls_update():
     policy = Policy(epsilon=0.0)
     brain = Brain(trainer, policy)
     brain.learn(
-        state="s",
-        action=2,
-        reward=5,
-        next_state="s2",
-        done=False
+        states=["s"],
+        actions=[2],
+        rewards=[5],
+        next_states=["s2"],
+        dones=[False]
     )
     assert trainer.last_update == {
-        "state": "s",
-        "action": 2,
-        "reward": 5,
-        "next_state": "s2",
-        "done": False
+        "states": ["s"],
+        "actions": [2],
+        "rewards": [5],
+        "next_states": ["s2"],
+        "dones": [False]
     }
