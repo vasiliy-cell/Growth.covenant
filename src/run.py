@@ -7,6 +7,7 @@ from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 from src.utils.td_estimator import TDErrorLogger
 from src.utils.logger import Logger
+from src.Brain.replay_buffer import ReplayBuffer
 import yaml
 import random
 import time
@@ -20,8 +21,7 @@ def make_seed():
 def choose_seed():
     """
     Спрашивает seed один раз, независимо от числа эпизодов.
-    'r' / пусто -> случайный. Число -> фиксированный seed для всего прогона
-    (нужно для воспроизводимых экспериментов с несколькими эпизодами подряд).
+    'r' / пусто -> случайный. Число -> фиксированный seed для всего прогона.
     """
     user_input = input("Enter global seed (number or 'r' for random): ").strip()
     if user_input.lower() in ["r", ""]:
@@ -44,11 +44,6 @@ def encode_observation(obs):
 def main(render_fn=None):
     episodes = int(input("Enter number of episodes: "))
 
-    # Раньше seed спрашивался только при episodes == 1, а при множестве
-    # эпизодов всегда брался случайный. Теперь можно задать фиксированный
-    # global seed для ЛЮБОГО количества эпизодов — нужно для воспроизводимых
-    # экспериментов (например, сравнить два прогона гиперпараметров на
-    # одинаковой последовательности seed'ов).
     seed = choose_seed()
     print(f"SEED: {seed}")
 
@@ -67,8 +62,6 @@ def main(render_fn=None):
         config=config
     )
 
-    # epsilon-параметры берутся из config.yml, если они там есть,
-    # иначе используются дефолты самого Policy.
     epsilon_cfg = config.get("epsilon", {})
     policy = Policy(
         epsilon=epsilon_cfg.get("start", 1.0),
@@ -82,10 +75,21 @@ def main(render_fn=None):
         curiosity=Curiosity(config["curiosity"]) if "curiosity" in config else None
     )
 
+    # --- Replay buffer / batching ---
+    # buffer_size: сколько transitions хранится максимум (старые вытесняются)
+    # batch_size: сколько transitions берём за одно обучение
+    # min_buffer_size: сколько шагов накопить ПЕРЕД тем, как начать учиться —
+    #   без прогрева на маленьком буфере sample() почти всегда возвращал бы
+    #   одни и те же несколько transitions, что не даёт настоящей развязки
+    #   корреляции.
+    buffer_cfg = config.get("replay_buffer", {})
+    buffer_size = buffer_cfg.get("buffer_size", 10_000)
+    batch_size = buffer_cfg.get("batch_size", 32)
+    min_buffer_size = buffer_cfg.get("min_buffer_size", batch_size)
+
+    replay_buffer = ReplayBuffer(capacity=buffer_size)
+
     for episode in range(episodes):
-        # Новый Logger -> новый файл .jsonl на КАЖДЫЙ эпизод.
-        # Имя файла генерируется внутри Logger по таймстампу,
-        # так что коллизий между эпизодами не будет.
         logger = Logger()
         observation = env.reset(seed=master_rng.randint(0, 1_000_000))
         logger.log_seed(seed, episode_seed=episode)
@@ -106,30 +110,45 @@ def main(render_fn=None):
 
             shaped_reward, intrinsic_reward = reward_shaping.compute(next_obs, env_reward)
 
-            # ОДИН вызов learn() на шаг — раньше здесь было два подряд
-            # с одинаковыми аргументами, что означало два градиентных
-            # обновления на одном и том же transition за шаг.
-            metrics = brain.learn(
+            next_state = encode_observation(next_obs)
+
+            # Сохраняем transition в буфер — НЕ учимся на нём сразу
+            replay_buffer.push(
                 state=state,
                 action=action,
                 reward=shaped_reward,
-                next_state=encode_observation(next_obs),
+                next_state=next_state,
                 done=done
             )
 
-            logger.log_step(
+            # Учимся батчем, только когда буфер достаточно прогрет.
+            # До этого момента metrics = None -> logger просто не получит
+            # loss/td_error/etc для этого шага (как и было задумано в Logger:
+            # среднее считается только по шагам, где значение реально было).
+            if len(replay_buffer) >= min_buffer_size:
+                batch = replay_buffer.sample(batch_size)
+                metrics = brain.learn(*batch)
+            else:
+                metrics = None
+
+            log_kwargs = dict(
                 step=step_counter,
                 position=observation.position,
                 action=action,
                 reward=env_reward,
                 shaped_reward=shaped_reward,
                 intrinsic_reward=intrinsic_reward,
-                loss=metrics["loss"],
-                td_error=metrics["td_error"],
-                grad_norm=metrics["grad_norm"],
-                target_q=metrics["target_q"],
-                q_prediction=metrics["q_prediction"],
             )
+            if metrics is not None:
+                log_kwargs.update(
+                    loss=metrics["loss"],
+                    td_error=metrics["td_error"],
+                    grad_norm=metrics["grad_norm"],
+                    target_q=metrics["target_q"],
+                    q_prediction=metrics["q_prediction"],
+                )
+
+            logger.log_step(**log_kwargs)
 
             total_reward += shaped_reward
             observation = next_obs
@@ -144,8 +163,6 @@ def main(render_fn=None):
             beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
         )
 
-        # ВАЖНО: без этого вызова epsilon никогда не убывает — Policy
-        # сам по себе не знает, когда эпизод закончился.
         policy.next_episode()
 
         if reward_shaping.curiosity is not None:

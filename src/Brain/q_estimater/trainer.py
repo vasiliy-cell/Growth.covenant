@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from copy import deepcopy
 
+
 class DQNTrainer:
 
     def __init__(
@@ -23,14 +24,11 @@ class DQNTrainer:
         for param in self.target_net.parameters():
             param.requires_grad = False
 
-
-
         self.loss_fn = nn.MSELoss()
 
         self.optimizer = optim.Adam(
             self.policy_net.parameters(),
             lr=config.get("learning_rate", 0.001)
-
         )
         self._load_model()
 
@@ -45,7 +43,6 @@ class DQNTrainer:
 
             state = torch.load(self.save_path, map_location="cpu")
             self.policy_net.load_state_dict(state)
-            
             self.target_net.load_state_dict(
                 self.policy_net.state_dict()
             )
@@ -70,41 +67,46 @@ class DQNTrainer:
 
         print("[MLP] Saved.")
 
-
     # -------------------------
-    # DQN UPDATE
+    # DQN UPDATE (batched)
     # -------------------------
-    def update(self, state, action, reward, next_state, done):
+    def update(self, states, actions, rewards, next_states, dones):
+        """
+        states, next_states: tuple/list из B тензоров формы (obs_size,)
+        actions: tuple/list из B int
+        rewards: tuple/list из B float
+        dones:   tuple/list из B bool
+        """
 
-        # Q(s, a)
-        q_values = self.policy_net(state)
-        current_q = q_values[action]
+        # Собираем batch в единые тензоры формы (B, obs_size) и (B,)
+        states = torch.stack(states)                                    # (B, obs_size)
+        next_states = torch.stack(next_states)                          # (B, obs_size)
+        actions = torch.tensor(actions, dtype=torch.long)               # (B,)
+        rewards = torch.tensor(rewards, dtype=torch.float32)            # (B,)
+        dones = torch.tensor(dones, dtype=torch.float32)                # (B,)
 
-        # Double DQN: policy_net ВЫБИРАЕТ лучшее действие, target_net ОЦЕНИВАЕТ его
+        # Q(s, a) для всего батча разом
+        q_values = self.policy_net(states)                              # (B, action_size)
+        current_q = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)  # (B,)
+
+        # Double DQN: policy_net ВЫБИРАЕТ действие, target_net ОЦЕНИВАЕТ его
         with torch.no_grad():
-            next_action = self.policy_net(next_state).argmax()
-            next_q_values = self.target_net(next_state)
-            next_q = next_q_values[next_action]
+            next_actions = self.policy_net(next_states).argmax(dim=1)                  # (B,)
+            next_q_values = self.target_net(next_states)                               # (B, action_size)
+            next_q = next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze(1)      # (B,)
 
-        # target
-        if done:
-            target_q = torch.tensor(reward, dtype=torch.float32)
-        else:
-            target_q = reward + self.gamma * next_q
-
-        current_q = current_q.squeeze()
-
-        td_error = (target_q - current_q).item()
+            # (1 - dones) обнуляет bootstrap-часть для терминальных состояний —
+            # батчевый эквивалент прежнего if done: target_q = reward
+            target_q = rewards + self.gamma * next_q * (1.0 - dones)
 
         loss = self.loss_fn(current_q, target_q)
 
         self.optimizer.zero_grad()
         loss.backward()
 
-        # считаем норму градиента ДО optimizer.step(), max_norm=1e10 —
-        # практически без ограничения, просто чтобы получить число.
-        # Если позже решишь реально клиппить градиенты — поставь сюда
-        # разумное значение (например 1.0 или 10.0) вместо 1e10.
+        # max_norm=1e10 — практически без ограничения, просто чтобы получить
+        # число нормы градиента. Если решишь реально клиппить — поставь
+        # сюда разумное значение (например 1.0 или 10.0).
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.policy_net.parameters(), max_norm=1e10
         ).item()
@@ -116,12 +118,16 @@ class DQNTrainer:
         if self.training_step % self.target_update_freq == 0:
             self.update_target_network()
 
+        # Для логгера отдаём средние по батчу значения — по одному числу
+        # на train-update, а не по B чисел на каждый шаг.
+        td_error_batch = (target_q - current_q).detach()
+
         return {
             "loss": loss.item(),
-            "td_error": td_error,
+            "td_error": td_error_batch.mean().item(),
             "grad_norm": grad_norm,
-            "target_q": target_q.item(),
-            "q_prediction": current_q.item(),
+            "target_q": target_q.mean().item(),
+            "q_prediction": current_q.mean().item(),
         }
 
     def update_target_network(self):
