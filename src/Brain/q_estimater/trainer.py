@@ -17,6 +17,7 @@ class DQNTrainer:
         self.gamma = config["trainer"]["gamma"]
         self.target_update_freq = config["trainer"]["target_update_freq"]
         self.save_path = config["trainer"]["save_path"]
+        self.max_norm = config["trainer"]["max_norm"]
 
         self.policy_net = model
         self.target_net = deepcopy(self.policy_net)
@@ -104,11 +105,8 @@ class DQNTrainer:
         self.optimizer.zero_grad()
         loss.backward()
 
-        # max_norm=1e10 — практически без ограничения, просто чтобы получить
-        # число нормы градиента. Если решишь реально клиппить — поставь
-        # сюда разумное значение (например 1.0 или 10.0).
         grad_norm = torch.nn.utils.clip_grad_norm_(
-            self.policy_net.parameters(), max_norm=1e10
+            self.policy_net.parameters(), max_norm=self.max_norm
         ).item()
 
         self.optimizer.step()
