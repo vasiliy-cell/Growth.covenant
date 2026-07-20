@@ -18,6 +18,9 @@ htmlcov/
 logs/
 simulation.log
 
+results
+tmp
+
 # --- Зависимости и библиотеки (matplotlib, numpy, torch и др.) ---
 # Исключаем локально установленные пакеты, если они находятся в корне проекта
 matplotlib/

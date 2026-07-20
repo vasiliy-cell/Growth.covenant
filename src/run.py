@@ -20,7 +20,6 @@ def make_seed():
 
 def choose_seed():
     """
-    Спрашивает seed один раз, независимо от числа эпизодов.
     'r' / пусто -> случайный. Число -> фиксированный seed для всего прогона.
     """
     user_input = input("Enter global seed (number or 'r' for random): ").strip()
@@ -41,10 +40,12 @@ def encode_observation(obs):
     return torch.tensor([x, y] + flat, dtype=torch.float32)
 
 
-def main(render_fn=None):
-    episodes = int(input("Enter number of episodes: "))
+def main(render_fn=None, episodes=None, seed=None):
+    if episodes is None:
+        episodes = int(input("Enter number of episodes: "))
 
-    seed = choose_seed()
+    if seed is None:
+        seed = choose_seed()
     print(f"SEED: {seed}")
 
     master_rng = random.Random(seed)

@@ -13,12 +13,12 @@ curiosity:
 
 trainer:
   gamma: 0.99
-  target_update_freq: 15000
+  target_update_freq: 10000
   save_path: "models/mlp.pth"
-  max_norm: 20
+  max_norm: 0.01
 
 
 replay_buffer:
-  buffer_size: 15000
+  buffer_size: 10000
   batch_size: 32
-  min_buffer_size: 500
+  min_buffer_size: 500 
