@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from log_selector import choose_files
 
 LOG_DIR = "logs"
-GRID_SIZE = 8
+GRID_SIZE = 64
 
 
 def load_positions(files):

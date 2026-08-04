@@ -55,6 +55,9 @@ class Map:
     def get_cell(self, x, y):
         return self.grid[y, x]
 
+    def set_cell(self, x, y, value):
+        self.grid[y, x] = value
+
     def print_map(self):
         for row in self.grid:
             print(" ".join(map(str, row)))

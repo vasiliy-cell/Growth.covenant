@@ -47,6 +47,10 @@ class GridWorldEnv:
 
         reward = self.world.get_reward(position)
 
+        # good/bad cells turn empty once the agent touches them
+        if self.world.get_cell(position) != 0:
+            self.world.clear_cell(position)
+
         done = self.current_step >= self.max_steps
 
         info = {

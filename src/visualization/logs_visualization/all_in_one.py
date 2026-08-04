@@ -11,7 +11,7 @@ from log_selector import choose_files
 # CONFIG
 # ---------------------------------------------------
 LOG_DIR = "logs"
-GRID_SIZE = 8
+GRID_SIZE = 64
 
 
 # ---------------------------------------------------

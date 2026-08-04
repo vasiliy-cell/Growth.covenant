@@ -49,7 +49,7 @@ def main(render_fn=None, episodes=None, seed=None):
     print(f"SEED: {seed}")
 
     master_rng = random.Random(seed)
-    env = GridWorldEnv(size=8, max_steps=20, rng=master_rng)
+    env = GridWorldEnv(size=64, max_steps=20, rng=master_rng)
 
     with open("src/Brain/config.yml", "r") as f:
         config = yaml.safe_load(f)

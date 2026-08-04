@@ -20,6 +20,10 @@ class World:
         cell = self.get_cell(position)
         return REWARDS[cell]
 
+    def clear_cell(self, position):
+        x, y = position
+        self.map.set_cell(x, y, 0)
+
     def print(self):
         if self.map:
             self.map.print_map()
