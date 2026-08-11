@@ -113,7 +113,7 @@ Stages 3–5, or pushing evolution further.
 1. instal requirements (requirements.txt)
 2. run `./run.sh`
 
-<video src="https://github.com/vasiliy-cell/Growth.covenant/raw/main/docs/Attachments/demo.mp4" controls width="640"></video>
+https://github.com/user-attachments/assets/dd9c73c2-4c0d-42ac-b3ff-7ee9cf9fd6ef
 
 
 
