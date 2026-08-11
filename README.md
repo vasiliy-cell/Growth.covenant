@@ -1,135 +1,121 @@
-
-(current CURRENT STAGE IS 3)
-
----
-
 # Growth.covenant
 
-**Growth.covenant** is an experimental research project exploring the emergence of intelligence, behavior, and communication in artificial agents.
+> An open-ended research project on which biological and social pressures
+> are actually required before adaptive behaviour, evolution, and
+> communication appear in artificial agents on their own.
 
-The core idea is simple but ambitious:
-build a system where intelligence is not hardcoded, but **grows step by step** through interaction with the environment, evolution, and eventually language.
-
-This project is not just about reinforcement learning.
-It is an attempt to simulate a **path from simple agents to complex adaptive systems**.
+**Status:** Stage 3 — artificial life / multi-agent evolution (in progress)
 
 ---
 
-## Concept
+## The question
 
-Growth.covenant is my personal experiment in building intelligence from the ground up.
+The project revolves around one question, approached from many angles:
 
-Instead of starting with a powerful neural network, the system evolves through stages:
+**Which properties of evolution,language and environment produce more capable agents?**
 
-* from simple rule-based behavior
-* to reinforcement learning
-* to neural networks
-* to evolution
-* to communication
-* and eventually toward biologically inspired systems
+Growth.covenant is not built around a single powerful model. The system grows
+in stages — tabular policy → neural policy → population → environment →
+language — and each stage after the second is an experiment, not just an
+engineering milestone.
 
 ---
 
-### Stage 1 — Foundation (Environment + Learning Core)
+## Position
 
-The goal of this stage is to build a reliable environment where learning actually works.
+A few commitments that shape every design decision here:
 
-Before introducing a real AI, I need to be sure that:
-
-- the world makes sense
-- rewards are meaningful
-- and the system naturally pushes the agent to learn
-
-Otherwise, it becomes impossible to tell whether problems come from the model or the environment.
-
-At this stage, I build:
-
-- a simple grid-world with basic interactions (reward, danger, empty space)
-- a reward and logging system
-- a minimal agent (movement, state, observations)
-- a basic learning core: Q-table + policy
-
-This is not the final intelligence, but a **temporary learning mechanism** used to validate the system.
-
-If learning doesn’t emerge here, the issue is in the environment, not the “brain”.
-
-##  Roadmap
-
-### Step 1 — Base System
-
-* Q-Table implementation
-* Grid-world environment
-* Reward system
-* Curiosity-driven learning
+- **Artificial life, not genetic algorithms.** No external fitness function
+  ranks agents and picks survivors. Selection is endogenous: agents eat, run
+  out of energy, die, choose mates, and reproduce inside the world. Fitness
+  metrics exist *only* as instruments of observation — never as a selection
+  mechanism.
+- **Emergence over authorship.** Behaviour should be learned, not scripted.
+  There is no `if energy > threshold: reproduce` rule; mate choice and
+  reproduction have to come out of the agent's own policy.
+- **Biology as inspiration, not as a specification.** Only the mechanisms that
+  buy something are reproduced: mutation, recombination, dominance/recessivity,
+  genetic diversity, speciation. Faithful biochemistry is deliberately out of
+  scope.
+- **The environment is the independent variable.** Where possible, the
+  environment is frozen and one factor at a time is varied against a baseline.
 
 ---
 
-### Step 2 — Brain Replacement
+## Method
+Each research stage follows the same shape:
 
-Once the system is stable:
-
-* Replace Q-Table with a neural network
-* Keep everything else unchanged:
-
-  * same world
-  * same rewards
-  * same environment
-
-> Only the “brain” changes
+1. one abstract question
+2. a set of smaller, testable hypotheses
+3. shared constraints (frozen environment, fixed seeds, fixed budget)
+4. a baseline
+5. one experiment per hypothesis — theoretical rationale, then run
+6. hypotheses compared against each other and against the baseline
+7. conclusion
 
 ---
 
-### Step 3 — Genetic Algorithms
+## Roadmap
 
-Introduce evolution:
+### Phase I — Foundations (Stages 1–2) — *done*
 
-* Population: **10–30 agents**
-* Mutation
-* Selection (survival of the fittest)
-* Optional crossover
+A grid world with a reward system and one agent that learns *stably*.
+Stability is the entire point of this phase, since every later result is
+measured against it. Implemented: experience replay, mini-batching, target
+network, Double DQN, gradient clipping, ε-decay, curiosity with decay.
 
-Goal: evolve better strategies over generations.
+### Phase II — Research (Stages 3–5)
+
+#### Stage 3 — Alife: multi-agent evolution
+
+Many agents in one world. Genomes are inherited; weights are not — a genome
+carries the *recipe* (layer count, neuron count, learning rate, γ, buffer and
+batch size, mutation magnitude, and so on), and every agent still learns its own weights
+within its lifetime.
+
+Directions under investigation:
+
+- **What is inherited** — genome size (minimal / medium / large).
+- **How it is inherited** — competing genome-encoding schemes, compared
+  head to head: a Mendelian table with explicit dominant/recessive flags
+  (baseline), a vector scheme merging two parental vectors through a
+  non-linear transform, and a probabilistic ancestral pool where recent genes
+  are more likely to resurface.
+- **How selection happens** — sexual selection, mate-choice criteria, the cost
+  of reproduction.
+- **Social pressure** — which available actions (sharing, killing, displays of
+  strength) change how the population develops. Scheduled last.
+
+#### Stage 4 — Sandbox environment
+
+How environmental change affects already biologically grounded agents:
+unstable environments, richer environments, new action spaces.
+
+#### Stage 5 — Language
+
+The largest and least certain stage.
+
+1. Can a language appear without being taught — given only a channel to pass
+   information through?
+   - which properties of the environment or of the agents make it appear?
+   - how do you establish that a language has appeared at all?
+   - what does it look like — structure, syntax, compositionality?
+2. Once it exists: how does having a language change behaviour?
+
+### Beyond
+
+Deliberately unspecified. Most likely: closing questions left open by
+Stages 3–5, or pushing evolution further.
 
 ---
+## Running it
 
-### Step 4 — Sandbox Environment
-
-Gradually increase complexity:
-
-* Increase map size
-* Allow agents to adapt
-* Add new object types:
-
-  * food
-  * dangers
-  * bonuses
-  * upgrades
-
-Also introduce:
-
-* **Memory system**
-
-Transition:
-
-```
-Grid World → Sandbox
-```
-
----
-
-### Next Steps — Flexible Direction
-
-In the following stages, the project may expand in multiple directions depending on experimental results, constraints, and emerging ideas.
-
-This includes the introduction of communication between agents, where interaction may evolve from simple signals into structured language. The system may incorporate neural architectures such as Transformer-based models, allowing agents to develop their own communication protocols.
-
-Further development may move toward biologically inspired systems, including genome-based representations, evolutionary pressure, reproduction mechanisms, and more advanced selection dynamics.
-
-There is also interest in exploring more realistic forms of computation, such as lightweight spiking neural networks, aiming to approximate biologically plausible behavior without unnecessary complexity.
-
-The exact order, depth, and priority of these directions are intentionally left undefined and may change over time as the project evolves.
-
----
+1. instal requirements (requirements.txt)
+2. run `./run.sh`
+![./](./docs/Attachments/Screen%20Recording%202026-08-11%20at%2015.15.26.mov)
 
 
 
+## Results
+
+*(nothing published yet — Stage 3 in progress)*
