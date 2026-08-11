@@ -8,10 +8,21 @@ from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curio
 from src.utils.td_estimator import TDErrorLogger
 from src.utils.logger import Logger
 from src.Brain.replay_buffer import ReplayBuffer
+import os
 import yaml
+import numpy as np
 import random
 import time
 import torch
+
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_PATH = os.path.join(REPO_ROOT, "config.yml")
+
+
+def load_config(path=CONFIG_PATH):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
 
 
 def make_seed():
@@ -20,7 +31,7 @@ def make_seed():
 
 def choose_seed():
     """
-    'r' / пусто -> случайный. Число -> фиксированный seed для всего прогона.
+    'r' / empty -> random. A number -> fixed seed for the whole run.
     """
     user_input = input("Enter global seed (number or 'r' for random): ").strip()
     if user_input.lower() in ["r", ""]:
@@ -29,6 +40,74 @@ def choose_seed():
         return int(user_input)
     except ValueError:
         return make_seed()
+
+
+def choose_episodes(episode_length):
+    """
+    Episodes are asked here, not read from config: only their length is a
+    config value. An episode is a logging window, so this number only decides
+    how long the run is and how often summaries are flushed.
+    """
+    print(f"1 episode = {episode_length} steps")
+
+    user_input = input("Enter number of episodes: ").strip()
+
+    try:
+        return int(user_input)
+    except ValueError:
+        print("Invalid input, falling back to 1 episode")
+        return 1
+
+
+def capture_rng_states(master_rng):
+    """
+    Snapshot of every rng that can influence the run:
+      - master_rng: python random.Random used by the world (map generation
+        and refills),
+      - numpy global rng,
+      - torch global rng (used by the policy for exploration) and cuda rng
+        if there is one.
+
+    There are no per-episode local seeds anymore, so these snapshots are the
+    only way to replay the run from an arbitrary logging window.
+
+    Restoring a snapshot `s` from logs/rng/<run>.jsonl:
+        rng.setstate((s["python_random"]["version"],
+                      tuple(s["python_random"]["state"]),
+                      s["python_random"]["gauss_next"]))
+        np.random.set_state((s["numpy"]["algorithm"],
+                             np.array(s["numpy"]["keys"], dtype="uint32"),
+                             s["numpy"]["pos"], s["numpy"]["has_gauss"],
+                             s["numpy"]["cached_gaussian"]))
+        torch.set_rng_state(torch.ByteTensor(list(bytes.fromhex(s["torch"]))))
+    """
+    np_state = np.random.get_state()
+    py_state = master_rng.getstate()  # (version, 625-int internal state, gauss_next)
+
+    states = {
+        "python_random": {
+            "version": py_state[0],
+            "state": list(py_state[1]),
+            "gauss_next": py_state[2],
+        },
+        "numpy": {
+            "algorithm": np_state[0],
+            "keys": np_state[1].tolist(),
+            "pos": int(np_state[2]),
+            "has_gauss": int(np_state[3]),
+            "cached_gaussian": float(np_state[4]),
+        },
+        # byte tensor -> hex, twice as compact as a list of ints
+        "torch": torch.get_rng_state().numpy().tobytes().hex(),
+    }
+
+    if torch.cuda.is_available():
+        states["torch_cuda"] = [
+            state.numpy().tobytes().hex()
+            for state in torch.cuda.get_rng_state_all()
+        ]
+
+    return states
 
 
 def encode_observation(obs):
@@ -41,21 +120,45 @@ def encode_observation(obs):
 
 
 def main(render_fn=None, episodes=None, seed=None):
+    config = load_config()
+
+    # --- run length ---
+    # Episodes no longer exist as a world mechanic: they are just logging
+    # windows. Their length comes from config.yml, their count is asked in
+    # the terminal.
+    run_cfg = config.get("run", {})
+    episode_length = int(run_cfg.get("episode_length", 20))
+
     if episodes is None:
-        episodes = int(input("Enter number of episodes: "))
+        episodes = choose_episodes(episode_length)
+    else:
+        print(f"1 episode = {episode_length} steps")
+
+    total_steps = episodes * episode_length
+
+    print(f"episodes = {episodes} -> total steps = {total_steps}")
 
     if seed is None:
         seed = choose_seed()
     print(f"SEED: {seed}")
 
+    # One rng for the whole run: the map, the refills and everything else
+    # draw from it, and its state is snapshotted per episode.
     master_rng = random.Random(seed)
-    env = GridWorldEnv(size=64, max_steps=20, rng=master_rng)
+    np.random.seed(seed % (2 ** 32))
+    torch.manual_seed(seed % (2 ** 63))
 
-    with open("src/Brain/config.yml", "r") as f:
-        config = yaml.safe_load(f)
+    world_cfg = config.get("world", {})
+    env = GridWorldEnv(
+        size=world_cfg.get("size", 64),
+        rng=master_rng,
+        empty_ratio=world_cfg.get("empty_ratio", 0.8),
+        refill=world_cfg.get("refill", {}),
+    )
 
-    dummy_obs = env.reset(seed=0)
-    obs_size = len(encode_observation(dummy_obs))
+    # The world is built exactly once - from here on it only gets updated.
+    observation = env.start()
+    obs_size = len(encode_observation(observation))
 
     mlp = MLP(obs_size=obs_size, action_size=8)
     trainer = DQNTrainer(
@@ -63,11 +166,11 @@ def main(render_fn=None, episodes=None, seed=None):
         config=config
     )
 
-    epsilon_cfg = config.get("epsilon", {})
+    policy_cfg = config.get("policy", {})
     policy = Policy(
-        epsilon=epsilon_cfg.get("start", 1.0),
-        epsilon_decay=epsilon_cfg.get("decay", 0.995),
-        epsilon_min=epsilon_cfg.get("min", 0.01)
+        epsilon=policy_cfg.get("epsilon", 1.0),
+        epsilon_decay=policy_cfg.get("epsilon_decay", 0.995),
+        epsilon_min=policy_cfg.get("epsilon_min", 0.01)
     )
 
     brain = Brain(trainer, policy)
@@ -77,12 +180,11 @@ def main(render_fn=None, episodes=None, seed=None):
     )
 
     # --- Replay buffer / batching ---
-    # buffer_size: сколько transitions хранится максимум (старые вытесняются)
-    # batch_size: сколько transitions берём за одно обучение
-    # min_buffer_size: сколько шагов накопить ПЕРЕД тем, как начать учиться —
-    #   без прогрева на маленьком буфере sample() почти всегда возвращал бы
-    #   одни и те же несколько transitions, что не даёт настоящей развязки
-    #   корреляции.
+    # buffer_size: max number of stored transitions (old ones are evicted)
+    # batch_size: how many transitions are used per training update
+    # min_buffer_size: how many steps to collect BEFORE training starts -
+    #   without this warmup sample() would keep returning the same few
+    #   transitions, which does not decorrelate anything.
     buffer_cfg = config.get("replay_buffer", {})
     buffer_size = buffer_cfg.get("buffer_size", 10_000)
     batch_size = buffer_cfg.get("batch_size", 32)
@@ -90,16 +192,29 @@ def main(render_fn=None, episodes=None, seed=None):
 
     replay_buffer = ReplayBuffer(capacity=buffer_size)
 
-    for episode in range(episodes):
-        logger = Logger()
-        observation = env.reset(seed=master_rng.randint(0, 1_000_000))
-        logger.log_seed(seed, episode_seed=episode)
+    # --- logging ---
+    logging_cfg = config.get("logging", {})
+    rng_snapshot_every = int(logging_cfg.get("rng_snapshot_every", 1))
 
-        done = False
-        total_reward = 0
-        step_counter = 0
+    logger = Logger(log_dir=logging_cfg.get("log_dir", "logs"))
+    logger.log_run_start(
+        seed=seed,
+        extra={
+            "episodes": episodes,
+            "episode_length": episode_length,
+            "total_steps": total_steps,
+            "world_size": world_cfg.get("size", 64),
+            "world_refill": world_cfg.get("refill", {}),
+        },
+    )
 
-        while not done:
+    if rng_snapshot_every > 0:
+        logger.log_rng(capture_rng_states(master_rng), step=0)
+
+    episode_reward = 0.0
+
+    try:
+        for step in range(1, total_steps + 1):
             state = encode_observation(observation)
 
             action = brain.choose_action(
@@ -107,25 +222,27 @@ def main(render_fn=None, episodes=None, seed=None):
                 env.agent.get_available_actions()
             )
 
-            next_obs, env_reward, done, info = env.step(action)
+            next_obs, env_reward, info = env.step(action)
 
             shaped_reward, intrinsic_reward = reward_shaping.compute(next_obs, env_reward)
 
             next_state = encode_observation(next_obs)
 
-            # Сохраняем transition в буфер — НЕ учимся на нём сразу
+            # Store the transition - do NOT train on it right away.
+            # done is always False: the process is continuous, there is no
+            # terminal state to cut the bootstrap on.
             replay_buffer.push(
                 state=state,
                 action=action,
                 reward=shaped_reward,
                 next_state=next_state,
-                done=done
+                done=False
             )
 
-            # Учимся батчем, только когда буфер достаточно прогрет.
-            # До этого момента metrics = None -> logger просто не получит
-            # loss/td_error/etc для этого шага (как и было задумано в Logger:
-            # среднее считается только по шагам, где значение реально было).
+            # Train on a batch only once the buffer is warm enough.
+            # Until then metrics = None -> the logger simply gets no
+            # loss/td_error/etc for this step (as designed in Logger: the
+            # average is computed only over steps where a value existed).
             if len(replay_buffer) >= min_buffer_size:
                 batch = replay_buffer.sample(batch_size)
                 metrics = brain.learn(*batch)
@@ -133,7 +250,7 @@ def main(render_fn=None, episodes=None, seed=None):
                 metrics = None
 
             log_kwargs = dict(
-                step=step_counter,
+                step=step,
                 position=observation.position,
                 action=action,
                 reward=env_reward,
@@ -151,23 +268,44 @@ def main(render_fn=None, episodes=None, seed=None):
 
             logger.log_step(**log_kwargs)
 
-            total_reward += shaped_reward
+            episode_reward += shaped_reward
             observation = next_obs
-            step_counter += 1
 
             if render_fn is not None:
                 render_fn(env, info)
 
-        print(f"Episode {episode+1} | reward={total_reward} | epsilon={policy.epsilon:.4f}")
+            # --- logging window boundary ---
+            # Nothing here touches the world or the agent position: only the
+            # log file, epsilon and curiosity.
+            if step % episode_length == 0:
+                episode_index = logger.episode
 
-        logger.end_episode(
-            beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
-        )
+                print(
+                    f"Episode {episode_index + 1}/{episodes} | step={step} | "
+                    f"reward={episode_reward} | epsilon={policy.epsilon:.4f} | "
+                    f"filled={info['non_empty_ratio']:.3f}"
+                )
 
-        policy.next_episode()
+                logger.end_episode(
+                    beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
+                )
 
-        if reward_shaping.curiosity is not None:
-            reward_shaping.reset()
+                policy.next_episode()
+
+                if reward_shaping.curiosity is not None:
+                    reward_shaping.reset()
+
+                if rng_snapshot_every > 0 and logger.episode % rng_snapshot_every == 0:
+                    logger.log_rng(capture_rng_states(master_rng), step=step)
+
+                episode_reward = 0.0
+    finally:
+        # Flush whatever is left of an unfinished window, then close the file.
+        if logger.steps > 0:
+            logger.end_episode(
+                beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
+            )
+        logger.close()
 
     trainer.save()
     print("Training finished")

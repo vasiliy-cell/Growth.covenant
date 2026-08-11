@@ -1,10 +1,9 @@
-import os
-import json
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 
 from log_selector import choose_files
+from episode_grouping import group_steps_by_episode
 
 
 # ---------------------------------------------------
@@ -23,41 +22,34 @@ def load_data(files):
     heatmap = np.zeros((GRID_SIZE, GRID_SIZE))
     action_counter = Counter()
 
-    for file in files:
-
-        path = os.path.join(LOG_DIR, file)
+    # One file holds the whole run, so episodes come from the `episode` field
+    # of each step, not from the file list.
+    for _, steps in group_steps_by_episode(files, LOG_DIR):
 
         total_reward = 0
 
-        with open(path) as f:
+        for data in steps:
 
-            for line in f:
+            # -----------------------------
+            # reward
+            # -----------------------------
+            total_reward += data["reward"]
 
-                data = json.loads(line)
+            # -----------------------------
+            # position
+            # -----------------------------
+            x, y = data["position"]
 
-                if data["type"] != "step":
-                    continue
+            if isinstance(x, list):
+                x, y = x
 
-                # -----------------------------
-                # reward
-                # -----------------------------
-                total_reward += data["reward"]
+            heatmap[int(x)][int(y)] += 1
 
-                # -----------------------------
-                # position
-                # -----------------------------
-                x, y = data["position"]
-
-                if isinstance(x, list):
-                    x, y = x
-
-                heatmap[int(x)][int(y)] += 1
-
-                # -----------------------------
-                # action
-                # -----------------------------
-                action = str(data["action"])
-                action_counter[action] += 1
+            # -----------------------------
+            # action
+            # -----------------------------
+            action = str(data["action"])
+            action_counter[action] += 1
 
         rewards.append(total_reward)
 

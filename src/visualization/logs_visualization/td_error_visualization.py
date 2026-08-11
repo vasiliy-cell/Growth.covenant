@@ -1,31 +1,21 @@
-import os
-import json
 import matplotlib.pyplot as plt
 import numpy as np
 from log_selector import choose_files
-
-LOG_DIR = "logs"
+from episode_grouping import group_steps_by_episode
 
 
 def load_td_metrics(files):
     td_per_episode = []
     abs_td_per_episode = []
 
-    for file in files:
-        path = os.path.join(LOG_DIR, file)
+    # One file holds the whole run, so episodes come from the `episode` field
+    # of each step, not from the file list.
+    for _, steps in group_steps_by_episode(files):
 
-        td_values = []
-        abs_td_values = []
+        td_values = [s["td_error"] for s in steps if "td_error" in s]
+        abs_td_values = [s["abs_td_error"] for s in steps if "abs_td_error" in s]
 
-        with open(path) as f:
-            for line in f:
-                data = json.loads(line)
-
-                if data["type"] == "step" and "td_error" in data:
-                    td_values.append(data["td_error"])
-                    abs_td_values.append(data["abs_td_error"])
-
-        # если вдруг пусто
+        # empty window (e.g. buffer still warming up)
         if len(td_values) == 0:
             td_per_episode.append(0)
             abs_td_per_episode.append(0)
@@ -43,7 +33,11 @@ def main():
 
     td, abs_td = load_td_metrics(files)
 
-    x = np.arange(len(files))
+    if not td:
+        print("No steps found")
+        return
+
+    x = np.arange(len(td))
 
     avg_td = np.mean(td) if td else 0
     avg_abs_td = np.mean(abs_td) if abs_td else 0

@@ -5,35 +5,37 @@ from src.Agent.agent import Agent
 
 
 class GridWorldEnv:
-    def __init__(self, size=8, max_steps=10, rng=None):
+    """
+    One continuous world. No episodes, no reset:
+      - the map is generated exactly once, in start(),
+      - the agent is created once and keeps its position forever,
+      - instead of regeneration the world refills itself (World.maybe_refill).
+    """
+
+    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None):
         self.size = size
-        self.max_steps = max_steps
 
-        # Global RNG for the whole run
-        self.master_rng = rng if rng is not None else random.Random()
+        # Single RNG for the whole run - no per-episode local seeds anymore
+        self.rng = rng if rng is not None else random.Random()
 
-        self.world = World(size=size)
+        self.world = World(size=size, empty_ratio=empty_ratio, refill=refill)
         self.agent = None
 
         self.current_step = 0
-        self.rng = None
 
-    # --- reset environment ---
-    def reset(self, seed=None):
-        # Create RNG for this episode
-        if seed is not None:
-            self.rng = random.Random(seed)
-        else:
-            self.rng = self.master_rng
+    # --- build the world (call once at the beginning of the run) ---
+    def start(self):
+        if self.agent is not None:
+            # Already running: never rebuild the world mid-run
+            return self.agent.get_state()
 
-        # Delegate world generation to World (clean encapsulation)
         self.world.generate(rng=self.rng)
-
-        # Create new agent in the generated world
         self.agent = Agent(self.world)
-
         self.current_step = 0
 
+        return self.agent.get_state()
+
+    def get_state(self):
         return self.agent.get_state()
 
     # --- one step in environment ---
@@ -51,13 +53,20 @@ class GridWorldEnv:
         if self.world.get_cell(position) != 0:
             self.world.clear_cell(position)
 
-        done = self.current_step >= self.max_steps
+        # the world tops itself up instead of being regenerated
+        refilled = self.world.maybe_refill(self.current_step, exclude=position)
 
+        # No terminal state: this is a continuing task, so the training loop
+        # always bootstraps (done=False) and stops only when total_steps is
+        # reached.
         info = {
+            "step": self.current_step,
             "position": position,
-            "available_actions": self.agent.get_available_actions()
+            "available_actions": self.agent.get_available_actions(),
+            "refilled": refilled,
+            "non_empty_ratio": self.world.non_empty_ratio(),
         }
-        return observation, reward, done, info
+        return observation, reward, info
 
     # --- action space ---
     def get_action_space(self):

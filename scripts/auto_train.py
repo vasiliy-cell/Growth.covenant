@@ -65,28 +65,26 @@ def clean_run_artifacts():
 
 def collect_episode_rewards(metric):
     """
-    Каждый episode-файл: первая строка seed_info даёт episode_seed (порядковый
-    номер эпизода в ране), где-то дальше -- episode_summary с самой наградой.
+    Один ран -- один файл logs/run_*.jsonl со множеством episode_summary
+    (эпизод теперь просто окно логирования, а не пересоздание мира). Индекс
+    окна лежит в поле "episode" самого summary.
     Возвращает список (episode_index, reward), отсортированный по индексу.
     """
     episodes = []
-    for fname in os.listdir(LOGS_DIR):
+    for fname in sorted(os.listdir(LOGS_DIR)):
         if not fname.endswith(".jsonl"):
             continue
-        episode_index = None
-        reward = None
         with open(os.path.join(LOGS_DIR, fname), "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 obj = json.loads(line)
-                if obj.get("type") == "seed_info":
-                    episode_index = obj.get("episode_seed")
-                elif obj.get("type") == "episode_summary" and obj.get(metric) is not None:
-                    reward = obj[metric]
-        if episode_index is not None and reward is not None:
-            episodes.append((episode_index, reward))
+                if obj.get("type") != "episode_summary":
+                    continue
+                if obj.get(metric) is None:
+                    continue
+                episodes.append((obj.get("episode", len(episodes)), obj[metric]))
     episodes.sort(key=lambda pair: pair[0])
     return episodes
 

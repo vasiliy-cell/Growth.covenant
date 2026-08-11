@@ -1,0 +1,54 @@
+# =====================================================================
+#  Main run config. Lives in the repo root because it drives not only
+#  the brain, but also the world, the logging and the run length.
+# =====================================================================
+
+# --- RUN ---
+# The world is NOT recreated anymore: one continuous process of
+# episodes * episode_length steps.
+# An "episode" is now ONLY a logging window (and the boundary where
+# epsilon / curiosity decay). It resets nothing in the world and never
+# teleports the agent back to the start of the map.
+#
+# The number of episodes is asked in the terminal before the run, not set
+# here - only the window length is a config value.
+run:
+  episode_length: 20      # steps per window -> total_steps = episodes * episode_length
+
+# --- WORLD ---
+world:
+  size: 64
+  empty_ratio: 0.8        # share of empty cells at the FIRST (and only) generation
+  refill:
+    every: 5              # check the map every N steps
+    threshold: 0.2        # if colored cells drop below this share -> refill
+    amount: 5             # how many cells to add per check
+
+# --- LOGGING ---
+logging:
+  log_dir: "logs"
+  rng_snapshot_every: 1   # snapshot every rng state once per N episodes (0 = off)
+
+learning_rate: 0.001
+gamma: 0.99
+
+policy:
+  mode: epsilon_greedy
+  epsilon: 1.0            # start value
+  epsilon_decay: 0.995    # applied at the episode (logging window) boundary
+  epsilon_min: 0.01
+
+curiosity:
+  beta: 4.0
+  decay: 0.995            # applied at the episode boundary
+
+trainer:
+  gamma: 0.99
+  target_update_freq: 10000
+  save_path: "models/mlp.pth"
+  max_norm: 0.01
+
+replay_buffer:
+  buffer_size: 10000
+  batch_size: 32
+  min_buffer_size: 500
