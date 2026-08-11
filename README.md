@@ -112,7 +112,8 @@ Stages 3–5, or pushing evolution further.
 
 1. instal requirements (requirements.txt)
 2. run `./run.sh`
-![./](./docs/Attachments/Screen%20Recording%202026-08-11%20at%2015.15.26.mov)
+
+<video src="https://github.com/vasiliy-cell/Growth.covenant/raw/main/docs/Attachments/demo.mp4" controls width="640"></video>
 
 
 
