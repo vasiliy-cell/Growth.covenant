@@ -6,8 +6,9 @@ from src.Brain.policy.policy import Policy
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 from src.utils.td_estimator import TDErrorLogger
-from src.utils.logger import Logger
+from src.persistence.logger import Logger
 from src.Brain.replay_buffer import ReplayBuffer
+
 import os
 import yaml
 import numpy as np
@@ -15,19 +16,15 @@ import random
 import time
 import torch
 
-
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(REPO_ROOT, "config.yml")
-
 
 def load_config(path=CONFIG_PATH):
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
-
 def make_seed():
     return int(time.time() * 1e6)
-
 
 def choose_seed():
     """

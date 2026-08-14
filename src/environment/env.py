@@ -14,8 +14,8 @@ class GridWorldEnv:
 
     def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None):
         self.size = size
-
-        # Single RNG for the whole run - no per-episode local seeds anymore
+ 
+        # Single RNG for the whole run 
         self.rng = rng if rng is not None else random.Random()
 
         self.world = World(size=size, empty_ratio=empty_ratio, refill=refill)

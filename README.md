@@ -53,6 +53,34 @@ Each research stage follows the same shape:
 6. hypotheses compared against each other and against the baseline
 7. conclusion
 
+
+---
+
+## AI usage
+
+Full disclosure, since this matters for how the results should be read.
+
+I use AI assistants (primarily Claude) in this project for exactly two things:
+
+- **generating some chunks of code** — routine, mechanical parts;
+- **spelling and grammar checks** in text.
+
+That is the whole list. Specifically, AI does **not**:
+
+- design experiments or choose hypotheses;
+- decide the architecture of the system or of the genome schemes;
+- write papers, reports, or research conclusions;
+- interpret results.
+
+Every line of generated code or text is read and understood by me before it enters the
+repository. Nothing goes in that I could not have written myself and cannot
+explain. The research design, the reasoning behind it, and the conclusions are
+mine.
+
+This is verifiable, not just a claim: Claude appears as a separate contributor
+in the commit history, so anyone can check line by line which parts were
+written with AI assistance and which I wrote by hand.
+
 ---
 
 ## Roadmap
@@ -110,13 +138,18 @@ Stages 3–5, or pushing evolution further.
 ---
 ## Running it
 
-1. instal requirements (requirements.txt)
+1. install requirements (requirements.txt)
 2. run `./run.sh`
+
+### Reproducibility
+
+A specific seed can be passed at launch, and the seed used for a run is
+recorded in that run's log files — so any run can be reproduced from its logs.
 
 https://github.com/user-attachments/assets/dd9c73c2-4c0d-42ac-b3ff-7ee9cf9fd6ef
 
 
 
-## Results
+## research Results
 
 *(nothing published yet — Stage 3 in progress)*
