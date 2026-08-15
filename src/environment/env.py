@@ -30,7 +30,10 @@ class GridWorldEnv:
             return self.agent.get_state()
 
         self.world.generate(rng=self.rng)
-        self.agent = Agent(self.world)
+
+        # Spawn AFTER the map is generated: the map keeps consuming the rng
+        # in the same order as before, so old seeds still produce old maps.
+        self.agent = Agent(self.world, rng=self.rng)
         self.current_step = 0
 
         return self.agent.get_state()

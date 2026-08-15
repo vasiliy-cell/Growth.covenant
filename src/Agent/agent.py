@@ -6,8 +6,12 @@ from src.Agent.Actions.movement.movements import MOVEMENTS
 
 
 class Agent:
-    def __init__(self, world):
-        self.position = Position()
+    def __init__(self, world, rng=None):
+        # With an rng the agent spawns anywhere inside the map; without one
+        # it falls back to the fixed corner start (used by tests).
+        self.position = (
+            Position.random(world.size, rng) if rng is not None else Position()
+        )
         self.world = world
 
     # -----------------------------

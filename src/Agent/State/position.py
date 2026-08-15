@@ -1,10 +1,11 @@
-
-
-
 class Position:
     def __init__(self, x=1, y=1):
         self.x = x
         self.y = y
+
+    @classmethod
+    def random(cls, size, rng):
+        return cls(rng.randint(0, size - 1), rng.randint(0, size - 1))
 
     def get(self):
         return (self.x, self.y)
