@@ -3,6 +3,8 @@ from src.Agent.State.observation import Observation
 from src.Agent.Actions.movement.available_movements import get_available_movements
 from src.Agent.Actions.movement.movements import MOVEMENTS
 
+from src.world.Grid_world.objects import AGENT_CELL
+
 
 class Agent:
     """
@@ -75,15 +77,28 @@ class Agent:
     # -----------------------------
     # OBSERVATION (STATE)
     # -----------------------------
-    def get_state(self):
+    def get_state(self, agent_positions=None):
+        """
+        agent_positions: where every body stands, as ONE snapshot of the
+        whole population. The env takes it after the tick has settled and
+        hands the same snapshot to everybody, so no agent sees a world in
+        which some have already moved and others have not.
+        """
         pos = self.get_position()
 
-        local = self.get_local_view(
+        map_view = self.get_local_view(
             self.world.map.grid,
             pos,
             size=7
         )
-        return Observation(pos, local)
+        local_view = self.overlay_agents(
+            map_view,
+            pos,
+            agent_positions,
+            size=7
+        )
+
+        return Observation(pos, local_view, map_view)
 
     # -----------------------------
     # LOCAL VIEW (VISION)
@@ -104,6 +119,40 @@ class Agent:
                     row.append(grid[ny][nx])
                 else:
                     row.append(-1)
+
+            view.append(row)
+
+        return view
+
+    @staticmethod
+    def overlay_agents(map_view, position, agent_positions, size=7):
+        """
+        Paints the other bodies on top of a map view.
+
+        A body HIDES the object it stands on - you cannot see through
+        somebody. That is a real loss of information, and it is the honest
+        price of showing agents as a cell value instead of a separate
+        channel.
+
+        The agent's own cell is never painted: it is always the center of
+        the window, so marking it would spend a value on something the
+        network can read off the geometry anyway.
+        """
+        agent_positions = agent_positions or set()
+
+        x, y = position
+        half = size // 2
+
+        view = []
+
+        for row_index, dy in enumerate(range(-half, half + 1)):
+            row = list(map_view[row_index])
+
+            for column, dx in enumerate(range(-half, half + 1)):
+                cell = (x + dx, y + dy)
+
+                if cell != position and cell in agent_positions:
+                    row[column] = AGENT_CELL
 
             view.append(row)
 

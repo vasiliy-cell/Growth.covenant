@@ -75,10 +75,10 @@ class AgentManager:
         """
         A free cell for a newborn agent.
 
-        Spawning spreads the population out so a run does not start with a
-        pile of agents on one tile. This is a spawn-time nicety ONLY: once
-        the run is going agents do not block each other and may share a
-        cell (see GridWorldEnv.step).
+        Finding one is not a nicety, it is the world's invariant: the map
+        holds one body per cell (GridWorldEnv._resolve_movements), and that
+        has to be true from the very first tick, not just after the first
+        move.
 
         The random draw comes first and the scan is only a fallback, so on a
         map with room to spare the very first agent consumes exactly the two
@@ -93,15 +93,16 @@ class AgentManager:
             if position.get() not in occupied:
                 return position
 
-        # Crowded (or tiny) map: take the first free cell instead of rolling
-        # forever, and if there is not a single one left allow the overlap
-        # rather than failing the run.
+        # Crowded map: scan for a free cell instead of rolling forever.
         for y in range(self.world.size):
             for x in range(self.world.size):
                 if (x, y) not in occupied:
                     return Position(x, y)
 
-        return Position.random(self.world.size, self.rng)
+        raise RuntimeError(
+            f"No free cell for a new agent: {len(self.agents)} agents "
+            f"already fill a {self.world.size}x{self.world.size} world"
+        )
 
     # -----------------------------
     # ACCESS
@@ -125,22 +126,6 @@ class AgentManager:
 
     def occupied_positions(self):
         return {agent.get_position() for agent in self.agents.values()}
-
-    def shuffled(self):
-        """
-        Every agent in a random order drawn from the run rng.
-
-        Anything order-sensitive inside a tick - above all, who eats a
-        shared cell first - MUST iterate through this instead of the spawn
-        order. Otherwise the agents spawned first would collect a permanent
-        advantage that silently biases every reward metric in the run.
-
-        With a single agent the shuffle draws nothing, so one-agent runs stay
-        bit-identical to the runs from before the population existed.
-        """
-        agents = self.all()
-        self.rng.shuffle(agents)
-        return agents
 
     def __len__(self):
         return len(self.agents)

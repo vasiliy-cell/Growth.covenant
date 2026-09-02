@@ -51,8 +51,18 @@ class GridWorldEnv:
         return self.get_states()
 
     def get_states(self):
-        """{agent_id: Observation} for every agent, in id order."""
-        return {agent.agent_id: agent.get_state() for agent in self.agents}
+        """
+        {agent_id: Observation} for every agent, in spawn order.
+
+        The snapshot of positions is taken ONCE and shared: everybody sees
+        the same frame of the world, nobody sees a half-moved population.
+        """
+        positions = self.agents.occupied_positions()
+
+        return {
+            agent.agent_id: agent.get_state(positions)
+            for agent in self.agents
+        }
 
     def get_available_actions(self):
         return {
@@ -85,14 +95,14 @@ class GridWorldEnv:
         for agent_id, position in targets.items():
             self.agents.get(agent_id).move_to(position)
 
-        # 4. REWARDS - in a RANDOM order, never in id order. Agents may share
-        #    a cell, so when two of them land on the same food the first one
-        #    through this loop takes it and the cell turns empty for the
-        #    other. Doing that in id order would make agent 0 permanently
-        #    luckier than agent 49.
+        # 4. REWARDS. The order of this loop does not matter and cannot be
+        #    made to matter: _resolve_movements guarantees one body per
+        #    cell, so no two agents are ever standing on the same food and
+        #    nobody can eat it from under anybody. Competition happens a
+        #    step earlier, over who is allowed to move there at all.
         rewards = {}
 
-        for agent in self.agents.shuffled():
+        for agent in self.agents:
             position = agent.get_position()
 
             rewards[agent.agent_id] = self.world.get_reward(position)
@@ -100,14 +110,6 @@ class GridWorldEnv:
             # good/bad cells turn empty once an agent touches them
             if self.world.get_cell(position) != 0:
                 self.world.clear_cell(position)
-
-        # Hand the rewards back in id order: the shuffle decides who eats
-        # first, it must not also decide the order of the log lines.
-        rewards = {
-            agent_id: rewards[agent_id]
-            for agent_id in self.agents.ids()
-            if agent_id in rewards
-        }
 
         # 5. REFILL - the world tops itself up once per TICK, however many
         #    agents there are, so world.refill.every keeps meaning what it
@@ -135,15 +137,55 @@ class GridWorldEnv:
 
     def _resolve_movements(self, targets):
         """
-        Turns what the agents WANT into what actually happens.
+        Turns what the agents WANT into what actually happens. This is the
+        one and only place the movement rule of this world lives.
 
-        Right now the world is permissive: nobody blocks anybody, two agents
-        may stand on the same cell and every intent is granted unchanged.
-        This is the one and only place a stricter rule belongs - blocking,
-        pushing, swap prevention - and adding one here changes nothing else
-        in the codebase.
+        Two rules, and together they are what makes the population a crowd
+        instead of N walkers ignoring each other:
+
+          - one body per cell: an agent may not step onto a cell somebody
+            already stands on,
+          - when several agents reach for the same free cell in the same
+            tick, exactly one gets it and the rng picks who.
+
+        "Already stands on" is read from ONE snapshot taken before anybody
+        moves, so the outcome never depends on the order the agents are
+        looked at - nobody gets an advantage for having spawned first. The
+        price is that a column of agents crawls forward one cell per tick:
+        the one in front leaves, and only on the next tick can the one
+        behind follow it.
         """
-        return targets
+        occupied = self.agents.occupied_positions()
+
+        resolved = {}
+        claims = {}
+
+        # Staying put is always allowed - the agent is already there.
+        # Stepping onto a taken cell never is.
+        for agent_id, target in targets.items():
+            current = self.agents.get(agent_id).get_position()
+
+            if target == current or target in occupied:
+                resolved[agent_id] = current
+            else:
+                claims.setdefault(target, []).append(agent_id)
+
+        # One free cell, several claimants: the rng draws the winner and
+        # everybody else stays where they are. An uncontested claim costs no
+        # draw, so a lone agent leaves the rng stream untouched.
+        for target, claimants in claims.items():
+            winner = (
+                claimants[0] if len(claimants) == 1
+                else self.rng.choice(claimants)
+            )
+
+            for agent_id in claimants:
+                resolved[agent_id] = (
+                    target if agent_id == winner
+                    else self.agents.get(agent_id).get_position()
+                )
+
+        return resolved
 
     # --- action space ---
     def get_action_space(self):
