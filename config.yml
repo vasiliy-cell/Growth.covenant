@@ -19,6 +19,10 @@ run:
 # How many agents share the one world. The value here is only the default
 # offered by the terminal prompt before the run: the population size is an
 # experiment parameter, so it is chosen next to the run length.
+#
+# Every agent gets its OWN brain, replay buffer, epsilon and curiosity, so
+# the settings below are per agent and keep the meaning they had when a
+# single agent lived in the world.
 agents:
   count: 1
 
@@ -52,8 +56,13 @@ curiosity:
 trainer:
   gamma: 0.99
   target_update_freq: 10000
-  save_path: "models/mlp.pth"
   max_norm: 0.01
+
+# --- CHECKPOINTS ---
+# Every agent has its own brain, so there is no single model file anymore:
+# one file per agent under models/<run_id>/<agent_id>.pth.
+checkpoints:
+  models_dir: "models"
 
 replay_buffer:
   buffer_size: 10000

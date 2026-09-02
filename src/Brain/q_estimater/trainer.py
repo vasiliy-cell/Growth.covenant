@@ -1,4 +1,3 @@
-import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,6 +5,15 @@ from copy import deepcopy
 
 
 class DQNTrainer:
+    """
+    The DQN math for ONE brain: its network, its target copy, its
+    optimizer.
+
+    It knows nothing about files. Where a mind is written down and under
+    what name is the checkpoint writer's business (src/persistence), the
+    same way the log format is the logger's - with a network per agent
+    there is no single path to hardcode here anyway.
+    """
 
     def __init__(
         self,
@@ -16,10 +24,7 @@ class DQNTrainer:
         self.policy_net = model
         self.gamma = config["trainer"]["gamma"]
         self.target_update_freq = config["trainer"]["target_update_freq"]
-        self.save_path = config["trainer"]["save_path"]
         self.max_norm = config["trainer"]["max_norm"]
-
-        self.policy_net = model
         self.target_net = deepcopy(self.policy_net)
         self.target_net.eval()
         for param in self.target_net.parameters():
@@ -31,42 +36,13 @@ class DQNTrainer:
             self.policy_net.parameters(),
             lr=config.get("learning_rate", 0.001)
         )
-        self._load_model()
 
     # -------------------------
-    # LOAD MODEL
+    # WEIGHTS
     # -------------------------
-    def _load_model(self):
-        print("LOAD-1")
-
-        if os.path.exists(self.save_path):
-            print(f"[MLP] Loading model from {self.save_path}")
-
-            state = torch.load(self.save_path, map_location="cpu")
-            self.policy_net.load_state_dict(state)
-            self.target_net.load_state_dict(
-                self.policy_net.state_dict()
-            )
-
-            print("LOAD-2 DONE")
-
-        else:
-            print("[MLP] No saved model found. Starting fresh.")
-
-    # -------------------------
-    # SAVE MODEL
-    # -------------------------
-    def save(self):
-        print("[MLP] Saving model...")
-
-        os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
-
-        torch.save(
-            self.policy_net.state_dict(),
-            self.save_path
-        )
-
-        print("[MLP] Saved.")
+    def state_dict(self):
+        """The learned part of this brain, for the checkpoint writer."""
+        return self.policy_net.state_dict()
 
     # -------------------------
     # DQN UPDATE (batched)

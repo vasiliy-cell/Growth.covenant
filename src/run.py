@@ -1,14 +1,8 @@
 from src.environment.env import GridWorldEnv
 from src.Agent.identity import new_run_id
-from src.Brain.brain import Brain
-from src.Brain.q_estimater.mlp import MLP
-from src.Brain.q_estimater.trainer import DQNTrainer
-from src.Brain.policy.policy import Policy
-from src.Brain.reward_shaping.reward_shaping import RewardShaping
-from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
-from src.utils.td_estimator import TDErrorLogger
+from src.Brain.BrainManager import BrainManager
+from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.logger import Logger
-from src.Brain.replay_buffer import ReplayBuffer
 
 import os
 import yaml
@@ -135,6 +129,30 @@ def capture_rng_states(master_rng):
     return states
 
 
+def population_summary(brains):
+    """
+    Epsilon and curiosity belong to the individual now, so a run summary can
+    only show the population mean.
+
+    Right now every agent is born at step 0 and the mean is the value every
+    one of them has. The moment agents start being born at different times
+    these numbers drift apart on their own - newborns exploring while the
+    veterans around them exploit - and the mean becomes the only honest
+    single number to print.
+    """
+    summaries = [brain.summary() for brain in brains]
+
+    epsilon = sum(s["epsilon"] for s in summaries) / len(summaries)
+
+    betas = [
+        s["curiosity_beta"] for s in summaries
+        if s["curiosity_beta"] is not None
+    ]
+    beta = sum(betas) / len(betas) if betas else None
+
+    return epsilon, beta
+
+
 def encode_observation(obs):
     x, y = obs.position
     flat = []
@@ -204,45 +222,26 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
     # network input size.
     obs_size = len(encode_observation(next(iter(observations.values()))))
 
-    mlp = MLP(obs_size=obs_size, action_size=8)
-    trainer = DQNTrainer(
-        model=mlp,
-        config=config
+    # --- minds ---
+    # One brain per agent, each with its own network, replay buffer,
+    # epsilon and curiosity. Nothing about learning is shared, which is the
+    # entire point: without a private mind an agent has no identity to
+    # grow.
+    #
+    # Because each agent stores exactly one transition per tick, every
+    # setting under replay_buffer in config.yml keeps the meaning it had
+    # when a single agent lived in the world.
+    checkpoints = CheckpointWriter(
+        models_dir=config.get("checkpoints", {}).get("models_dir", "models"),
+        run_id=run_id,
     )
 
-    policy_cfg = config.get("policy", {})
-    policy = Policy(
-        epsilon=policy_cfg.get("epsilon", 1.0),
-        epsilon_decay=policy_cfg.get("epsilon_decay", 0.995),
-        epsilon_min=policy_cfg.get("epsilon_min", 0.01)
+    brains = BrainManager(
+        config=config,
+        obs_size=obs_size,
+        action_size=len(env.get_action_space()),
+        checkpoints=checkpoints,
     )
-
-    # One brain for the whole population: every agent acts with it and every
-    # agent feeds it. The env knows nothing about brains - it only takes
-    # actions - so giving each agent its own is a change here and nowhere
-    # else.
-    brain = Brain(trainer, policy)
-
-    # One curiosity counter for the whole population as well: novelty is
-    # something the group discovers, so a cell another agent already visited
-    # is no longer new. Per-agent counters would send everybody rushing into
-    # the same "unexplored" corner at once.
-    reward_shaping = RewardShaping(
-        curiosity=Curiosity(config["curiosity"]) if "curiosity" in config else None
-    )
-
-    # --- Replay buffer / batching ---
-    # buffer_size: max number of stored transitions (old ones are evicted)
-    # batch_size: how many transitions are used per training update
-    # min_buffer_size: how many steps to collect BEFORE training starts -
-    #   without this warmup sample() would keep returning the same few
-    #   transitions, which does not decorrelate anything.
-    buffer_cfg = config.get("replay_buffer", {})
-    buffer_size = buffer_cfg.get("buffer_size", 10_000)
-    batch_size = buffer_cfg.get("batch_size", 32)
-    min_buffer_size = buffer_cfg.get("min_buffer_size", batch_size)
-
-    replay_buffer = ReplayBuffer(capacity=buffer_size)
 
     # --- logging ---
     logging_cfg = config.get("logging", {})
@@ -269,6 +268,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
 
     try:
         for step in range(1, total_steps + 1):
+            # Minds follow the population: whoever was born this tick gets
+            # one, whoever is gone has theirs written down and dropped.
+            brains.sync(env.agents)
+
             available_actions = env.get_available_actions()
 
             states = {
@@ -276,33 +279,33 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
                 for agent_id, observation in observations.items()
             }
 
-            # One forward pass per agent. At ~50 agents that is cheap; if the
-            # population ever grows a lot, this is the place to push the
-            # whole population through the network in a single batch.
+            # One forward pass per agent, through that agent's own network.
             actions = {
-                agent_id: brain.choose_action(state, available_actions[agent_id])
+                agent_id: brains.get(agent_id).choose_action(
+                    state, available_actions[agent_id]
+                )
                 for agent_id, state in states.items()
             }
 
             # One call = one tick of the world in which everybody moves.
             next_observations, env_rewards, info = env.step(actions)
 
-            # Every agent contributes its own transition to the SHARED replay
-            # buffer, so the population collects experience N times faster
-            # than a single agent did.
+            # Each agent remembers and learns on its own: its own curiosity
+            # values the step, its own buffer stores it, its own network
+            # takes the gradient. Nothing crosses between agents.
             # done is always False: the process is continuous, there is no
             # terminal state to cut the bootstrap on.
-            transitions = {}
-
             for agent_id in actions:
-                next_observation = next_observations[agent_id]
-                env_reward = env_rewards[agent_id]
+                brain = brains.get(agent_id)
 
-                shaped_reward, intrinsic_reward = reward_shaping.compute(
+                env_reward = env_rewards[agent_id]
+                next_observation = next_observations[agent_id]
+
+                shaped_reward, intrinsic_reward = brain.shape_reward(
                     next_observation, env_reward
                 )
 
-                replay_buffer.push(
+                brain.remember(
                     state=states[agent_id],
                     action=actions[agent_id],
                     reward=shaped_reward,
@@ -310,29 +313,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
                     done=False
                 )
 
-                transitions[agent_id] = (
-                    env_reward, shaped_reward, intrinsic_reward
-                )
-                episode_reward += shaped_reward
-
-            # Train on a batch only once the buffer is warm enough.
-            # Until then metrics = None -> the logger simply gets no
-            # loss/td_error/etc for this step (as designed in Logger: the
-            # average is computed only over steps where a value existed).
-            #
-            # One update per TICK, not per agent: the population fills the
-            # buffer N times faster, so the same cadence now means N times
-            # more experience collected per gradient step than before.
-            if len(replay_buffer) >= min_buffer_size:
-                batch = replay_buffer.sample(batch_size)
-                metrics = brain.learn(*batch)
-            else:
-                metrics = None
-
-            # The train metrics describe the tick, not any single agent -
-            # there is one shared brain and one update behind all of them.
-            for agent_id, rewards in transitions.items():
-                env_reward, shaped_reward, intrinsic_reward = rewards
+                # None while this agent's buffer is still warming up -> the
+                # logger simply gets no loss/td_error for the step (as
+                # designed in Logger: an average is computed only over the
+                # steps where a value existed).
+                metrics = brain.learn()
 
                 log_kwargs = dict(
                     step=step,
@@ -353,6 +338,8 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
 
                 logger.log_step(**log_kwargs)
 
+                episode_reward += shaped_reward
+
             observations = next_observations
 
             if render_fn is not None:
@@ -364,22 +351,22 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
             if step % episode_length == 0:
                 episode_index = logger.episode
 
+                mean_epsilon, mean_beta = population_summary(brains)
+
                 print(
                     f"Episode {episode_index + 1}/{episodes} | step={step} | "
                     f"reward={episode_reward:.2f} | "
                     f"per_agent={episode_reward / len(env.agents):.2f} | "
-                    f"epsilon={policy.epsilon:.4f} | "
+                    f"epsilon={mean_epsilon:.4f} | "
                     f"filled={info['non_empty_ratio']:.3f}"
                 )
 
-                logger.end_episode(
-                    beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
-                )
+                logger.end_episode(beta=mean_beta)
 
-                policy.next_episode()
-
-                if reward_shaping.curiosity is not None:
-                    reward_shaping.reset()
+                # Every mind decays its OWN epsilon and clears its OWN
+                # curiosity: the schedule belongs to the individual, so an
+                # agent born late still starts out exploring.
+                brains.next_episode()
 
                 if rng_snapshot_every > 0 and logger.episode % rng_snapshot_every == 0:
                     logger.log_rng(capture_rng_states(master_rng), step=step)
@@ -388,12 +375,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
     finally:
         # Flush whatever is left of an unfinished window, then close the file.
         if logger.steps > 0:
-            logger.end_episode(
-                beta=reward_shaping.curiosity.beta if reward_shaping.curiosity is not None else None
-            )
+            logger.end_episode(beta=population_summary(brains)[1])
         logger.close()
 
-    trainer.save()
+    saved = checkpoints.save_all(brains)
+    print(f"Saved {len(saved)} brains to {checkpoints.directory}")
     print("Training finished")
 
 
