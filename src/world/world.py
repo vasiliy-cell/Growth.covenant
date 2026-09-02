@@ -41,6 +41,9 @@ class World:
         refill_threshold, add refill_amount random objects.
         The map is NOT generated from scratch.
 
+        exclude: iterable of (x, y) cells to leave alone - the positions of
+                 every agent, so nothing spawns under a body.
+
         Returns how many cells were added (0 if nothing happened).
         """
         if self.map is None:

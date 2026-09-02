@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Colors for the population. Beyond its size agents start sharing colors -
+# with dozens of bodies on screen that is unavoidable and harmless.
+AGENT_PALETTE = plt.get_cmap("tab20")
+
 
 class Renderer:
     def __init__(self):
@@ -20,7 +24,18 @@ class Renderer:
 
         self.alive = True
 
-    def render(self, grid, agent_pos):
+    @staticmethod
+    def agent_color(index):
+        """
+        A stable color for the whole life of an agent: its index is never
+        reused, so a color never jumps to somebody else when an agent is
+        born or dies. Taking the color from the drawing order instead would
+        reshuffle the whole picture on every death.
+        """
+        return AGENT_PALETTE(index % AGENT_PALETTE.N)
+
+    def render(self, grid, agent_positions):
+        """agent_positions: {agent index: (x, y)} - the whole population."""
         if not self.alive:
             return
 
@@ -36,8 +51,13 @@ class Renderer:
         self.ax.clear()
         self.ax.imshow(image)
 
-        ax_x, ax_y = agent_pos
-        self.ax.scatter(ax_x, ax_y, c="#692ad5", s=120)
+        if agent_positions:
+            self.ax.scatter(
+                [position[0] for position in agent_positions.values()],
+                [position[1] for position in agent_positions.values()],
+                c=[self.agent_color(index) for index in agent_positions],
+                s=120,
+            )
 
         self.ax.set_xticks(np.arange(-0.5, size, 1))
         self.ax.set_yticks(np.arange(-0.5, size, 1))

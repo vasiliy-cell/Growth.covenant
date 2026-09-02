@@ -15,6 +15,13 @@
 run:
   episode_length: 20      # steps per window -> total_steps = episodes * episode_length
 
+# --- AGENTS ---
+# How many agents share the one world. The value here is only the default
+# offered by the terminal prompt before the run: the population size is an
+# experiment parameter, so it is chosen next to the run length.
+agents:
+  count: 1
+
 # --- WORLD ---
 world:
   size: 64

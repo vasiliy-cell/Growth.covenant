@@ -1,4 +1,3 @@
-from src.Agent.State.position import Position
 from src.Agent.State.observation import Observation
 
 from src.Agent.Actions.movement.available_movements import get_available_movements
@@ -6,30 +5,57 @@ from src.Agent.Actions.movement.movements import MOVEMENTS
 
 
 class Agent:
-    def __init__(self, world, rng=None):
-        # With an rng the agent spawns anywhere inside the map; without one
-        # it falls back to the fixed corner start (used by tests).
-        self.position = (
-            Position.random(world.size, rng) if rng is not None else Position()
-        )
+    """
+    One body in the world: a position, a field of view and a way to say
+    where it wants to go.
+
+    The agent does NOT decide where it spawns and does NOT invent its own
+    id - both come from AgentManager, the single owner of agent identity.
+
+    agent_id is globally unique across every run of the project and is the
+    only thing that identifies an agent anywhere outside this process.
+    index is its plain number inside this run, kept for the places that
+    genuinely want a small integer (picking a color, printing a line).
+    """
+
+    def __init__(self, agent_id, index, world, position):
+        self.agent_id = agent_id
+        self.index = index
         self.world = world
+        self.position = position
 
     # -----------------------------
-    # MOVE (SAFE + CONSISTENT)
+    # MOVEMENT (INTENT -> APPLY)
     # -----------------------------
-    def move(self, action):
+    def intended_position(self, action):
+        """
+        Where this action WOULD take the agent - nothing is applied here.
+
+        Intent and application are split because a tick has to be resolved
+        as a whole: the env first collects what every agent wants, then
+        decides what actually happens, and only then moves anybody. Today
+        every intent is granted, but a movement rule (blocking, pushing,
+        swapping) has a single place to live because of this split.
+
+        An impossible action - unknown id or a step outside the map -
+        resolves to the current position: the agent simply stays put.
+        """
         x, y = self.position.get()
 
-        # если действие вообще не существует — игнор
         if action not in MOVEMENTS:
-            return
+            return (x, y)
 
         dx, dy = MOVEMENTS[action]
         nx, ny = x + dx, y + dy
 
-        # hard bounds check (финальный барьер)
-        if 0 <= nx < self.world.size and 0 <= ny < self.world.size:
-            self.position.update((nx, ny))
+        # hard bounds check
+        if not (0 <= nx < self.world.size and 0 <= ny < self.world.size):
+            return (x, y)
+
+        return (nx, ny)
+
+    def move_to(self, position):
+        self.position.update(position)
 
     # -----------------------------
     # POSITION
@@ -84,4 +110,7 @@ class Agent:
         return view
 
     def __repr__(self):
-        return f"Agent(position={self.position.get()})"
+        return (
+            f"Agent(index={self.index}, id={self.agent_id}, "
+            f"position={self.position.get()})"
+        )

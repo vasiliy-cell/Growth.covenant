@@ -14,9 +14,12 @@ def main_visual():
             print("NO GRID FOUND")
             return
 
+        # Keyed by index, not by agent id: the renderer only needs a stable
+        # small number to pick a color from, and the global id says nothing
+        # about which color an agent should keep.
         renderer.render(
             env.world.map.grid,
-            info.get("position", (0, 0))
+            {agent.index: agent.get_position() for agent in env.agents}
         )
 
     try:

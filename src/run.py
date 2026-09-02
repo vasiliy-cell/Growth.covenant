@@ -1,4 +1,5 @@
 from src.environment.env import GridWorldEnv
+from src.Agent.identity import new_run_id
 from src.Brain.brain import Brain
 from src.Brain.q_estimater.mlp import MLP
 from src.Brain.q_estimater.trainer import DQNTrainer
@@ -54,6 +55,33 @@ def choose_episodes(episode_length):
     except ValueError:
         print("Invalid input, falling back to 1 episode")
         return 1
+
+
+def choose_agent_count(default=1):
+    """
+    How many agents share the world.
+
+    Asked in the terminal like the number of episodes: it is the parameter
+    you change between two experiments, so it belongs next to the run
+    length and not buried in the config. config.yml only supplies the
+    default offered here.
+    """
+    user_input = input(f"Enter number of agents [{default}]: ").strip()
+
+    if not user_input:
+        return default
+
+    try:
+        count = int(user_input)
+    except ValueError:
+        print(f"Invalid input, falling back to {default}")
+        return default
+
+    if count < 1:
+        print(f"A world needs at least one agent, falling back to {default}")
+        return default
+
+    return count
 
 
 def capture_rng_states(master_rng):
@@ -116,7 +144,7 @@ def encode_observation(obs):
     return torch.tensor([x, y] + flat, dtype=torch.float32)
 
 
-def main(render_fn=None, episodes=None, seed=None):
+def main(render_fn=None, episodes=None, seed=None, agent_count=None):
     config = load_config()
 
     # --- run length ---
@@ -135,9 +163,22 @@ def main(render_fn=None, episodes=None, seed=None):
 
     print(f"episodes = {episodes} -> total steps = {total_steps}")
 
+    # --- population ---
+    if agent_count is None:
+        agent_count = choose_agent_count(
+            int(config.get("agents", {}).get("count", 1))
+        )
+    print(f"agents = {agent_count}")
+
     if seed is None:
         seed = choose_seed()
     print(f"SEED: {seed}")
+
+    # Minted once per run and shared by the whole population: every agent id
+    # of this run is built on it, which is what keeps ids unique across all
+    # the runs the project will ever make.
+    run_id = new_run_id()
+    print(f"RUN: {run_id}")
 
     # One rng for the whole run: the map, the refills and everything else
     # draw from it, and its state is snapshotted per episode.
@@ -151,11 +192,17 @@ def main(render_fn=None, episodes=None, seed=None):
         rng=master_rng,
         empty_ratio=world_cfg.get("empty_ratio", 0.8),
         refill=world_cfg.get("refill", {}),
+        agent_count=agent_count,
+        run_id=run_id,
     )
 
     # The world is built exactly once - from here on it only gets updated.
-    observation = env.start()
-    obs_size = len(encode_observation(observation))
+    # start() hands back one observation per agent, keyed by agent id.
+    observations = env.start()
+
+    # Every agent has the same field of view, so any of them defines the
+    # network input size.
+    obs_size = len(encode_observation(next(iter(observations.values()))))
 
     mlp = MLP(obs_size=obs_size, action_size=8)
     trainer = DQNTrainer(
@@ -170,8 +217,16 @@ def main(render_fn=None, episodes=None, seed=None):
         epsilon_min=policy_cfg.get("epsilon_min", 0.01)
     )
 
+    # One brain for the whole population: every agent acts with it and every
+    # agent feeds it. The env knows nothing about brains - it only takes
+    # actions - so giving each agent its own is a change here and nowhere
+    # else.
     brain = Brain(trainer, policy)
 
+    # One curiosity counter for the whole population as well: novelty is
+    # something the group discovers, so a cell another agent already visited
+    # is no longer new. Per-agent counters would send everybody rushing into
+    # the same "unexplored" corner at once.
     reward_shaping = RewardShaping(
         curiosity=Curiosity(config["curiosity"]) if "curiosity" in config else None
     )
@@ -197,9 +252,11 @@ def main(render_fn=None, episodes=None, seed=None):
     logger.log_run_start(
         seed=seed,
         extra={
+            "run_id": run_id,
             "episodes": episodes,
             "episode_length": episode_length,
             "total_steps": total_steps,
+            "agents": agent_count,
             "world_size": world_cfg.get("size", 64),
             "world_refill": world_cfg.get("refill", {}),
         },
@@ -212,61 +269,91 @@ def main(render_fn=None, episodes=None, seed=None):
 
     try:
         for step in range(1, total_steps + 1):
-            state = encode_observation(observation)
+            available_actions = env.get_available_actions()
 
-            action = brain.choose_action(
-                state,
-                env.agent.get_available_actions()
-            )
+            states = {
+                agent_id: encode_observation(observation)
+                for agent_id, observation in observations.items()
+            }
 
-            next_obs, env_reward, info = env.step(action)
+            # One forward pass per agent. At ~50 agents that is cheap; if the
+            # population ever grows a lot, this is the place to push the
+            # whole population through the network in a single batch.
+            actions = {
+                agent_id: brain.choose_action(state, available_actions[agent_id])
+                for agent_id, state in states.items()
+            }
 
-            shaped_reward, intrinsic_reward = reward_shaping.compute(next_obs, env_reward)
+            # One call = one tick of the world in which everybody moves.
+            next_observations, env_rewards, info = env.step(actions)
 
-            next_state = encode_observation(next_obs)
-
-            # Store the transition - do NOT train on it right away.
+            # Every agent contributes its own transition to the SHARED replay
+            # buffer, so the population collects experience N times faster
+            # than a single agent did.
             # done is always False: the process is continuous, there is no
             # terminal state to cut the bootstrap on.
-            replay_buffer.push(
-                state=state,
-                action=action,
-                reward=shaped_reward,
-                next_state=next_state,
-                done=False
-            )
+            transitions = {}
+
+            for agent_id in actions:
+                next_observation = next_observations[agent_id]
+                env_reward = env_rewards[agent_id]
+
+                shaped_reward, intrinsic_reward = reward_shaping.compute(
+                    next_observation, env_reward
+                )
+
+                replay_buffer.push(
+                    state=states[agent_id],
+                    action=actions[agent_id],
+                    reward=shaped_reward,
+                    next_state=encode_observation(next_observation),
+                    done=False
+                )
+
+                transitions[agent_id] = (
+                    env_reward, shaped_reward, intrinsic_reward
+                )
+                episode_reward += shaped_reward
 
             # Train on a batch only once the buffer is warm enough.
             # Until then metrics = None -> the logger simply gets no
             # loss/td_error/etc for this step (as designed in Logger: the
             # average is computed only over steps where a value existed).
+            #
+            # One update per TICK, not per agent: the population fills the
+            # buffer N times faster, so the same cadence now means N times
+            # more experience collected per gradient step than before.
             if len(replay_buffer) >= min_buffer_size:
                 batch = replay_buffer.sample(batch_size)
                 metrics = brain.learn(*batch)
             else:
                 metrics = None
 
-            log_kwargs = dict(
-                step=step,
-                position=observation.position,
-                action=action,
-                reward=env_reward,
-                shaped_reward=shaped_reward,
-                intrinsic_reward=intrinsic_reward,
-            )
-            if metrics is not None:
-                log_kwargs.update(
-                    loss=metrics["loss"],
-                    td_error=metrics["td_error"],
-                    grad_norm=metrics["grad_norm"],
-                    target_q=metrics["target_q"],
-                    q_prediction=metrics["q_prediction"],
+            # The train metrics describe the tick, not any single agent -
+            # there is one shared brain and one update behind all of them.
+            for agent_id, rewards in transitions.items():
+                env_reward, shaped_reward, intrinsic_reward = rewards
+
+                log_kwargs = dict(
+                    step=step,
+                    position=observations[agent_id].position,
+                    action=actions[agent_id],
+                    reward=env_reward,
+                    shaped_reward=shaped_reward,
+                    intrinsic_reward=intrinsic_reward,
                 )
+                if metrics is not None:
+                    log_kwargs.update(
+                        loss=metrics["loss"],
+                        td_error=metrics["td_error"],
+                        grad_norm=metrics["grad_norm"],
+                        target_q=metrics["target_q"],
+                        q_prediction=metrics["q_prediction"],
+                    )
 
-            logger.log_step(**log_kwargs)
+                logger.log_step(**log_kwargs)
 
-            episode_reward += shaped_reward
-            observation = next_obs
+            observations = next_observations
 
             if render_fn is not None:
                 render_fn(env, info)
@@ -279,7 +366,9 @@ def main(render_fn=None, episodes=None, seed=None):
 
                 print(
                     f"Episode {episode_index + 1}/{episodes} | step={step} | "
-                    f"reward={episode_reward} | epsilon={policy.epsilon:.4f} | "
+                    f"reward={episode_reward:.2f} | "
+                    f"per_agent={episode_reward / len(env.agents):.2f} | "
+                    f"epsilon={policy.epsilon:.4f} | "
                     f"filled={info['non_empty_ratio']:.3f}"
                 )
 

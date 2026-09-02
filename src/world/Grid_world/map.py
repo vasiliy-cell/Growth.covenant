@@ -76,8 +76,9 @@ class Map:
         The map is never regenerated, only topped up, so everything the
         agent already ate elsewhere stays eaten.
 
-        exclude: (x, y) cell that must stay untouched (the agent position:
-                 otherwise an object would pop up right under its feet).
+        exclude: iterable of (x, y) cells that must stay untouched (every
+                 agent position: otherwise an object would pop up right
+                 under somebody's feet).
 
         Returns how many cells were actually filled.
         """
@@ -86,11 +87,15 @@ class Map:
 
         empty_cells = np.argwhere(self.grid == 0)  # list of (y, x)
 
-        if exclude is not None:
-            ex_x, ex_y = exclude
-            empty_cells = empty_cells[
-                ~((empty_cells[:, 0] == ex_y) & (empty_cells[:, 1] == ex_x))
-            ]
+        if exclude:
+            keep = np.ones(len(empty_cells), dtype=bool)
+
+            for ex_x, ex_y in exclude:
+                keep &= ~(
+                    (empty_cells[:, 0] == ex_y) & (empty_cells[:, 1] == ex_x)
+                )
+
+            empty_cells = empty_cells[keep]
 
         if len(empty_cells) == 0:
             return 0
