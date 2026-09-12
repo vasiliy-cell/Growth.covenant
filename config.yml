@@ -68,3 +68,126 @@ replay_buffer:
   buffer_size: 10000
   batch_size: 32
   min_buffer_size: 500
+
+
+
+
+# ==>-------------<====== genome ======>-------------<== #
+# ==>-------------<====== genome ======>-------------<== #
+# ==>-------------<====== genome ======>-------------<== #
+# ==>-------------<====== genome ======>-------------<== #
+
+
+# Every value in the project that changes HOW an agent learns, written as a
+# gene: a distribution to draw a newborn from instead of a single number
+# shared by everybody. `mean` is the value the sections above use today, so
+# a population born with scale = 0 is exactly the run you have now.
+#
+# Shape of a gene - the same for all of them, so the sampler never has to
+# special-case anything:
+#   mean  - center of the draw (the current, hand-tuned value)
+#   scale - stddev of the draw; 0 freezes the gene at `mean`
+#   type  - float | int, how the drawn number is rounded
+#   step  - round to a multiple of this (view_size must stay odd)
+#
+# NOTE: nothing under src/ reads this section yet - the genome is not wired
+# into BrainManager. Until it is, the live values are the ones in the
+# sections above, and a gene whose `applied` note says "hardcoded" also has
+# no config key to fall back on.
+genome:
+  genes:
+    sigma:
+      mean: 1.1
+      scale: 0.7
+      type: float
+    # --- OPTIMIZER ---
+    # The step size of every gradient update, and how much of the update is
+    # allowed through at all. max_norm is the tightest clip in the project
+    # (0.01), so it decides the effective learning rate far more than
+    # learning_rate does - it belongs in the genome next to it.
+    learning_rate:                # trainer: Adam lr (config root learning_rate)
+      mean: 0.001
+      scale: 0.0005
+      type: float
+    max_norm:                     # trainer.max_norm: gradient clipping
+      mean: 0.01
+      scale: 0.005
+      type: float
+
+    # --- DQN TARGETS ---
+    # How far ahead this mind looks and how stale the target it chases is.
+    gamma:                        # trainer.gamma: discount factor
+      mean: 0.99
+      scale: 0.02
+      type: float
+    target_update_freq:           # trainer.target_update_freq, in updates
+      mean: 10000
+      scale: 2000
+      type: int
+
+    # --- NETWORK SHAPE ---
+    # The capacity of the mind itself. Both are hardcoded in MLP today
+    # (hidden_size=64, two hidden layers) and have no config key at all.
+    hidden_size:
+      mean: 64
+      scale: 8
+      type: int
+    hidden_layers:
+      mean: 2
+      scale: 0.5
+      type: int
+
+    # --- MEMORY ---
+    # One agent stores exactly one transition per tick, so these are ticks
+    # of personal history: how far back this mind can remember, how much of
+    # it it revisits at once, and how long it waits before learning at all.
+    buffer_size:                  # replay_buffer.buffer_size
+      mean: 10000
+      scale: 2000
+      type: int
+    batch_size:                   # replay_buffer.batch_size
+      mean: 32
+      scale: 4
+      type: int
+    min_buffer_size:              # replay_buffer.min_buffer_size (warmup)
+      mean: 500
+      scale: 100
+      type: int
+
+    # --- EXPLORATION ---
+    # The schedule follows the age of the individual, not the age of the
+    # run, so every one of these is already personal - the genome only
+    # decides that two newborns need not get the same schedule.
+    epsilon:                      # policy.epsilon: start value
+      mean: 0.01
+      scale: 0.1
+      type: float
+    epsilon_decay:                # policy.epsilon_decay, per logging window
+      mean: 0.995
+      scale: 0.002
+      type: float
+    epsilon_min:                  # policy.epsilon_min: floor
+      mean: 0.01
+      scale: 0.005
+      type: float
+
+    # --- CURIOSITY ---
+    # The intrinsic half of the reward: how loudly novelty pays, and how
+    # fast that voice fades. beta = 4.0 against a food cell worth +5 means
+    # a newborn is driven mostly by curiosity, so this gene moves behaviour
+    # harder than almost anything else here.
+    curiosity_beta:               # curiosity.beta
+      mean: 4.0
+      scale: 0.5
+      type: float
+    curiosity_decay:              # curiosity.decay, per logging window
+      mean: 0.995
+      scale: 0.002
+      type: float
+
+
+
+
+
+
+
