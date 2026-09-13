@@ -161,6 +161,9 @@ class GridWorldEnv:
 
             agent.energy -= energy_leak
 
+        # 4b. BIRTH - energy-gated cloning, once this tick's energy has settled.
+        self._reproduce()
+
         # 5. REFILL - the world tops itself up once per TICK, however many
         #    agents there are, so world.refill.every keeps meaning what it
         #    meant with a single agent.
