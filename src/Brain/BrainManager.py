@@ -6,6 +6,7 @@ from src.Brain.replay_buffer import ReplayBuffer
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 
+
 class BrainManager:
     """
     The registry of minds: one Brain per living agent.
@@ -20,15 +21,14 @@ class BrainManager:
     that appeared gets a mind, an agent that is gone has its mind written
     down and dropped. Birth and death therefore need no change here.
     """
-
     def __init__(self, config, obs_size, action_size, checkpoints=None):
+
         self.config = config
         self.obs_size = obs_size
         self.action_size = action_size
         self.checkpoints = checkpoints
-
-        # agent_id -> Brain
         self.brains = {}
+
 
     # -----------------------------
     # FOLLOWING THE POPULATION
@@ -60,10 +60,6 @@ class BrainManager:
 
     def _create(self, phenotype):
         return Brain(
-            trainer=DQNTrainer(
-                model=MLP(obs_size=self.obs_size, action_size=self.action_size),
-                config=self.config,        # trainer/MLP пока из config — мигрируем потом
-            ),
             policy=Policy(
                 epsilon=phenotype["epsilon"],
                 epsilon_decay=phenotype["epsilon_decay"],
@@ -75,6 +71,18 @@ class BrainManager:
             ),
             batch_size=phenotype["batch_size"],
             min_buffer_size=phenotype["min_buffer_size"],
+
+            trainer=DQNTrainer(
+                model=MLP(
+                    obs_size=self.obs_size,
+                    hidden_size=phenotype["hidden_size"],
+                    action_size=self.action_size,
+                ),
+                gamma=phenotype["gamma"],
+                learning_rate=phenotype["learning_rate"],
+                max_norm=phenotype["max_norm"],
+                target_update_freq=phenotype["target_update_freq"],
+            ),
         )
 
 

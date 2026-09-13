@@ -278,7 +278,6 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
             brains.sync(env.agents, phenotypes)
             # Minds follow the population: whoever was born this tick gets
             # one, whoever is gone has theirs written down and dropped.
-            brains.sync(env.agents, phenotypes)
 
             available_actions = env.get_available_actions()
 

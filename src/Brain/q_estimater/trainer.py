@@ -15,27 +15,21 @@ class DQNTrainer:
     there is no single path to hardcode here anyway.
     """
 
-    def __init__(
-        self,
-        model,
-        config
-    ):
+
+    def __init__(self, model, gamma, learning_rate, max_norm, target_update_freq):
+
+
         self.training_step = 0
         self.policy_net = model
-        self.gamma = config["trainer"]["gamma"]
-        self.target_update_freq = config["trainer"]["target_update_freq"]
-        self.max_norm = config["trainer"]["max_norm"]
+        self.gamma = gamma
+        self.target_update_freq = target_update_freq
+        self.max_norm = max_norm
         self.target_net = deepcopy(self.policy_net)
         self.target_net.eval()
         for param in self.target_net.parameters():
             param.requires_grad = False
-
         self.loss_fn = nn.MSELoss()
-
-        self.optimizer = optim.Adam(
-            self.policy_net.parameters(),
-            lr=config.get("learning_rate", 0.001)
-        )
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
 
     # -------------------------
     # WEIGHTS
