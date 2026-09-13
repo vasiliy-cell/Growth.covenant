@@ -3,6 +3,10 @@ from src.Agent.identity import new_run_id
 from src.Brain.BrainManager import BrainManager
 from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.logger import Logger
+from src.Genome.GenePool import Genepool
+
+from src.phenotype.make_phenotype import make_phenotype
+
 
 import os
 import yaml
@@ -22,17 +26,13 @@ def make_seed():
     return int(time.time() * 1e6)
 
 def choose_seed():
-    """
-    'r' / empty -> random. A number -> fixed seed for the whole run.
-    """
-    user_input = input("Enter global seed (number or 'r' for random): ").strip()
+    user_input = input("Enter global seed (number or 'r' / empty for random): ").strip()
     if user_input.lower() in ["r", ""]:
         return make_seed()
     try:
         return int(user_input)
     except ValueError:
         return make_seed()
-
 
 def choose_episodes(episode_length):
     """
@@ -236,6 +236,8 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
         run_id=run_id,
     )
 
+    pool = Genepool()
+
     brains = BrainManager(
         config=config,
         obs_size=obs_size,
@@ -268,9 +270,15 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
 
     try:
         for step in range(1, total_steps + 1):
+
+            phenotypes = {
+                aid: make_phenotype(env.genomes.get_genotype(aid))
+                for aid in env.agents.ids()
+            }
+            brains.sync(env.agents, phenotypes)
             # Minds follow the population: whoever was born this tick gets
             # one, whoever is gone has theirs written down and dropped.
-            brains.sync(env.agents)
+            brains.sync(env.agents, phenotypes)
 
             available_actions = env.get_available_actions()
 

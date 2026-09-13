@@ -3,6 +3,12 @@ import random
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
 
+from src.Genome.types.clons import make_first_genome
+from src.Genome.types.clons import config
+from src.Genome.GenePool import Genepool
+
+import numpy as np
+
 
 class GridWorldEnv:
     """
@@ -22,8 +28,7 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None,
-                 agent_count=1, run_id=None):
+    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None):
         self.size = size
 
         # Single RNG for the whole run
@@ -34,6 +39,8 @@ class GridWorldEnv:
         self.agent_count = agent_count
 
         self.current_step = 0
+        
+        self.genomes = Genepool()
 
     # --- build the world (call once at the beginning of the run) ---
     def start(self):
@@ -46,9 +53,16 @@ class GridWorldEnv:
         # Spawn AFTER the map is generated: the map keeps consuming the rng
         # in the same order as before, so old seeds still produce old maps.
         self.agents.spawn(self.agent_count)
+        self.create_agents()
         self.current_step = 0
-
         return self.get_states()
+
+    def create_agents(self):                        
+        genome_config = config["genome"]
+        rng = np.random.default_rng(self.rng.randrange(2**32))   
+        for agent_id in self.agents.ids():          
+            genome = make_first_genome(genome_config, rng)
+            self.genomes.put(agent_id, genome)      
 
     def get_states(self):
         """

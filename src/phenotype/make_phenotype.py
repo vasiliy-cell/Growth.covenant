@@ -7,7 +7,4 @@ def make_phenotype(genotype):
         if genome_config["genes"][name].get("type") == "int":
             value = round(value)    
         phenotype[name] = value
-    print("phenotype")
     return phenotype
-
-

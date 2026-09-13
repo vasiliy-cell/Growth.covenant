@@ -6,7 +6,6 @@ from src.Brain.replay_buffer import ReplayBuffer
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
 
-
 class BrainManager:
     """
     The registry of minds: one Brain per living agent.
@@ -34,17 +33,12 @@ class BrainManager:
     # -----------------------------
     # FOLLOWING THE POPULATION
     # -----------------------------
-    def sync(self, agents):
-        """Gives every new agent a mind and retires the minds left over."""
-        # Spawn order, never set order: creating a brain draws from the
-        # torch rng to initialise its weights, so an unstable order would
-        # quietly cost the run its reproducibility.
+    def sync(self, agents, phenotypes):
         for agent in agents:
             if agent.agent_id not in self.brains:
-                self.brains[agent.agent_id] = self._create()
+                self.brains[agent.agent_id] = self._create(phenotypes[agent.agent_id])
 
         living = set(agents.ids())
-
         for agent_id in [i for i in self.brains if i not in living]:
             self.retire(agent_id)
 
@@ -64,34 +58,25 @@ class BrainManager:
 
         return brain
 
-    def _create(self):
-        policy_cfg = self.config.get("policy", {})
-        buffer_cfg = self.config.get("replay_buffer", {})
-        batch_size = buffer_cfg.get("batch_size", 32)
-
+    def _create(self, phenotype):
         return Brain(
             trainer=DQNTrainer(
-                model=MLP(
-                    obs_size=self.obs_size,
-                    action_size=self.action_size
-                ),
-                config=self.config
+                model=MLP(obs_size=self.obs_size, action_size=self.action_size),
+                config=self.config,        # trainer/MLP пока из config — мигрируем потом
             ),
             policy=Policy(
-                epsilon=policy_cfg.get("epsilon", 1.0),
-                epsilon_decay=policy_cfg.get("epsilon_decay", 0.995),
-                epsilon_min=policy_cfg.get("epsilon_min", 0.01)
+                epsilon=phenotype["epsilon"],
+                epsilon_decay=phenotype["epsilon_decay"],
+                epsilon_min=phenotype["epsilon_min"],
             ),
-            replay_buffer=ReplayBuffer(
-                capacity=buffer_cfg.get("buffer_size", 10_000)
-            ),
+            replay_buffer=ReplayBuffer(capacity=phenotype["buffer_size"]),
             reward_shaping=RewardShaping(
-                curiosity=Curiosity(self.config["curiosity"])
-                if "curiosity" in self.config else None
+                curiosity=Curiosity(self.config["curiosity"]) if "curiosity" in self.config else None
             ),
-            batch_size=batch_size,
-            min_buffer_size=buffer_cfg.get("min_buffer_size", batch_size),
+            batch_size=phenotype["batch_size"],
+            min_buffer_size=phenotype["min_buffer_size"],
         )
+
 
     # -----------------------------
     # LOGGING WINDOW BOUNDARY

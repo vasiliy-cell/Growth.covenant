@@ -6,7 +6,7 @@ genes_type = "clons"
 with open("config.yml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-def make_first_genome(agent_id, genome_config, rng):
+def make_first_genome(genome_config, rng):
     genotype = {}
     for gene_name, spec in genome_config["genes"].items():
         genotype[gene_name] = rng.normal(spec["mean"], spec["scale"])
@@ -22,11 +22,6 @@ def make_first_genome(agent_id, genome_config, rng):
     if genotype["sigma"] <0:
         genotype["sigma"] = 0.01
         
-    return agent_id, genotype
+    return genotype
 
-rng = np.random.default_rng(12)
-aid, geno = make_first_genome(42, config["genome"], rng)
-
-def mutate():
-    fenotype = {"learning_rate": 12.3, "gamma": 12}
 
