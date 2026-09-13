@@ -67,7 +67,10 @@ class BrainManager:
             ),
             replay_buffer=ReplayBuffer(capacity=phenotype["buffer_size"]),
             reward_shaping=RewardShaping(
-                curiosity=Curiosity(self.config["curiosity"]) if "curiosity" in self.config else None
+                curiosity=Curiosity(
+                    beta=phenotype["curiosity_beta"],
+                    decay=phenotype["curiosity_decay"],
+                )
             ),
             batch_size=phenotype["batch_size"],
             min_buffer_size=phenotype["min_buffer_size"],

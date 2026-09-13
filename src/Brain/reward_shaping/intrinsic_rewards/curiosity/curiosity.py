@@ -3,16 +3,15 @@ from collections import defaultdict
 
 
 class Curiosity:
-    def __init__(self, config: dict):
+    def __init__(self, beta, decay=1.0):
         """
-        config:
-            beta  - initial curiosity strength
-            decay - decay per episode (optional)
+        beta  - initial curiosity strength
+        decay - decay per episode
         """
-        self.beta_start = config["beta"]
+        self.beta_start = beta
         self.beta = self.beta_start
 
-        self.decay = config.get("decay", 1.0)
+        self.decay = decay
 
         # state visit counter
         self.visit_counts = defaultdict(int)

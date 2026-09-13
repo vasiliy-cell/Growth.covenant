@@ -40,37 +40,11 @@ logging:
   log_dir: "logs"
   rng_snapshot_every: 1   # snapshot every rng state once per N episodes (0 = off)
 
-learning_rate: 0.001
-gamma: 0.99
-
-policy:
-  mode: epsilon_greedy
-  epsilon: 1.0            # start value
-  epsilon_decay: 0.995    # applied at the episode (logging window) boundary
-  epsilon_min: 0.01
-
-curiosity:
-  beta: 4.0
-  decay: 0.995            # applied at the episode boundary
-
-trainer:
-  gamma: 0.99
-  target_update_freq: 10000
-  max_norm: 0.01
-
 # --- CHECKPOINTS ---
 # Every agent has its own brain, so there is no single model file anymore:
 # one file per agent under models/<run_id>/<agent_id>.pth.
 checkpoints:
   models_dir: "models"
-
-replay_buffer:
-  buffer_size: 10000
-  batch_size: 32
-  min_buffer_size: 500
-
-
-
 
 # ==>-------------<====== genome ======>-------------<== #
 # ==>-------------<====== genome ======>-------------<== #
@@ -90,10 +64,11 @@ replay_buffer:
 #   type  - float | int, how the drawn number is rounded
 #   step  - round to a multiple of this (view_size must stay odd)
 #
-# NOTE: nothing under src/ reads this section yet - the genome is not wired
-# into BrainManager. Until it is, the live values are the ones in the
-# sections above, and a gene whose `applied` note says "hardcoded" also has
-# no config key to fall back on.
+# This section is now the SOURCE OF TRUTH: every newborn's brain is built
+# from a genome sampled here (make_first_genome -> make_phenotype ->
+# BrainManager -> DQNTrainer/MLP/Policy/Curiosity). The old flat sections
+# (policy / trainer / replay_buffer / curiosity / learning_rate / gamma) are
+# gone - their values live here now as gene `mean`s.
 genome:
   genes:
     sigma:
