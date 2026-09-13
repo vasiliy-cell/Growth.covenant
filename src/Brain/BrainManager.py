@@ -76,6 +76,7 @@ class BrainManager:
                 model=MLP(
                     obs_size=self.obs_size,
                     hidden_size=phenotype["hidden_size"],
+                    hidden_layers=phenotype["hidden_layers"],
                     action_size=self.action_size,
                 ),
                 gamma=phenotype["gamma"],
