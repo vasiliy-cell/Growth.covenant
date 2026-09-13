@@ -1,6 +1,7 @@
 import numpy as np
 import yaml
 
+
 genes_type = "clons"
 
 with open("config.yml", "r", encoding="utf-8") as f:
@@ -8,6 +9,7 @@ with open("config.yml", "r", encoding="utf-8") as f:
 
 def make_first_genome(genome_config, rng):
     genotype = {}
+
     for gene_name, spec in genome_config["genes"].items():
         genotype[gene_name] = rng.normal(spec["mean"], spec["scale"])
 
@@ -23,5 +25,28 @@ def make_first_genome(genome_config, rng):
         genotype["sigma"] = 0.01
         
     return genotype
+
+def mutate(genotype, rng):
+    sigma = genotype["sigma"]
+    child_genotype = {}
+    for gene_name, value in genotype.items():
+        child_genotype[gene_name] = rng.normal(value, sigma)
+
+        if rng.random() < sigma:
+            child_genotype[gene_name] *= rng.uniform(0.2, 5.0)
+
+    if child_genotype["gamma"] <= 0: 
+        child_genotype["gamma"] = 0.001
+    if child_genotype["gamma"] >= 1: 
+        child_genotype["gamma"] = 0.999
+
+    if child_genotype["learning_rate"] < 0:
+        child_genotype["learning_rate"] = abs(child_genotype["learning_rate"])
+
+    if child_genotype["sigma"] <0:
+        child_genotype["sigma"] = 0.01
+
+    return child_genotype
+
 
 

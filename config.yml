@@ -46,6 +46,14 @@ logging:
 checkpoints:
   models_dir: "models"
 
+
+# --- energy ---
+energy:
+  energy_leak: 0.5
+  reproduction_threshold: 300
+  reproduction_cost: 100
+
+
 # ==>-------------<====== genome ======>-------------<== #
 # ==>-------------<====== genome ======>-------------<== #
 # ==>-------------<====== genome ======>-------------<== #
@@ -72,8 +80,8 @@ checkpoints:
 genome:
   genes:
     sigma:
-      mean: 1.1
-      scale: 0.7
+      mean: 0.05
+      scale: 0.5
       type: float
     # --- OPTIMIZER ---
     # The step size of every gradient update, and how much of the update is

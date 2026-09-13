@@ -3,7 +3,7 @@ import random
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
 
-from src.Genome.types.clons import make_first_genome
+from src.Genome.types.clons import make_first_genome, mutate
 from src.Genome.types.clons import config
 from src.Genome.GenePool import Genepool
 
@@ -39,8 +39,12 @@ class GridWorldEnv:
         self.agent_count = agent_count
 
         self.current_step = 0
-        
+
         self.genomes = Genepool()
+
+        # One numpy rng for everything genetic (genesis + mutation), seeded
+        # from the master rng so the whole run stays reproducible from one seed.
+        self.genome_rng = np.random.default_rng(self.rng.randrange(2 ** 32))
 
     # --- build the world (call once at the beginning of the run) ---
     def start(self):
@@ -57,12 +61,41 @@ class GridWorldEnv:
         self.current_step = 0
         return self.get_states()
 
-    def create_agents(self):                        
+    def create_agents(self):
         genome_config = config["genome"]
-        rng = np.random.default_rng(self.rng.randrange(2**32))   
-        for agent_id in self.agents.ids():          
-            genome = make_first_genome(genome_config, rng)
-            self.genomes.put(agent_id, genome)      
+        for agent_id in self.agents.ids():
+            genome = make_first_genome(genome_config, self.genome_rng)
+            self.genomes.put(agent_id, genome)
+
+    # --- birth: energy-gated asexual cloning ---
+    def _reproduce(self):
+        """
+        Any agent whose energy reached the threshold clones itself: its
+        genotype is copied + mutated into a child genome, a child body is
+        spawned, and the parent pays the energy cost (which becomes the
+        child's starting energy).
+
+        No partner, no external fitness - whoever gathers enough energy gets
+        to reproduce, so selection falls out of the environment itself.
+        """
+        cfg = config["energy"]
+        threshold = cfg["reproduction_threshold"]
+        cost = cfg["reproduction_cost"]
+
+        # Snapshot parents BEFORE spawning: spawn() grows self.agents (can't
+        # mutate a dict mid-iteration), and a newborn must not reproduce on
+        # the same tick it was born.
+        parents = [a for a in self.agents.all() if a.energy >= threshold]
+
+        for parent in parents:
+            parent_genotype = self.genomes.get_genotype(parent.agent_id)
+            child_genotype = mutate(parent_genotype, self.genome_rng)
+
+            child = self.agents.spawn(1)[0]
+            self.genomes.put(child.agent_id, child_genotype)
+
+            parent.energy -= cost
+            child.energy = cost   # the parent's investment becomes the child's start
 
     def get_states(self):
         """
@@ -86,6 +119,7 @@ class GridWorldEnv:
 
     # --- one tick of the world: everybody moves at once ---
     def step(self, actions):
+
         """
         actions: {agent_id: action}. An agent missing from the dict simply
                  does not act this tick.
@@ -94,7 +128,6 @@ class GridWorldEnv:
         agent id, info describes the tick as a whole.
         """
         self.current_step += 1
-
         # 1. INTENT - where everyone WANTS to be, nothing applied yet.
         targets = {
             agent.agent_id: agent.intended_position(actions[agent.agent_id])
@@ -115,15 +148,18 @@ class GridWorldEnv:
         #    nobody can eat it from under anybody. Competition happens a
         #    step earlier, over who is allowed to move there at all.
         rewards = {}
-
+        energy_leak = config["energy"]["energy_leak"]
         for agent in self.agents:
             position = agent.get_position()
 
             rewards[agent.agent_id] = self.world.get_reward(position)
+            agent.energy += rewards[agent.agent_id]
 
             # good/bad cells turn empty once an agent touches them
             if self.world.get_cell(position) != 0:
                 self.world.clear_cell(position)
+
+            agent.energy -= energy_leak
 
         # 5. REFILL - the world tops itself up once per TICK, however many
         #    agents there are, so world.refill.every keeps meaning what it
@@ -132,6 +168,7 @@ class GridWorldEnv:
             self.current_step,
             exclude=self.agents.occupied_positions(),
         )
+        
 
         # 6. OBSERVE - only after the tick has fully settled, so every agent
         #    sees the same world state.
@@ -147,6 +184,7 @@ class GridWorldEnv:
             "refilled": refilled,
             "non_empty_ratio": self.world.non_empty_ratio(),
         }
+
         return observations, rewards, info
 
     def _resolve_movements(self, targets):

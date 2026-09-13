@@ -25,6 +25,7 @@ class Agent:
         self.index = index
         self.world = world
         self.position = position
+        self.energy = 0.0
 
     # -----------------------------
     # MOVEMENT (INTENT -> APPLY)
