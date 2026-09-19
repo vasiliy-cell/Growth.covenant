@@ -3,8 +3,8 @@ import random
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
 
-from src.Genome.types.clons import make_first_genome, mutate
-from src.Genome.types.clons import config
+from src.Genome.types.reuse import make_first_genome, mutate
+from src.Genome.types.reuse import config
 from src.Genome.GenePool import Genepool
 
 import numpy as np
