@@ -31,7 +31,7 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None):
+    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None):
         self.size = size
 
         # Single RNG for the whole run
@@ -52,7 +52,7 @@ class GridWorldEnv:
         # The reproduction strategy for this run, chosen ONCE by config.
         # Everything below calls self.species.reproduce(...) without ever
         # asking which species it is - that is the whole point.
-        self.species = make_species(config["genome"]["type"])
+        self.species = make_species(species_name or config["genome"]["type"])
 
     # --- build the world (call once at the beginning of the run) ---
     def start(self):
@@ -104,8 +104,8 @@ class GridWorldEnv:
                 g_father = self.genomes.get_genotype(father.agent_id)
                 child = self.species.reproduce(g_father, g_mother, self.genome_rng)
                 self._birth(child, cost)
-                mother.energy -= cost
-                father.energy -= cost
+                mother.energy -= cost/2
+                father.energy -= cost/2
 
     def _birth(self, child_genotype, start_energy):
         """Give a new child genome a body and register it in every registry."""

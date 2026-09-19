@@ -78,6 +78,22 @@ def choose_agent_count(default=1):
     return count
 
 
+def choose_species(default="clons"):
+    """
+    How agents reproduce this run - an experiment knob, so it is asked in the
+    terminal like the agent count, not buried in config.
+    """
+    print("How do agents reproduce?")
+    print("  1) clons       - asexual: energy-gated cloning")
+    print("  2) non_linear  - sexual: BLX-a blend of two nearby parents")
+    choice = input(f"Enter choice (1/2) [{default}]: ").strip()
+    if choice == "1":
+        return "clons"
+    if choice == "2":
+        return "non_linear"
+    return default
+
+
 def capture_rng_states(master_rng):
     """
     Snapshot of every rng that can influence the run:
@@ -162,7 +178,7 @@ def encode_observation(obs):
     return torch.tensor([x, y] + flat, dtype=torch.float32)
 
 
-def main(render_fn=None, episodes=None, seed=None, agent_count=None):
+def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=None):
     config = load_config()
 
     # --- run length ---
@@ -188,6 +204,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
         )
     print(f"agents = {agent_count}")
 
+    if species is None:
+        species = choose_species(config.get("genome", {}).get("type", "clons"))
+    print(f"reproduction: {species}")
+
     if seed is None:
         seed = choose_seed()
     print(f"SEED: {seed}")
@@ -212,6 +232,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None):
         refill=world_cfg.get("refill", {}),
         agent_count=agent_count,
         run_id=run_id,
+        species_name=species,
     )
 
     # The world is built exactly once - from here on it only gets updated.
