@@ -79,7 +79,11 @@ energy:
 # gone - their values live here now as gene `mean`s.
 genome:
   genes:
-    sigma:
+    alpha:
+      mean: 0.5
+      scale: 0.5
+      type: float
+    sigma: # chance of huge mutation 
       mean: 0.05
       scale: 0.5
       type: float

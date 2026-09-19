@@ -97,6 +97,9 @@ class GridWorldEnv:
             parent.energy -= cost
             child.energy = cost   # the parent's investment becomes the child's start
 
+            # temporary probe: watch births happen during a real run
+            print(f"[birth @ step {self.current_step}] {parent.agent_id} -> {child.agent_id}  (pop {len(self.agents)})")
+
     def get_states(self):
         """
         {agent_id: Observation} for every agent, in spawn order.
