@@ -78,6 +78,7 @@ energy:
 # (policy / trainer / replay_buffer / curiosity / learning_rate / gamma) are
 # gone - their values live here now as gene `mean`s.
 genome:
+  type: clons          # which reproduction species this run uses: clons | non_linear
   genes:
     alpha:
       mean: 0.5

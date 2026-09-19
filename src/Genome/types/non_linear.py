@@ -4,13 +4,9 @@ import yaml
 from src.Genome.types.clons import mutate
 
 class NonLinearSpecies:
-    partners_required=1
+    partners_required = 1
 
-    with open("config.yml", "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
-
-    def reproduce(self, dad_genotype, mom_genotype, rng): 
+    def reproduce(self, dad_genotype, mom_genotype, rng):
         alpha = mom_genotype["alpha"]
         
         child = {}

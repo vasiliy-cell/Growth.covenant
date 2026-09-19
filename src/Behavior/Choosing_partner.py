@@ -20,3 +20,5 @@ def choose_partners(agents):
             used.add(agent.agent_id)
             used.add(b.agent_id)
     return couples
+
+

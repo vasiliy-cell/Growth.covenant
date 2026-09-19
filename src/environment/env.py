@@ -3,9 +3,12 @@ import random
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
 
-from src.Genome.types.reuse import make_first_genome, mutate
-from src.Genome.types.reuse import config
+from src.Genome.types.reuse import make_first_genome, mutate, config
+from src.Genome.types.factory import make_species
+from src.Behavior.Choosing_partner import choose_partners
 from src.Genome.GenePool import Genepool
+
+
 
 import numpy as np
 
@@ -46,6 +49,11 @@ class GridWorldEnv:
         # from the master rng so the whole run stays reproducible from one seed.
         self.genome_rng = np.random.default_rng(self.rng.randrange(2 ** 32))
 
+        # The reproduction strategy for this run, chosen ONCE by config.
+        # Everything below calls self.species.reproduce(...) without ever
+        # asking which species it is - that is the whole point.
+        self.species = make_species(config["genome"]["type"])
+
     # --- build the world (call once at the beginning of the run) ---
     def start(self):
         if len(self.agents) > 0:
@@ -61,44 +69,50 @@ class GridWorldEnv:
         self.current_step = 0
         return self.get_states()
 
+
     def create_agents(self):
         genome_config = config["genome"]
         for agent_id in self.agents.ids():
             genome = make_first_genome(genome_config, self.genome_rng)
             self.genomes.put(agent_id, genome)
 
-    # --- birth: energy-gated asexual cloning ---
+    # --- birth: reproduction driven by this run's species ---
     def _reproduce(self):
         """
-        Any agent whose energy reached the threshold clones itself: its
-        genotype is copied + mutated into a child genome, a child body is
-        spawned, and the parent pays the energy cost (which becomes the
-        child's starting energy).
+        One reproduction step for the whole population. The SPECIES decides HOW
+        a child genome is made (clone vs blend); this method only decides WHO
+        reproduces and does the world side (spawn + energy).
 
-        No partner, no external fitness - whoever gathers enough energy gets
-        to reproduce, so selection falls out of the environment itself.
+        partners_required is DATA, not code: 0 -> asexual (energy-gated solo),
+        1 -> sexual (proximity+energy matched pairs). No `if species == ...`.
         """
-        cfg = config["energy"]
-        threshold = cfg["reproduction_threshold"]
-        cost = cfg["reproduction_cost"]
+        cost = config["energy"]["reproduction_cost"]
 
-        # Snapshot parents BEFORE spawning: spawn() grows self.agents (can't
-        # mutate a dict mid-iteration), and a newborn must not reproduce on
-        # the same tick it was born.
-        parents = [a for a in self.agents.all() if a.energy >= threshold]
+        if self.species.partners_required == 0:
+            # asexual: everyone past the energy threshold clones itself
+            threshold = config["energy"]["reproduction_threshold"]
+            parents = [a for a in self.agents.all() if a.energy >= threshold]
+            for parent in parents:
+                genotype = self.genomes.get_genotype(parent.agent_id)
+                child = self.species.reproduce(genotype, None, self.genome_rng)
+                self._birth(child, cost)
+                parent.energy -= cost
+        else:
+            # sexual: choose_partners returns energy+proximity matched pairs
+            for mother, father in choose_partners(self.agents):
+                g_mother = self.genomes.get_genotype(mother.agent_id)
+                g_father = self.genomes.get_genotype(father.agent_id)
+                child = self.species.reproduce(g_father, g_mother, self.genome_rng)
+                self._birth(child, cost)
+                mother.energy -= cost
+                father.energy -= cost
 
-        for parent in parents:
-            parent_genotype = self.genomes.get_genotype(parent.agent_id)
-            child_genotype = mutate(parent_genotype, self.genome_rng)
-
-            child = self.agents.spawn(1)[0]
-            self.genomes.put(child.agent_id, child_genotype)
-
-            parent.energy -= cost
-            child.energy = cost   # the parent's investment becomes the child's start
-
-            # temporary probe: watch births happen during a real run
-            print(f"[birth @ step {self.current_step}] {parent.agent_id} -> {child.agent_id}  (pop {len(self.agents)})")
+    def _birth(self, child_genotype, start_energy):
+        """Give a new child genome a body and register it in every registry."""
+        baby = self.agents.spawn(1)[0]
+        self.genomes.put(baby.agent_id, child_genotype)
+        baby.energy = start_energy
+        print(f"[birth @ step {self.current_step}] -> {baby.agent_id}  (pop {len(self.agents)})")
 
     def get_states(self):
         """
