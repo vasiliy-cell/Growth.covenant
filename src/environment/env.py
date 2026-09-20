@@ -67,7 +67,8 @@ class GridWorldEnv:
         # The reproduction strategy for this run, chosen ONCE by config.
         # Everything below calls self.species.reproduce(...) without ever
         # asking which species it is - that is the whole point.
-        self.species = make_species(species_name or config["genome"]["type"])
+        self.species_name = species_name or config["genome"]["type"]
+        self.species = make_species(self.species_name)
 
     # --- build the world (call once at the beginning of the run) ---
     def start(self):
@@ -138,7 +139,7 @@ class GridWorldEnv:
                 "amount": self.world.refill_amount,
             },
             "current_step": self.current_step,
-            "species": type(self.species).__name__,
+            "species": self.species_name,
             "population": population,
             "genomes": {
                 record["agent_id"]: {

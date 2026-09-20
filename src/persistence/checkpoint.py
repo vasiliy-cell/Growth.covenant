@@ -72,21 +72,27 @@ class Checkpoint:
     # RESTORE
     # -----------------------------
     @staticmethod
-    def restore(record, env, brains, rng):
+    def restore(record, env, make_brains, rng):
         """
-        Puts a captured run back into a freshly built one, and returns the
-        `run` block so the runner knows which tick it is on.
+        Puts a captured run back into a freshly built one.
 
-        env and brains must be built but untouched: no start(), no sync().
+        env must be built but untouched - no start(). The minds cannot be
+        built before the world is back (the size of a network input comes
+        from an observation), so they are built here, through make_brains,
+        which is also what keeps the whole order in one place.
+
+        Returns (run, observations, brains).
         """
         Checkpoint.check(record, env)
 
         # 1. The world, exactly as it was eaten.
-        env.restore(record["env"])
+        observations = env.restore(record["env"])
 
         # 2. The minds, built to the shape the DNA was read into back then
         #    - the phenotypes came back with the world, so nothing is read
         #    a second time and no network comes out a different size.
+        brains = make_brains(observations)
+
         phenotypes = {
             agent_id: env.make_phenotype(agent_id)
             for agent_id in env.agents.ids()
@@ -102,7 +108,7 @@ class Checkpoint:
         #    construction is allowed to draw.
         rng.load_state(record["rng"])
 
-        return dict(record["run"])
+        return dict(record["run"]), observations, brains
 
     # -----------------------------
     # READING A RECORD
@@ -118,7 +124,7 @@ class Checkpoint:
             )
 
         saved_species = record["env"]["species"]
-        live_species = type(env.species).__name__
+        live_species = env.species_name
 
         if saved_species != live_species:
             raise ValueError(

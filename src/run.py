@@ -1,9 +1,10 @@
 from src.environment.env import GridWorldEnv
 from src.Agent.identity import new_run_id
 from src.Brain.BrainManager import BrainManager
+from src.persistence.checkpoint import Checkpoint
+from src.persistence.checkpoint_store import CheckpointStore
 from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.logger import Logger
-from src.Genome.GenePool import Genepool
 
 from src.Genome.types.reuse import reuse
 from src.utils.rng import RunRandom
@@ -96,6 +97,56 @@ def choose_species(default="clons"):
     return default
 
 
+def choose_checkpoint(store):
+    """
+    Which run to carry on, or none of them.
+
+    The listing is printed before anything is built, because a resumed run
+    takes its seed, its species and its world from the checkpoint - by the
+    time those are asked for it is too late to change your mind.
+    """
+    found = store.list()
+
+    if not found:
+        return None
+
+    print("Continue an earlier run?")
+    print("  0) no, build a new world")
+
+    for number, checkpoint in enumerate(found, start=1):
+        print(
+            f"  {number}) {checkpoint['name']}"
+            f"{'  [pinned]' if checkpoint['pinned'] else ''}"
+            f"  step {checkpoint['step']}"
+            f"  {checkpoint['size'] / 1e6:.1f} MB"
+            f"  {checkpoint['saved_at']:%Y-%m-%d %H:%M}"
+        )
+
+    answer = input(f"Enter choice (0-{len(found)}) [0]: ").strip()
+
+    if not answer or answer == "0":
+        return None
+
+    try:
+        return found[int(answer) - 1]["path"]
+    except (ValueError, IndexError):
+        print("Invalid input, building a new world")
+        return None
+
+
+def choose_pin(default=False):
+    """
+    Whether this run's last checkpoint survives the rotation.
+
+    Rolling checkpoints overwrite each other on purpose - most runs are
+    not worth a 100 MB file a week later. The ones that are get said so
+    here, and are never deleted.
+    """
+    answer = input("Keep this run's final checkpoint forever? [y/N]: ").strip()
+
+    return answer.lower().startswith("y") if answer else default
+
+
 def capture_rng_states(rng):
     """
     A snapshot of every stream this run has actually used.
@@ -146,8 +197,47 @@ def encode_observation(obs):
     return torch.tensor([x, y] + flat, dtype=torch.float32)
 
 
-def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=None):
+def main(render_fn=None, episodes=None, seed=None, agent_count=None,
+         species=None, resume=None, pin=None):
+    """
+    resume: path of a checkpoint to carry on, "" to force a new world,
+            None to ask.
+    pin:    whether this run's final checkpoint is kept forever (None asks).
+    """
     config = load_config()
+
+    # --- new world, or an old one continued? ---
+    # This comes first because a resumed run takes its seed, its species,
+    # its world and its population from the checkpoint - there is nothing
+    # left to ask about once one is chosen.
+    checkpoints_cfg = config.get("checkpoints", {})
+    store = CheckpointStore(
+        directory=checkpoints_cfg.get("dir", "checkpoints"),
+        keep=int(checkpoints_cfg.get("keep", 5)),
+    )
+
+    if resume is None:
+        resume = choose_checkpoint(store)
+
+    record = CheckpointStore.load(resume) if resume else None
+
+    if record is not None:
+        print(f"Continuing {Checkpoint.describe(record)}")
+
+        drift = Checkpoint.config_drift(record, config)
+        if drift:
+            print(
+                "WARNING: config changed since this checkpoint: "
+                + ", ".join(drift)
+            )
+
+        seed = record["run"]["seed"]
+        species = record["env"]["species"]
+        world_id = record["run"]["world_id"]
+        start_step = record["run"]["step"]
+    else:
+        world_id = None
+        start_step = 0
 
     # --- run length ---
     # Episodes no longer exist as a world mechanic: they are just logging
@@ -166,25 +256,41 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
     print(f"episodes = {episodes} -> total steps = {total_steps}")
 
     # --- population ---
-    if agent_count is None:
-        agent_count = choose_agent_count(
-            int(config.get("agents", {}).get("count", 1))
-        )
-    print(f"agents = {agent_count}")
+    # A continued world brings its own population, its own species and its
+    # own seed: asking for them again could only contradict the checkpoint.
+    if record is None:
+        if agent_count is None:
+            agent_count = choose_agent_count(
+                int(config.get("agents", {}).get("count", 1))
+            )
+        print(f"agents = {agent_count}")
 
-    if species is None:
-        species = choose_species(config.get("genome", {}).get("type", "clons"))
-    print(f"reproduction: {species}")
+        if species is None:
+            species = choose_species(config.get("genome", {}).get("type", "clons"))
+        print(f"reproduction: {species}")
 
-    if seed is None:
-        seed = choose_seed()
+        if seed is None:
+            seed = choose_seed()
+    else:
+        agent_count = len(record["env"]["population"]["agents"])
+        print(f"agents = {agent_count} (from the checkpoint)")
+        print(f"reproduction: {species}")
+
     print(f"SEED: {seed}")
+
+    if pin is None:
+        pin = choose_pin()
 
     # Minted once per run and shared by the whole population: every agent id
     # of this run is built on it, which is what keeps ids unique across all
     # the runs the project will ever make.
     run_id = new_run_id()
     print(f"RUN: {run_id}")
+
+    # The world keeps the id it was born with: agent ids are built on it,
+    # so a continued world goes on minting ids in the same lineage while
+    # the logs and the checkpoints of THIS process carry the new run id.
+    world_id = world_id or run_id
 
     # One seed for the whole run, and every stream grown from it by name:
     # the map, the population, the movement draws, the genome and, per
@@ -199,22 +305,17 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
 
     world_cfg = config.get("world", {})
     env = GridWorldEnv(
-        size=world_cfg.get("size", 64),
+        size=(
+            record["env"]["world"]["size"] if record is not None
+            else world_cfg.get("size", 64)
+        ),
         rng=rng,
         empty_ratio=world_cfg.get("empty_ratio", 0.8),
         refill=world_cfg.get("refill", {}),
         agent_count=agent_count,
-        run_id=run_id,
+        run_id=world_id,
         species_name=species,
     )
-
-    # The world is built exactly once - from here on it only gets updated.
-    # start() hands back one observation per agent, keyed by agent id.
-    observations = env.start()
-
-    # Every agent has the same field of view, so any of them defines the
-    # network input size.
-    obs_size = len(encode_observation(next(iter(observations.values()))))
 
     # --- minds ---
     # One brain per agent, each with its own network, replay buffer,
@@ -225,20 +326,40 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
     # Because each agent stores exactly one transition per tick, every
     # setting under replay_buffer in config.yml keeps the meaning it had
     # when a single agent lived in the world.
-    checkpoints = CheckpointWriter(
-        models_dir=config.get("checkpoints", {}).get("models_dir", "models"),
+    archive = CheckpointWriter(
+        models_dir=checkpoints_cfg.get("models_dir", "models"),
         run_id=run_id,
     )
 
-    pool = Genepool()
+    def make_brains(observations):
+        """Every agent has the same field of view, so any of them sizes the
+        network input. An empty world (everybody starved before the save)
+        still has to build a manager, so fall back on the view itself."""
+        obs_size = (
+            len(encode_observation(next(iter(observations.values()))))
+            if observations else 2 + 7 * 7
+        )
 
-    brains = BrainManager(
-        config=config,
-        obs_size=obs_size,
-        action_size=len(env.get_action_space()),
-        checkpoints=checkpoints,
-        rng=rng,
-    )
+        return BrainManager(
+            config=config,
+            obs_size=obs_size,
+            action_size=len(env.get_action_space()),
+            checkpoints=archive,
+            rng=rng,
+        )
+
+    if record is None:
+        # The world is built exactly once - from here on it only gets
+        # updated. start() hands back one observation per agent.
+        observations = env.start()
+        brains = make_brains(observations)
+    else:
+        # Everything comes back in one place, in one order, because the
+        # order is part of the format: world, then minds, then - last of
+        # all - the rng streams. See Checkpoint.restore.
+        _, observations, brains = Checkpoint.restore(
+            record, env, make_brains, rng
+        )
 
     # --- logging ---
     logging_cfg = config.get("logging", {})
@@ -252,6 +373,9 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
         seed=seed,
         extra={
             "run_id": run_id,
+            "world_id": world_id,
+            "resumed_from": os.path.basename(resume) if resume else None,
+            "resumed_at_step": start_step,
             "episodes": episodes,
             "episode_length": episode_length,
             "total_steps": total_steps,
@@ -268,8 +392,39 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
 
     episode_reward = 0.0
 
+    # --- checkpoints ---
+    every_steps = int(checkpoints_cfg.get("every_steps", 500))
+    replay_every = int(checkpoints_cfg.get("replay_every", 5))
+
+    written = 0
+    last_step = start_step
+
+    def write_checkpoint(step, with_replay, pinned=False):
+        """The whole run in one file: world, bodies, minds, streams."""
+        return store.save(
+            Checkpoint.capture(
+                env,
+                brains,
+                rng,
+                run={
+                    "run_id": run_id,
+                    "world_id": world_id,
+                    "seed": seed,
+                    "step": step,
+                    "episode": logger.episode,
+                    "episode_length": episode_length,
+                },
+                config=config,
+                with_replay=with_replay,
+            ),
+            run_id=run_id,
+            step=step,
+            pinned=pinned,
+        )
+
     try:
-        for step in range(1, total_steps + 1):
+        for step in range(start_step + 1, start_step + total_steps + 1):
+            last_step = step
             # Minds follow the population: whoever was born this tick gets
             # one, whoever is gone has theirs written down and dropped.
             #
@@ -408,14 +563,38 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
                     logger.log_rng(capture_rng_states(rng), step=step)
 
                 episode_reward = 0.0
+
+            # --- checkpoint ---
+            # The replay buffers are most of the weight of a file, so only
+            # every replay_every-th checkpoint carries them: the cheap ones
+            # are for crashes, the heavy ones for picking a run back up
+            # days later.
+            if every_steps > 0 and step % every_steps == 0:
+                written += 1
+                path = write_checkpoint(
+                    step,
+                    with_replay=(
+                        replay_every > 0 and written % replay_every == 0
+                    ),
+                )
+                print(f"[checkpoint @ step {step}] {os.path.basename(path)}")
+    except BaseException:
+        # Whatever went wrong, hours of training must not go with it. This
+        # is the one checkpoint that carries everything, replay included.
+        path = write_checkpoint(last_step, with_replay=True)
+        print(f"[crash @ step {last_step}] checkpoint written: {path}")
+        raise
     finally:
         # Flush whatever is left of an unfinished window, then close the file.
         if logger.steps > 0:
             logger.end_episode(beta=population_summary(brains)[1])
         logger.close()
 
-    saved = checkpoints.save_all(brains)
-    print(f"Saved {len(saved)} brains to {checkpoints.directory}")
+    final = write_checkpoint(last_step, with_replay=True, pinned=bool(pin))
+    print(f"Checkpoint: {final}{' [pinned]' if pin else ''}")
+
+    saved = archive.save_all(brains)
+    print(f"Saved {len(saved)} brains to {archive.directory}")
     print("Training finished")
 
 
