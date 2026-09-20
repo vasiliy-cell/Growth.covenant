@@ -129,17 +129,33 @@ class RunRandom:
     # -----------------------------
     # STATE (SNAPSHOT / RESUME)
     # -----------------------------
-    def state(self):
+    # Names that start with this belong to one agent; everything else is
+    # the world's (the map, the movement draws, the genome, the spawns).
+    AGENT = "agent"
+
+    def state(self, scope="all"):
         """
         Every live stream, as JSON-able values.
 
         Only streams that were actually asked for are in here: a stream
         nobody used has drawn nothing, and re-deriving it from the seed
         gives it back untouched.
+
+        scope: "all", "world" or "agents". A snapshot of the agents costs
+        about 16 KB per agent and does not compress - the numbers are
+        random, that is the point - so a log that wants the world's streams
+        every window and the population's rarely asks for them apart.
         """
         states = {"seed": self.seed, "streams": {}}
 
         for (kind, name), stream in self._streams.items():
+            belongs_to_agent = bool(name) and name[0] == self.AGENT
+
+            if scope == "world" and belongs_to_agent:
+                continue
+            if scope == "agents" and not belongs_to_agent:
+                continue
+
             states["streams"][self._label(kind, name)] = self._dump(kind, stream)
 
         return states
