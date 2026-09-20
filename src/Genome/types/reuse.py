@@ -46,8 +46,6 @@ class reuse:
         return mutated_genotype
 
     def make_phenotype(genotype):
-        with open("config.yml", "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
         genome_config = config["genome"]
         phenotype = {}
         for name, value in genotype.items():
