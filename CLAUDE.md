@@ -35,14 +35,39 @@ uncommitted.
 ### One continuous run, no episodes in the world
 The world is generated **once** in `GridWorldEnv.start()` and is never reset:
 
-- the agent is created once and keeps its position for the whole run — it is
-  never teleported back to the start of the map,
+- an agent keeps its position for as long as it lives — it is never
+  teleported back to the start of the map,
 - eaten cells stay eaten; instead of regeneration the map tops itself up
   (`World.maybe_refill` → `Map.refill`): every `world.refill.every` steps, if
   colored cells drop below `world.refill.threshold`, `world.refill.amount`
   random objects are added to empty cells,
 - there is no terminal state, so `env.step()` returns `(observation, reward,
   info)` and the training loop always stores `done=False`.
+
+### Life: childhood, aging, starvation
+The population turns over even though the world does not. The rules live in
+`src/Agent/life.py` (one `Life` object shared by everybody, built from the
+`life` / `energy` sections of `config.yml`); an agent carries only its own
+`age` and asks `Life` what that age costs it:
+
+- **childhood** — the first `life.childhood_steps` ticks after birth. The
+  agent ages and leaks energy, but nothing can kill it,
+- **adulthood** — mortal. At or below `life.death_energy` the agent starves
+  and `GridWorldEnv._reap()` removes it from the run,
+- **aging** — the personal leak is `energy.energy_leak` plus
+  `life.aging.amount` for every full `life.aging.every` ticks lived, so
+  there is no hard age limit: the bill simply keeps rising,
+- a body is born with `energy.start_energy` (a newborn gets
+  `energy.reproduction_cost` from its parents instead).
+
+Order inside a tick: eat → leak → **death** → age → birth. Death before
+birth, so a starving agent does not reproduce on its last tick; aging after
+death, so childhood really is `childhood_steps` whole ticks.
+
+`info` from `env.step()` carries `died` (ids that left this tick) and
+`alive`. An agent in `died` has no next observation, so `src/run.py` logs
+its final step but stores nothing for it, and the run ends early when the
+last agent starves.
 
 ### "Episode" = logging window only
 An episode no longer affects the world. It only:
