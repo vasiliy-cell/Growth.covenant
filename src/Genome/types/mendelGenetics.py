@@ -11,11 +11,8 @@ class MendelGeneticsSpecies:
     partners_required = 1
     rng = np.random.default_rng()
     def make_first_genome(self, genome_config, rng):
-        return reuse.make_first_genome(genome_config, rng)
-
-    def make_first_genome(self,genome_config, rng):
-        draft_1 = reuse.make_first_genome(self, genome_config, rng)
-        draft_2 = reuse.make_first_genome(self, genome_config, rng)
+        draft_1 = reuse.make_first_genome(genome_config, rng)
+        draft_2 = reuse.make_first_genome(genome_config, rng)
         genotype = {}
         
         for gene_name in draft_1:

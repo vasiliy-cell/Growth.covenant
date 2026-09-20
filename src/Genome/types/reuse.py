@@ -4,7 +4,7 @@ with open("config.yml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 class reuse: 
-    def make_first_genome(self, genome_config, rng):
+    def make_first_genome(genome_config, rng):
         genotype = {}
 
         for gene_name, spec in genome_config["genes"].items():
