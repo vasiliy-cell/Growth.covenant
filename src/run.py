@@ -4,7 +4,7 @@ from src.Brain.BrainManager import BrainManager
 from src.persistence.checkpoint import Checkpoint
 from src.persistence.checkpoint_store import CheckpointStore
 from src.persistence.checkpoint_writer import CheckpointWriter
-from src.persistence.logger import Logger
+from src.persistence.run_log import RunLog
 
 from src.Genome.types.reuse import reuse
 from src.utils.rng import RunRandom
@@ -134,6 +134,15 @@ def choose_checkpoint(store):
         return None
 
 
+def choose_label():
+    """
+    What this experiment is, in words, for whoever opens the folder in a
+    month. It names the log folder and goes into its header - an empty
+    answer is fine, the world id already makes the folder unique.
+    """
+    return input("Name for this experiment (optional): ").strip()
+
+
 def choose_pin(default=False):
     """
     Whether this run's last checkpoint survives the rotation.
@@ -147,45 +156,30 @@ def choose_pin(default=False):
     return answer.lower().startswith("y") if answer else default
 
 
-def capture_rng_states(rng):
+def population_state(env, brains):
     """
-    A snapshot of every stream this run has actually used.
+    Where every living mind stands, for the end of a logging window.
 
-    There are no per-episode seeds and no global generators to chase
-    anymore: the run draws from named streams (src/utils/rng.py), so one
-    call to rng.state() is the whole of its randomness. Restoring it is
-    RunRandom.load_state(snapshot) - that, plus the brains, is everything a
-    run needs to continue instead of starting over.
+    Keyed by the population and not by the registry of minds: a body that
+    starved this tick still has a brain until the next sync, and it is not
+    part of the population any more.
     """
-    return rng.state()
+    state = {}
 
+    for agent in env.agents:
+        if agent.agent_id not in brains:
+            continue
 
-def population_summary(brains):
-    """
-    Epsilon and curiosity belong to the individual now, so a run summary can
-    only show the population mean.
+        summary = brains.get(agent.agent_id).summary()
 
-    Agents are born and die at different times now, so these numbers drift
-    apart on their own - newborns exploring while the veterans around them
-    exploit - and the mean is the only honest single number to print.
+        state[agent.agent_id] = {
+            "epsilon": summary["epsilon"],
+            "curiosity_beta": summary["curiosity_beta"],
+            "energy": agent.energy,
+            "age": agent.age,
+        }
 
-    An empty population is not an error: the last window of an extinct run
-    still has to be flushed, and it simply has nothing to average.
-    """
-    summaries = [brain.summary() for brain in brains]
-
-    if not summaries:
-        return 0.0, None
-
-    epsilon = sum(s["epsilon"] for s in summaries) / len(summaries)
-
-    betas = [
-        s["curiosity_beta"] for s in summaries
-        if s["curiosity_beta"] is not None
-    ]
-    beta = sum(betas) / len(betas) if betas else None
-
-    return epsilon, beta
+    return state
 
 
 def encode_observation(obs):
@@ -198,11 +192,13 @@ def encode_observation(obs):
 
 
 def main(render_fn=None, episodes=None, seed=None, agent_count=None,
-         species=None, resume=None, pin=None):
+         species=None, resume=None, pin=None, label=None):
     """
     resume: path of a checkpoint to carry on, "" to force a new world,
             None to ask.
     pin:    whether this run's final checkpoint is kept forever (None asks).
+    label:  a name for the experiment, used for the log folder (None asks
+            on a new world; a continued one already has its folder).
     """
     config = load_config()
 
@@ -278,6 +274,9 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         print(f"reproduction: {species}")
 
     print(f"SEED: {seed}")
+
+    if label is None:
+        label = choose_label() if record is None else None
 
     if pin is None:
         pin = choose_pin()
@@ -369,35 +368,30 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         )
 
     # --- logging ---
+    # The folder belongs to the WORLD, not to this process: a continued run
+    # writes into the same one and only opens a new session in its header.
     logging_cfg = config.get("logging", {})
-    rng_snapshot_every = int(logging_cfg.get("rng_snapshot_every", 1))
+    flush_every_steps = int(logging_cfg.get("flush_every_steps", 1000))
 
-    logger = Logger(
-        log_dir=logging_cfg.get("log_dir", "logs"),
-        flush_every=int(logging_cfg.get("flush_every", 100)),
-    )
-    logger.log_run_start(
+    log = RunLog(
+        directory=logging_cfg.get("dir", "logs"),
+        world_id=world_id,
+        run_id=run_id,
         seed=seed,
-        extra={
-            "run_id": run_id,
-            "world_id": world_id,
-            "resumed_from": os.path.basename(resume) if resume else None,
-            "resumed_at_step": start_step,
-            "episodes": episodes,
-            "episode_length": episode_length,
-            "total_steps": total_steps,
-            "agents": agent_count,
-            "world_size": world_cfg.get("size", 64),
-            "world_refill": world_cfg.get("refill", {}),
-            "life": config.get("life", {}),
-            "energy": config.get("energy", {}),
-        },
+        episode_length=episode_length,
+        config=config,
+        species=species,
+        gene_names=list(config.get("genome", {}).get("genes", {})),
+        label=label,
+        resumed_from=os.path.basename(resume) if resume else None,
+        max_rows=int(logging_cfg.get("max_rows_per_part", 50000)),
+        world_snapshot_every=int(logging_cfg.get("world_snapshot_every", 100)),
+        rng_world_every=int(logging_cfg.get("rng_world_every_episodes", 1)),
+        rng_agents_every=int(logging_cfg.get("rng_agents_every_episodes", 100)),
     )
+    log.episode = record["run"]["episode"] if record is not None else 0
 
-    if rng_snapshot_every > 0:
-        logger.log_rng(capture_rng_states(rng), step=0)
-
-    episode_reward = 0.0
+    print(f"LOG: {log.path} (session {log.session})")
 
     # --- checkpoints ---
     every_steps = int(checkpoints_cfg.get("every_steps", 500))
@@ -418,7 +412,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     "world_id": world_id,
                     "seed": seed,
                     "step": step,
-                    "episode": logger.episode,
+                    "episode": log.episode,
                     "episode_length": episode_length,
                 },
                 config=config,
@@ -471,24 +465,32 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
             # terminal state to cut the bootstrap on. Death does not make
             # one either - a starved agent is removed, and the transition
             # that killed it is simply never stored.
+            bodies = {record["agent_id"]: record for record in info["deaths"]}
+
             for agent_id in actions:
                 env_reward = env_rewards[agent_id]
+                dead = bodies.get(agent_id)
 
                 # Starved on this very tick: the world removed the body
                 # before it could see where its move led. There is no next
                 # observation to shape a reward from and no mind left to
-                # train, so the step is only written down.
+                # train, so the step is written down and nothing is stored.
                 if agent_id not in next_observations:
-                    logger.log_step(
+                    log.log_step(
                         step=step,
+                        agent_id=agent_id,
                         position=observations[agent_id].position,
                         action=actions[agent_id],
-                        reward=env_reward,
+                        env_reward=env_reward,
+                        intrinsic_reward=0.0,
+                        shaped_reward=env_reward,
+                        energy=dead["energy"] if dead else 0.0,
+                        age=dead["lifespan"] if dead else 0,
                     )
-                    episode_reward += env_reward
                     continue
 
                 brain = brains.get(agent_id)
+                agent = env.agents.get(agent_id)
                 next_observation = next_observations[agent_id]
 
                 shaped_reward, intrinsic_reward = brain.shape_reward(
@@ -503,32 +505,61 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     done=False
                 )
 
-                # None while this agent's buffer is still warming up -> the
-                # logger simply gets no loss/td_error for the step (as
-                # designed in Logger: an average is computed only over the
-                # steps where a value existed).
+                # None while this agent's buffer is still warming up: a
+                # step happens, no gradient does, and the updates table
+                # simply has no row for this tick.
                 metrics = brain.learn()
 
-                log_kwargs = dict(
+                log.log_step(
                     step=step,
+                    agent_id=agent_id,
                     position=observations[agent_id].position,
                     action=actions[agent_id],
-                    reward=env_reward,
-                    shaped_reward=shaped_reward,
+                    env_reward=env_reward,
                     intrinsic_reward=intrinsic_reward,
+                    shaped_reward=shaped_reward,
+                    energy=agent.energy,
+                    age=agent.age,
                 )
+
                 if metrics is not None:
-                    log_kwargs.update(
-                        loss=metrics["loss"],
-                        td_error=metrics["td_error"],
-                        grad_norm=metrics["grad_norm"],
-                        target_q=metrics["target_q"],
-                        q_prediction=metrics["q_prediction"],
+                    summary = brain.summary()
+
+                    log.log_update(
+                        step=step,
+                        agent_id=agent_id,
+                        training_step=brain.trainer.training_step,
+                        metrics=metrics,
+                        curiosity_beta=summary["curiosity_beta"],
+                        epsilon=summary["epsilon"],
+                        buffer_size=len(brain.replay_buffer),
                     )
 
-                logger.log_step(**log_kwargs)
+            # --- events ---
+            # A newborn is read here and not on the next tick's sync: the
+            # phenotype is cached, so this is the same reading its mind
+            # will be built from, and the log gets the body's whole
+            # description at the moment it appears.
+            for birth in info["births"]:
+                log.log_birth(
+                    step=step,
+                    agent_id=birth["agent_id"],
+                    index=birth["index"],
+                    parents=birth["parents"],
+                    energy=birth["energy"],
+                    genotype=birth["genotype"],
+                    phenotype=env.make_phenotype(birth["agent_id"]),
+                )
 
-                episode_reward += shaped_reward
+            for death in info["deaths"]:
+                log.log_death(step=step, record=death)
+
+            if log.should_snapshot(step):
+                log.log_world(
+                    step=step,
+                    grid=env.world.map.grid,
+                    positions=env.agents.positions(),
+                )
 
             observations = next_observations
 
@@ -545,31 +576,34 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
             # --- logging window boundary ---
             # Nothing here touches the world or the agent position: only the
-            # log file, epsilon and curiosity.
+            # log, epsilon and curiosity.
             if step % episode_length == 0:
-                episode_index = logger.episode
+                # The streams go down BEFORE the counter moves, so a
+                # snapshot is labelled with the window it belongs to - and
+                # the very first window is one of them.
+                log.log_rng(rng, step=step)
 
-                mean_epsilon, mean_beta = population_summary(brains)
-
-                print(
-                    f"Episode {episode_index + 1}/{episodes} | step={step} | "
-                    f"reward={episode_reward:.2f} | "
-                    f"per_agent={episode_reward / len(env.agents):.2f} | "
-                    f"epsilon={mean_epsilon:.4f} | "
-                    f"filled={info['non_empty_ratio']:.3f}"
+                summary = log.end_episode(
+                    step=step,
+                    agents=population_state(env, brains),
+                    non_empty_ratio=info["non_empty_ratio"],
                 )
 
-                logger.end_episode(beta=mean_beta)
+                print(
+                    f"Episode {summary['episode'] + 1}/{episodes} | "
+                    f"step={step} | "
+                    f"reward={summary['shaped_reward']:.2f} | "
+                    f"per_agent={summary['shaped_reward'] / max(summary['agents'], 1):.2f} | "
+                    f"epsilon={summary['mean_epsilon'] or 0.0:.4f} | "
+                    f"pop={summary['agents']} "
+                    f"(+{summary['births']}/-{summary['deaths']}) | "
+                    f"filled={summary['non_empty_ratio']:.3f}"
+                )
 
                 # Every mind decays its OWN epsilon and clears its OWN
                 # curiosity: the schedule belongs to the individual, so an
                 # agent born late still starts out exploring.
                 brains.next_episode()
-
-                if rng_snapshot_every > 0 and logger.episode % rng_snapshot_every == 0:
-                    logger.log_rng(capture_rng_states(rng), step=step)
-
-                episode_reward = 0.0
 
             # --- checkpoint ---
             # The replay buffers are most of the weight of a file, so only
@@ -585,6 +619,12 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     ),
                 )
                 print(f"[checkpoint @ step {step}] {os.path.basename(path)}")
+
+            # --- log to disk ---
+            # Closes a part of every table. Whatever is still in memory is
+            # all a kill -9 can cost from here on.
+            if flush_every_steps > 0 and step % flush_every_steps == 0:
+                log.flush()
     except BaseException:
         # Whatever went wrong, hours of training must not go with it. This
         # is the one checkpoint that carries everything, replay included.
@@ -597,10 +637,15 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         print(f"[crash @ step {last_step}] checkpoint written: {path}")
         raise
     finally:
-        # Flush whatever is left of an unfinished window, then close the file.
-        if logger.steps > 0:
-            logger.end_episode(beta=population_summary(brains)[1])
-        logger.close()
+        # Close whatever is left of an unfinished window, then the log.
+        if log.window_steps > 0:
+            log.end_episode(
+                step=last_step,
+                agents=population_state(env, brains),
+                non_empty_ratio=env.world.non_empty_ratio(),
+            )
+
+        log.close()
 
     final = write_checkpoint(last_step, with_replay=True, pinned=bool(pin))
     print(f"Checkpoint: {final}{' [pinned]' if pin else ''}")

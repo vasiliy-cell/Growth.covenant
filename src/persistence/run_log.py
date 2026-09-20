@@ -531,6 +531,11 @@ class RunLog:
 
         return summary
 
+    @property
+    def window_steps(self):
+        """Whether the window being accumulated has anything in it yet."""
+        return self._window["steps"]
+
     # -----------------------------
     # DISK
     # -----------------------------

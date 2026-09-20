@@ -4,15 +4,17 @@
 Каждый ран:
   1. получает новый global seed (время в микросекундах),
   2. обучается episodes эпизодов через src.run.main(),
-  3. читает logs/*.jsonl, усредняет env_reward по последним --tail эпизодам
-     рана (curiosity beta затухает по ходу рана, поэтому среднее по ВСЕМ
-     эпизодам смешивает "разогрев" с выученной политикой -- усреднение по
-     хвосту даёт честную оценку того, чему агент реально научился),
+  3. читает таблицу episodes/population последнего забега, усредняет
+     env_reward по последним --tail эпизодам (curiosity beta затухает по
+     ходу рана, поэтому среднее по ВСЕМ эпизодам смешивает "разогрев" с
+     выученной политикой -- усреднение по хвосту даёт честную оценку того,
+     чему агент реально научился),
   4. сравнивает среднее с порогом -> вердикт GOOD/BAD,
   5. дописывает запись рана (seed, среднее по хвосту, среднее по всему рану,
      вердикт) в results/runs_summary.jsonl (этот файл НЕ удаляется между
      ранами),
-  6. удаляет logs/ и models/mlp.pth и переходит к следующему рану.
+  6. переходит к следующему рану (логи НЕ удаляются: они живут до конца
+     эксперимента, паковать их -- дело scripts/logs.py).
 
 Запуск из корня репозитория:
     PYTHONPATH=. python scripts/auto_train.py --runs 5 --episodes 40000
@@ -56,8 +58,10 @@ def make_seed():
 
 
 def clean_run_artifacts():
-    if os.path.isdir(LOGS_DIR):
-        shutil.rmtree(LOGS_DIR)
+    """
+    Логи НЕ трогаем: они живут до конца эксперимента и удаляются только
+    руками (scripts/logs.py archive упакует их, если кончается место).
+    """
     os.makedirs(LOGS_DIR, exist_ok=True)
     if os.path.exists(MODEL_PATH):
         os.remove(MODEL_PATH)
@@ -65,28 +69,23 @@ def clean_run_artifacts():
 
 def collect_episode_rewards(metric):
     """
-    Один ран -- один файл logs/run_*.jsonl со множеством episode_summary
-    (эпизод теперь просто окно логирования, а не пересоздание мира). Индекс
-    окна лежит в поле "episode" самого summary.
-    Возвращает список (episode_index, reward), отсортированный по индексу.
+    Читает сводку по популяции ПОСЛЕДНЕГО забега: одна строка на окно
+    логирования. Возвращает [(индекс окна, значение метрики)], по порядку.
     """
-    episodes = []
-    for fname in sorted(os.listdir(LOGS_DIR)):
-        if not fname.endswith(".jsonl"):
-            continue
-        with open(os.path.join(LOGS_DIR, fname), "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                obj = json.loads(line)
-                if obj.get("type") != "episode_summary":
-                    continue
-                if obj.get(metric) is None:
-                    continue
-                episodes.append((obj.get("episode", len(episodes)), obj[metric]))
-    episodes.sort(key=lambda pair: pair[0])
-    return episodes
+    from src.persistence.log_reader import RunLogReader
+
+    worlds = RunLogReader.find(LOGS_DIR)
+
+    if not worlds:
+        return []
+
+    summary = worlds[0].episode_population()
+
+    return [
+        (row["episode"], row[metric])
+        for row in summary.to_pylist()
+        if row.get(metric) is not None
+    ]
 
 
 def average(values):
@@ -145,7 +144,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--episodes", type=int, default=40000)
-    parser.add_argument("--metric", default="env_reward", choices=["env_reward", "training_reward"])
+    parser.add_argument("--metric", default="env_reward", choices=["env_reward", "shaped_reward"])
     parser.add_argument("--threshold", type=float, default=45.0)
     parser.add_argument("--tail", type=int, default=2000, help="average over last N episodes of each run")
     args = parser.parse_args()

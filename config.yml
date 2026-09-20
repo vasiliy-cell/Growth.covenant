@@ -43,14 +43,37 @@ world:
     amount: 5             # how many cells to add per check
 
 # --- LOGGING ---
-# flush_every is crash insurance: python buffers writes, so a run that dies
-# between two window summaries loses everything it had not flushed. Every N
-# steps the log file is pushed out, and a killed run keeps all of its steps
-# but the last few. 0 turns it off (only the OS decides when to write).
+# One folder per WORLD, not per process: a run continued from a checkpoint
+# writes into the same folder and opens a new session in its run.json.
+#
+#   logs/<world_id>[_<label>]/
+#     run.json            how to repeat it: seed, config, commit, schema,
+#                         species, gene set, library versions, sessions
+#     steps/              a row per agent per tick
+#     updates/            a row per gradient update
+#     episodes/           per agent and per population, one row per window
+#     events/             births (with parents and DNA) and whole lives
+#     world/              the map and the bodies on it, every N steps
+#     rng/                stream states, world often and agents rarely
+#
+# Each table is a folder of finished parquet parts. Parquet writes its
+# footer at close, so one open file would be unreadable after a crash; a
+# part is closed and renamed into place, and flush_every_steps bounds what
+# a kill -9 can cost.
+#
+# NOTHING here is ever deleted automatically. A log is deleted by a human
+# who has decided the experiment is over - scripts/logs.py archives one
+# with a note attached when the disk gets tight.
 logging:
-  log_dir: "logs"
-  rng_snapshot_every: 1   # snapshot every rng state once per N episodes (0 = off)
-  flush_every: 100        # push the log file to disk every N steps
+  dir: "logs"
+  flush_every_steps: 1000       # close a part of every table this often
+  max_rows_per_part: 50000      # ...or when a table has this many rows
+  world_snapshot_every: 100     # snapshot the map every N steps (0 = off)
+  rng_world_every_episodes: 1   # map/movement/genome streams, per window
+  rng_agents_every_episodes: 100  # the agents' own streams: ~16 KB each,
+                                  # random bytes that do not compress, and
+                                  # the checkpoints carry them all anyway
+  archive_dir: "archives"       # where scripts/logs.py puts packed runs
 
 # --- CHECKPOINTS ---
 # Two different things live here and they answer different questions.
