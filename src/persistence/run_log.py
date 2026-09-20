@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import os
@@ -100,19 +101,25 @@ class RunLog:
         species,
         gene_names,
         label=None,
+        series=None,
         resumed_from=None,
         max_rows=50000,
         world_snapshot_every=100,
         rng_world_every=1,
         rng_agents_every=100,
+        live_every=20,
     ):
-        self.path = self.folder_for(directory, world_id, label)
+        self.path = self.folder_for(directory, world_id, label, series)
         os.makedirs(self.path, exist_ok=True)
 
         self.world_id = world_id
         self.run_id = run_id
+        self.series = series
         self.episode_length = episode_length
         self.world_snapshot_every = world_snapshot_every
+        self.live_every = live_every
+        self.live_path = os.path.join(self.path, "live.json")
+        self._live_at = (time.time(), 0)
         self.rng_world_every = rng_world_every
         self.rng_agents_every = rng_agents_every
 
@@ -141,6 +148,7 @@ class RunLog:
                 "label": label,
                 "created_at": time.time(),
                 "episode_length": episode_length,
+                "series": series,
                 "species": species,
                 "genes": sorted(gene_names),
                 "config": config,
@@ -188,29 +196,37 @@ class RunLog:
     # WHERE IT ALL LIVES
     # -----------------------------
     @staticmethod
-    def folder_for(directory, world_id, label=None):
+    def folder_for(directory, world_id, label=None, series=None):
         """
         The folder of a world: found by its id, named with its label.
 
         A continuation only knows the world id, never the label somebody
         typed months ago, so the id is the key and the label is decoration
-        on the end of it.
+        on the end of it. A world that belongs to a series lives one level
+        down, in a folder named after the series - which is all a series
+        is: a place, and a word in every run.json under it.
         """
-        if os.path.isdir(directory):
-            for name in sorted(os.listdir(directory)):
-                if name == world_id or name.startswith(world_id + "_"):
-                    return os.path.join(directory, name)
+        for root, _, files in os.walk(directory):
+            if "run.json" not in files:
+                continue
+
+            name = os.path.basename(root)
+
+            if name == world_id or name.startswith(world_id + "_"):
+                return root
+
+        name = world_id
 
         if label:
-            safe = "".join(
-                character if character.isalnum() or character in "-_" else "-"
-                for character in label
-            ).strip("-")
+            safe = _slug(label)
 
             if safe:
-                return os.path.join(directory, f"{world_id}_{safe}")
+                name = f"{world_id}_{safe}"
 
-        return os.path.join(directory, world_id)
+        if series:
+            return os.path.join(directory, _slug(series) or "series", name)
+
+        return os.path.join(directory, name)
 
     def _table(self, name, schema, max_rows):
         return PartWriter(
@@ -408,6 +424,63 @@ class RunLog:
                 "y": y,
             })
 
+    # -----------------------------
+    # LIVE
+    # -----------------------------
+    def log_live(self, step, grid, positions, agents, reward, epsilon):
+        """
+        A few kilobytes saying what is happening RIGHT NOW, rewritten in
+        place for whoever is watching.
+
+        The panel reads this file and the simulation never hears about the
+        panel: no socket, no lock, no back pressure. If nobody is watching
+        it costs one small atomic write every `live_every` steps, which is
+        nothing next to a backward pass - and turning it off is setting
+        that to 0.
+
+        The grid goes as base64 of raw int8 instead of a list of 4096
+        numbers: five times smaller and far cheaper to produce.
+        """
+        now = time.time()
+        was_at, was_step = self._live_at
+        elapsed = now - was_at
+
+        grid = np.asarray(grid, dtype=np.int8)
+
+        record = {
+            "world_id": self.world_id,
+            "run_id": self.run_id,
+            "session": self.session,
+            "label": self.header.get("label"),
+            "series": self.series,
+            "path": self.path,
+            "pid": os.getpid(),
+            "updated_at": now,
+            "step": step,
+            "episode": self.episode,
+            "agents": agents,
+            "reward": reward,
+            "epsilon": epsilon,
+            "steps_per_second": (step - was_step) / elapsed if elapsed > 0 else None,
+            "size": int(grid.shape[0]),
+            "grid": base64.b64encode(grid.reshape(-1).tobytes()).decode("ascii"),
+            "positions": [
+                [agent_id, int(x), int(y)] for agent_id, (x, y) in positions.items()
+            ],
+        }
+
+        temporary = self.live_path + ".writing"
+
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(record, handle)
+
+        os.replace(temporary, self.live_path)
+
+        self._live_at = (now, step)
+
+    def should_live(self, step):
+        return self.live_every > 0 and step % self.live_every == 0
+
     def should_snapshot(self, step):
         return (
             self.world_snapshot_every > 0
@@ -532,6 +605,18 @@ class RunLog:
         return summary
 
     @property
+    def window_reward(self):
+        """What the whole population has earned in the window so far."""
+        return self._window["shaped_reward"]
+
+    @staticmethod
+    def window_epsilon(brains):
+        """The population mean, for the one number a watcher wants."""
+        values = [brain.policy.epsilon for brain in brains]
+
+        return sum(values) / len(values) if values else None
+
+    @property
     def window_steps(self):
         """Whether the window being accumulated has anything in it yet."""
         return self._window["steps"]
@@ -573,6 +658,14 @@ def _empty_sums():
         "births": 0,
         "deaths": 0,
     }
+
+
+def _slug(text):
+    """A folder name a human can still read: letters, digits, dashes."""
+    return "".join(
+        character if character.isalnum() or character in "-_" else "-"
+        for character in str(text)
+    ).strip("-")
 
 
 def _number(value):

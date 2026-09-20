@@ -56,3 +56,6 @@ temp_data
 .temp_data
 temp_data/
 .claude
+
+# --- Рабочий план для Claude (не для истории) ---
+tasks.md

@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 
@@ -259,6 +260,52 @@ def test_a_continued_world_writes_into_the_same_folder(tmp_path):
     assert sessions[1]["resumed_from"].endswith(".pt")
     assert reader.episode_population().num_rows == 5
     assert set(reader.steps()["session"].to_pylist()) == {0, 1}
+
+
+def test_a_series_nests_the_folder_and_the_reader_still_finds_it(tmp_path):
+    """A series is a folder and a word in run.json, not a new concept."""
+    log = make_log(tmp_path, label="third try", series="leak sweep")
+    write_episodes(log, episodes=1)
+    log.close()
+
+    assert os.path.basename(os.path.dirname(log.path)) == "leak-sweep"
+
+    found = RunLogReader.find(str(tmp_path))
+
+    assert [reader.path for reader in found] == [log.path]
+    assert found[0].series == "leak sweep"
+
+
+def test_the_live_file_says_what_is_happening_right_now(tmp_path):
+    """
+    A few kilobytes for whoever is watching, and nothing at all for the
+    simulation to know about them.
+    """
+    log = make_log(tmp_path, live_every=5)
+    grid = np.arange(64, dtype=np.int8).reshape(8, 8) % 3
+
+    assert log.should_live(5)
+    assert not log.should_live(4)
+
+    log.log_live(
+        step=5,
+        grid=grid,
+        positions={"a": (1, 2)},
+        agents=1,
+        reward=12.5,
+        epsilon=0.6,
+    )
+
+    with open(log.live_path, encoding="utf-8") as handle:
+        live = json.load(handle)
+
+    assert live["step"] == 5
+    assert live["agents"] == 1
+    assert live["positions"] == [["a", 1, 2]]
+    assert np.array_equal(
+        np.frombuffer(base64.b64decode(live["grid"]), dtype=np.int8).reshape(8, 8),
+        grid,
+    )
 
 
 def test_the_label_names_the_folder_and_the_id_finds_it(tmp_path):

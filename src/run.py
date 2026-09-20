@@ -10,7 +10,9 @@ from src.Genome.types.reuse import reuse
 from src.utils.rng import RunRandom
 
 
+import argparse
 import os
+import signal
 import yaml
 import numpy as np
 import torch
@@ -21,6 +23,49 @@ CONFIG_PATH = os.path.join(REPO_ROOT, "config.yml")
 def load_config(path=CONFIG_PATH):
     with open(path, "r") as f:
         return yaml.safe_load(f)
+
+
+def apply_overrides(config, overrides):
+    """
+    --set life.childhood_steps=2000, for a run that differs from the file
+    in one place and should not have the file edited for it.
+
+    The value goes through yaml, so 2000 is an int, 0.2 is a float and
+    true is a bool - the same reader that produced the rest of the config.
+
+    The overrides land in BOTH copies of the config in this process: the
+    one read here and the module-level one in src/Genome/types/reuse.py
+    that the world reads. One process must not hold two different
+    opinions about its own rules.
+    """
+    from src.Genome.types import reuse
+
+    for override in overrides or []:
+        key, _, raw = str(override).partition("=")
+        value = yaml.safe_load(raw)
+
+        for target in (config, reuse.config):
+            node = target
+            parts = key.strip().split(".")
+
+            for part in parts[:-1]:
+                node = node.setdefault(part, {})
+
+            node[parts[-1]] = value
+
+    return config
+
+
+def stop_gracefully(signum, frame):
+    """
+    A panel that stops a run should not cost it its checkpoint.
+
+    SIGTERM kills a process where it stands, so the runner would never
+    reach the rescue checkpoint it writes on the way out. Turning the
+    signal into an exception puts the stop on the same path as a crash -
+    which is the path that saves everything.
+    """
+    raise KeyboardInterrupt(f"stopped by signal {signum}")
 
 def make_seed():
     return RunRandom.new_seed()
@@ -192,15 +237,20 @@ def encode_observation(obs):
 
 
 def main(render_fn=None, episodes=None, seed=None, agent_count=None,
-         species=None, resume=None, pin=None, label=None):
+         species=None, resume=None, pin=None, label=None, series=None,
+         live_every=None, overrides=None):
     """
-    resume: path of a checkpoint to carry on, "" to force a new world,
-            None to ask.
-    pin:    whether this run's final checkpoint is kept forever (None asks).
-    label:  a name for the experiment, used for the log folder (None asks
-            on a new world; a continued one already has its folder).
+    resume:     path of a checkpoint to carry on, "" to force a new world,
+                None to ask.
+    pin:        whether this run's final checkpoint is kept (None asks).
+    label:      a name for the experiment, used for the log folder (None
+                asks on a new world; a continued one has its folder).
+    series:     a name this run shares with its siblings; it nests the log
+                folder and is written into run.json.
+    live_every: how often to rewrite live.json for whoever is watching.
+    overrides:  ["life.childhood_steps=2000", ...] for this run only.
     """
-    config = load_config()
+    config = apply_overrides(load_config(), overrides)
 
     # --- new world, or an old one continued? ---
     # This comes first because a resumed run takes its seed, its species,
@@ -384,10 +434,15 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         gene_names=list(config.get("genome", {}).get("genes", {})),
         label=label,
         resumed_from=os.path.basename(resume) if resume else None,
+        series=series,
         max_rows=int(logging_cfg.get("max_rows_per_part", 50000)),
         world_snapshot_every=int(logging_cfg.get("world_snapshot_every", 100)),
         rng_world_every=int(logging_cfg.get("rng_world_every_episodes", 1)),
         rng_agents_every=int(logging_cfg.get("rng_agents_every_episodes", 100)),
+        live_every=(
+            int(logging_cfg.get("live_every_steps", 20))
+            if live_every is None else int(live_every)
+        ),
     )
     log.episode = record["run"]["episode"] if record is not None else 0
 
@@ -566,6 +621,18 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     positions=env.agents.positions(),
                 )
 
+            # What somebody watching the panel sees. Cheap, and the
+            # simulation never learns whether anybody is watching.
+            if log.should_live(step):
+                log.log_live(
+                    step=step,
+                    grid=env.world.map.grid,
+                    positions=env.agents.positions(),
+                    agents=len(env.agents),
+                    reward=log.window_reward,
+                    epsilon=log.window_epsilon(brains),
+                )
+
             observations = next_observations
 
             if render_fn is not None:
@@ -663,5 +730,40 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     print("Training finished")
 
 
+def parse_args():
+    """
+    Everything the prompts ask, as flags.
+
+    A flag that is not given stays None, which is exactly what makes the
+    prompt appear - so `python src/run.py` is still the interactive run it
+    has always been, and the panel launches the same runner with every
+    answer already filled in.
+    """
+    parser = argparse.ArgumentParser(description="Run the world.")
+
+    parser.add_argument("--episodes", type=int, help="logging windows to run")
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--agents", type=int, dest="agent_count")
+    parser.add_argument("--species", choices=["clons", "non_linear", "mendel"])
+    parser.add_argument("--label", help="name of the experiment")
+    parser.add_argument("--series", help="name this run shares with its siblings")
+    parser.add_argument("--resume", help="checkpoint to carry on ('' = new world)")
+    parser.add_argument("--pin", dest="pin", action="store_true", default=None,
+                        help="keep this run's final checkpoint forever")
+    parser.add_argument("--no-pin", dest="pin", action="store_false")
+    parser.add_argument("--live-every", type=int, dest="live_every",
+                        help="rewrite live.json every N steps (0 = off)")
+    parser.add_argument("--set", action="append", dest="overrides", default=[],
+                        metavar="KEY=VALUE",
+                        help="override one config value, e.g. energy.energy_leak=0.2")
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main()
+    # A stop from the panel arrives as SIGTERM. Turning it into an
+    # exception sends it down the same path a crash takes, and that path
+    # writes a checkpoint on the way out.
+    signal.signal(signal.SIGTERM, stop_gracefully)
+
+    main(**vars(parse_args()))

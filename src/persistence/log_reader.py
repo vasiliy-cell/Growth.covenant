@@ -47,19 +47,32 @@ class RunLogReader:
     # -----------------------------
     @classmethod
     def find(cls, directory="logs"):
-        """Every world in a log directory, newest first."""
+        """
+        Every world under a log directory, newest first.
+
+        The walk is recursive because a world that belongs to a series
+        lives one level down, in a folder named after it - and because
+        somebody will eventually sort their logs into folders by hand,
+        and should not lose them by doing so. A folder with a run.json in
+        it is a world; anything else is just a folder.
+        """
         if not os.path.isdir(directory):
             return []
 
         found = []
 
-        for name in sorted(os.listdir(directory)):
-            path = os.path.join(directory, name)
+        for root, directories, files in os.walk(directory):
+            if "run.json" in files:
+                found.append(cls(root))
 
-            if os.path.isfile(os.path.join(path, "run.json")):
-                found.append(cls(path))
+                # Nothing nests inside a world.
+                directories[:] = []
 
         return sorted(found, key=lambda reader: reader.created_at, reverse=True)
+
+    @property
+    def series(self):
+        return self.header.get("series")
 
     @property
     def world_id(self):
