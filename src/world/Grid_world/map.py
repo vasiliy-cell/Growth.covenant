@@ -2,7 +2,15 @@ import numpy as np
 from src.world.Grid_world.objects import OBJECTS
 
 class Map:
-    def __init__(self, size=8, empty_ratio=0.8, rng=None):
+    """
+    grid: an existing map to carry on with, instead of generating one.
+
+    A restored map must not be generated first and overwritten after: a
+    generation shuffles the whole world stream, and a run that resumes
+    would carry on from a different place in it than the run that saved it.
+    """
+
+    def __init__(self, size=8, empty_ratio=0.8, rng=None, grid=None):
         self.size = size
         self.empty_ratio = empty_ratio
         self.object_ids = list(OBJECTS.keys())
@@ -12,7 +20,7 @@ class Map:
             raise ValueError("Map requires rng for reproducibility")
 
         self.rng = rng
-        self.grid = self._generate()
+        self.grid = self._generate() if grid is None else np.array(grid)
 
     def _generate(self):
         total_cells = self.size * self.size
@@ -110,6 +118,13 @@ class Map:
             self.grid[y, x] = self.rng.choice(self.non_empty_ids)
 
         return count
+
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        """Plain lists, so a checkpoint does not depend on a numpy version."""
+        return self.grid.tolist()
 
     def print_map(self):
         for row in self.grid:

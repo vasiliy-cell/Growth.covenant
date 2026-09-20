@@ -94,18 +94,82 @@ class GridWorldEnv:
 
     def make_phenotype(self, agent_id):
         """
-        How this genotype reads, in this body.
+        How this genotype reads, in this body - read once and kept.
 
         The draw belongs to the agent and not to the run: mendel tosses a
         coin for every pair of equal alleles, and that toss must not depend
-        on how many other agents were read before this one.
+        on how many other agents were read before this one. The result is
+        stored in the gene pool because reading the same DNA twice need not
+        give the same body, and a checkpoint that re-read it would rebuild a
+        network its saved weights no longer fit.
         """
+        if self.genomes.has_phenotype(agent_id):
+            return self.genomes.get_phenotype(agent_id)
+
         index = self.agents.get(agent_id).index
 
-        return self.species.make_phenotype(
+        phenotype = self.species.make_phenotype(
             self.genomes.get_genotype(agent_id),
             self.rng.numpy("agent", index, "phenotype"),
         )
+        self.genomes.put_phenotype(agent_id, phenotype)
+
+        return phenotype
+
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        """
+        The world as one record: the map, the clock and every body on it.
+
+        The species is in here because a genotype only means something to
+        the species that wrote it - a mendel genome is pairs of alleles and
+        a clon genome is plain numbers, so resuming one as the other would
+        read nonsense out of the DNA.
+        """
+        population = self.agents.state()
+
+        return {
+            "world": self.world.state(),
+            "refill": {
+                "every": self.world.refill_every,
+                "threshold": self.world.refill_threshold,
+                "amount": self.world.refill_amount,
+            },
+            "current_step": self.current_step,
+            "species": type(self.species).__name__,
+            "population": population,
+            "genomes": {
+                record["agent_id"]: {
+                    "genotype": self.genomes.get_genotype(record["agent_id"]),
+                    "phenotype": self.genomes.get_phenotype(record["agent_id"]),
+                }
+                for record in population["agents"]
+            },
+        }
+
+    def restore(self, state):
+        """
+        Carries on the saved world instead of building a new one.
+
+        This is start() for a run that already happened: nothing is
+        generated and nothing is spawned, so not one draw is taken from any
+        stream. Everything the streams had drawn by then is put back
+        separately, by the checkpoint, after everything else is built.
+        """
+        self.world.restore(state["world"], rng=self.world_rng)
+        self.size = self.world.size
+
+        self.agents.restore(state["population"])
+
+        for agent_id, genome in state["genomes"].items():
+            self.genomes.put(agent_id, genome["genotype"])
+            self.genomes.put_phenotype(agent_id, genome["phenotype"])
+
+        self.current_step = state["current_step"]
+
+        return self.get_states()
 
     # --- birth: reproduction driven by this run's species ---
     def _reproduce(self):

@@ -19,6 +19,26 @@ class World:
         # World is responsible for creating its map
         self.map = Map(size=self.size, empty_ratio=self.empty_ratio, rng=rng)
 
+    # --- or carry on with the map a checkpoint remembered ---
+    def restore(self, state, rng):
+        """
+        Puts back the map exactly as it was, eaten cells and all.
+
+        Nothing is generated here: a map that grew from a checkpoint must
+        look like the one that was saved, not like a fresh one with the
+        same seed - the run that saved it had been eating from it for
+        hours.
+        """
+        self.size = state["size"]
+        self.empty_ratio = state["empty_ratio"]
+
+        self.map = Map(
+            size=self.size,
+            empty_ratio=self.empty_ratio,
+            rng=rng,
+            grid=state["grid"],
+        )
+
     def get_cell(self, position):
         x, y = position
         return self.map.get_cell(x, y)
@@ -56,6 +76,16 @@ class World:
             return 0
 
         return self.map.refill(self.refill_amount, exclude=exclude)
+
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        return {
+            "size": self.size,
+            "empty_ratio": self.empty_ratio,
+            "grid": self.map.state() if self.map is not None else None,
+        }
 
     def print(self):
         if self.map:

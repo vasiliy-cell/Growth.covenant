@@ -78,6 +78,57 @@ class AgentManager:
         """Removes an agent from the run and returns it (None if unknown)."""
         return self.agents.pop(agent_id, None)
 
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        """Every body alive, and the index counter that keeps ids unique."""
+        return {
+            "next_index": self._next_index,
+            "world_id": self.run_id,
+            "agents": [
+                {
+                    "agent_id": agent.agent_id,
+                    "index": agent.index,
+                    "position": agent.get_position(),
+                    "energy": agent.energy,
+                    "age": agent.age,
+                }
+                for agent in self.all()
+            ],
+        }
+
+    def restore(self, state):
+        """
+        Puts the saved bodies back where they stood.
+
+        No spawn draws happen here, and that is the point: a restored
+        population must not consume the population stream, or the first
+        birth after a resume would land somewhere the saved run would never
+        have put it.
+
+        The index counter is restored too. An index is never reused - it
+        names an agent's private rng streams, so handing out 0 again would
+        give a newborn the mind of the agent that already holds it.
+        """
+        self.run_id = state.get("world_id", self.run_id)
+        self.agents = {}
+
+        for record in state["agents"]:
+            agent = Agent(
+                agent_id=record["agent_id"],
+                index=record["index"],
+                world=self.world,
+                position=Position(*record["position"]),
+                life=self.life,
+            )
+            agent.energy = record["energy"]
+            agent.age = record["age"]
+
+            self.agents[agent.agent_id] = agent
+
+        self._next_index = state["next_index"]
+
     def _spawn_position(self):
         """
         A free cell for a newborn agent.
