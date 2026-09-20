@@ -4,15 +4,15 @@ import pytest
 
 from src.environment.env import GridWorldEnv
 from src.world.Grid_world.objects import AGENT_CELL
-from src.world.world import World
 from src.Agent.State.position import Position
+from src.utils.rng import RunRandom
 
 # Action ids, see src/Agent/Actions/movement/available_movements.py
 UP, DOWN, LEFT, RIGHT = 0, 1, 2, 3
 
 
 def make_env(size=12, seed=0, agent_count=2):
-    env = GridWorldEnv(size=size, rng=random.Random(seed), agent_count=agent_count)
+    env = GridWorldEnv(size=size, rng=RunRandom(seed), agent_count=agent_count)
     env.start()
     return env
 
@@ -149,20 +149,17 @@ def test_curiosity_key_ignores_other_agents():
 # -----------------------------
 # SEED COMPATIBILITY
 # -----------------------------
-def test_a_single_agent_spawns_where_it_always_did():
+def test_a_spawn_is_drawn_from_the_population_stream_alone():
     """
-    One agent must consume the rng exactly as it did before the population
-    existed, so agent_count=1 stays the baseline old runs can be compared
-    against.
+    Where a body appears depends on the seed and on nothing else. The map
+    is generated from its own stream, so however many cells it shuffled
+    first, the spawn lands where the population stream says it does.
     """
     seed, size = 12345, 16
 
-    rng = random.Random(seed)
-    world = World(size=size)
-    world.generate(rng=rng)
-    expected = Position.random(size, rng).get()
+    expected = Position.random(size, RunRandom(seed).python("population")).get()
 
-    env = GridWorldEnv(size=size, rng=random.Random(seed), agent_count=1)
+    env = GridWorldEnv(size=size, rng=RunRandom(seed), agent_count=1)
     env.start()
 
     assert env.agents.all()[0].get_position() == expected

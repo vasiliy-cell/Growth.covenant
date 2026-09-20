@@ -6,13 +6,12 @@ from src.persistence.logger import Logger
 from src.Genome.GenePool import Genepool
 
 from src.Genome.types.reuse import reuse
+from src.utils.rng import RunRandom
 
 
 import os
 import yaml
 import numpy as np
-import random
-import time
 import torch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +22,7 @@ def load_config(path=CONFIG_PATH):
         return yaml.safe_load(f)
 
 def make_seed():
-    return int(time.time() * 1e6)
+    return RunRandom.new_seed()
 
 def choose_seed():
     user_input = input("Enter global seed (number or 'r' / empty for random): ").strip()
@@ -97,55 +96,17 @@ def choose_species(default="clons"):
     return default
 
 
-def capture_rng_states(master_rng):
+def capture_rng_states(rng):
     """
-    Snapshot of every rng that can influence the run:
-      - master_rng: python random.Random used by the world (map generation
-        and refills),
-      - numpy global rng,
-      - torch global rng (used by the policy for exploration) and cuda rng
-        if there is one.
+    A snapshot of every stream this run has actually used.
 
-    There are no per-episode local seeds anymore, so these snapshots are the
-    only way to replay the run from an arbitrary logging window.
-
-    Restoring a snapshot `s` from logs/rng/<run>.jsonl:
-        rng.setstate((s["python_random"]["version"],
-                      tuple(s["python_random"]["state"]),
-                      s["python_random"]["gauss_next"]))
-        np.random.set_state((s["numpy"]["algorithm"],
-                             np.array(s["numpy"]["keys"], dtype="uint32"),
-                             s["numpy"]["pos"], s["numpy"]["has_gauss"],
-                             s["numpy"]["cached_gaussian"]))
-        torch.set_rng_state(torch.ByteTensor(list(bytes.fromhex(s["torch"]))))
+    There are no per-episode seeds and no global generators to chase
+    anymore: the run draws from named streams (src/utils/rng.py), so one
+    call to rng.state() is the whole of its randomness. Restoring it is
+    RunRandom.load_state(snapshot) - that, plus the brains, is everything a
+    run needs to continue instead of starting over.
     """
-    np_state = np.random.get_state()
-    py_state = master_rng.getstate()  # (version, 625-int internal state, gauss_next)
-
-    states = {
-        "python_random": {
-            "version": py_state[0],
-            "state": list(py_state[1]),
-            "gauss_next": py_state[2],
-        },
-        "numpy": {
-            "algorithm": np_state[0],
-            "keys": np_state[1].tolist(),
-            "pos": int(np_state[2]),
-            "has_gauss": int(np_state[3]),
-            "cached_gaussian": float(np_state[4]),
-        },
-        # byte tensor -> hex, twice as compact as a list of ints
-        "torch": torch.get_rng_state().numpy().tobytes().hex(),
-    }
-
-    if torch.cuda.is_available():
-        states["torch_cuda"] = [
-            state.numpy().tobytes().hex()
-            for state in torch.cuda.get_rng_state_all()
-        ]
-
-    return states
+    return rng.state()
 
 
 def population_summary(brains):
@@ -225,16 +186,21 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
     run_id = new_run_id()
     print(f"RUN: {run_id}")
 
-    # One rng for the whole run: the map, the refills and everything else
-    # draw from it, and its state is snapshotted per episode.
-    master_rng = random.Random(seed)
+    # One seed for the whole run, and every stream grown from it by name:
+    # the map, the population, the movement draws, the genome and, per
+    # agent, its weights, its exploration and its replay sampling.
+    rng = RunRandom(seed)
+
+    # Belt and braces: nothing in the project should reach for a global
+    # generator anymore, but if something does, it must at least land on
+    # the same numbers for the same seed.
     np.random.seed(seed % (2 ** 32))
     torch.manual_seed(seed % (2 ** 63))
 
     world_cfg = config.get("world", {})
     env = GridWorldEnv(
         size=world_cfg.get("size", 64),
-        rng=master_rng,
+        rng=rng,
         empty_ratio=world_cfg.get("empty_ratio", 0.8),
         refill=world_cfg.get("refill", {}),
         agent_count=agent_count,
@@ -271,6 +237,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
         obs_size=obs_size,
         action_size=len(env.get_action_space()),
         checkpoints=checkpoints,
+        rng=rng,
     )
 
     # --- logging ---
@@ -297,20 +264,25 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
     )
 
     if rng_snapshot_every > 0:
-        logger.log_rng(capture_rng_states(master_rng), step=0)
+        logger.log_rng(capture_rng_states(rng), step=0)
 
     episode_reward = 0.0
 
     try:
         for step in range(1, total_steps + 1):
-            rng = np.random.default_rng()
-            phenotypes = {
-                aid: env.species.make_phenotype(env.genomes.get_genotype(aid), rng)
-                for aid in env.agents.ids()
-            }
-            brains.sync(env.agents, phenotypes)
             # Minds follow the population: whoever was born this tick gets
             # one, whoever is gone has theirs written down and dropped.
+            #
+            # A genotype is read ONCE, for the body that is about to be
+            # given a mind. Reading it again every step cost a config file
+            # per agent per step and, worse, spent a draw of that agent's
+            # stream on a phenotype nobody was going to use.
+            phenotypes = {
+                agent_id: env.make_phenotype(agent_id)
+                for agent_id in env.agents.ids()
+                if agent_id not in brains
+            }
+            brains.sync(env.agents, phenotypes)
 
             available_actions = env.get_available_actions()
 
@@ -433,7 +405,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
                 brains.next_episode()
 
                 if rng_snapshot_every > 0 and logger.episode % rng_snapshot_every == 0:
-                    logger.log_rng(capture_rng_states(master_rng), step=step)
+                    logger.log_rng(capture_rng_states(rng), step=step)
 
                 episode_reward = 0.0
     finally:

@@ -1,7 +1,6 @@
-import random
-
 from src.Agent.life import Life
 from src.environment.env import GridWorldEnv
+from src.utils.rng import RunRandom
 
 
 def make_life(**overrides):
@@ -19,7 +18,7 @@ def make_life(**overrides):
 
 def make_env(life, size=12, seed=0, agent_count=2):
     env = GridWorldEnv(
-        size=size, rng=random.Random(seed), agent_count=agent_count, life=life
+        size=size, rng=RunRandom(seed), agent_count=agent_count, life=life
     )
     env.start()
     return env

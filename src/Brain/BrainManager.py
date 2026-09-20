@@ -1,3 +1,5 @@
+import torch
+
 from src.Brain.brain import Brain
 from src.Brain.policy.policy import Policy
 from src.Brain.q_estimater.mlp import MLP
@@ -5,6 +7,7 @@ from src.Brain.q_estimater.trainer import DQNTrainer
 from src.Brain.replay_buffer import ReplayBuffer
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
 from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curiosity
+from src.utils.rng import RunRandom
 
 
 class BrainManager:
@@ -20,13 +23,20 @@ class BrainManager:
     sync() follows the population instead of being told about it: an agent
     that appeared gets a mind, an agent that is gone has its mind written
     down and dropped. Birth and death therefore need no change here.
+
+    Every mind is built from the streams of ITS agent (src/utils/rng.py),
+    addressed by the agent's index: weights, exploration and replay
+    sampling. That is what makes a run reproducible through birth and
+    death - agent 7 gets the same mind whether it was the seventh of a
+    crowd or the only body left alive.
     """
-    def __init__(self, config, obs_size, action_size, checkpoints=None):
+    def __init__(self, config, obs_size, action_size, checkpoints=None, rng=None):
 
         self.config = config
         self.obs_size = obs_size
         self.action_size = action_size
         self.checkpoints = checkpoints
+        self.rng = rng if rng is not None else RunRandom(0)
         self.brains = {}
 
 
@@ -36,7 +46,9 @@ class BrainManager:
     def sync(self, agents, phenotypes):
         for agent in agents:
             if agent.agent_id not in self.brains:
-                self.brains[agent.agent_id] = self._create(phenotypes[agent.agent_id])
+                self.brains[agent.agent_id] = self._create(
+                    phenotypes[agent.agent_id], agent.index
+                )
 
         living = set(agents.ids())
         for agent_id in [i for i in self.brains if i not in living]:
@@ -58,14 +70,18 @@ class BrainManager:
 
         return brain
 
-    def _create(self, phenotype):
+    def _create(self, phenotype, index):
         return Brain(
             policy=Policy(
                 epsilon=phenotype["epsilon"],
                 epsilon_decay=phenotype["epsilon_decay"],
                 epsilon_min=phenotype["epsilon_min"],
+                generator=self.rng.torch("agent", index, "policy"),
             ),
-            replay_buffer=ReplayBuffer(capacity=phenotype["buffer_size"]),
+            replay_buffer=ReplayBuffer(
+                capacity=phenotype["buffer_size"],
+                rng=self.rng.python("agent", index, "replay"),
+            ),
             reward_shaping=RewardShaping(
                 curiosity=Curiosity(
                     beta=phenotype["curiosity_beta"],
@@ -76,12 +92,7 @@ class BrainManager:
             min_buffer_size=phenotype["min_buffer_size"],
 
             trainer=DQNTrainer(
-                model=MLP(
-                    obs_size=self.obs_size,
-                    hidden_size=phenotype["hidden_size"],
-                    hidden_layers=phenotype["hidden_layers"],
-                    action_size=self.action_size,
-                ),
+                model=self._build_model(phenotype, index),
                 gamma=phenotype["gamma"],
                 learning_rate=phenotype["learning_rate"],
                 max_norm=phenotype["max_norm"],
@@ -89,6 +100,25 @@ class BrainManager:
             ),
         )
 
+
+    def _build_model(self, phenotype, index):
+        """
+        This agent's network, with this agent's weights.
+
+        torch builds a layer from the GLOBAL generator and takes no
+        generator argument, so the only way to give one mind its own
+        weights is to fork the global state, seed the fork from this
+        agent's stream and let it go back to what it was afterwards.
+        """
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(self.rng.seed_for("agent", index, "brain"))
+
+            return MLP(
+                obs_size=self.obs_size,
+                hidden_size=phenotype["hidden_size"],
+                hidden_layers=phenotype["hidden_layers"],
+                action_size=self.action_size,
+            )
 
     # -----------------------------
     # LOGGING WINDOW BOUNDARY

@@ -1,17 +1,12 @@
-import random
-
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
 from src.Agent.life import Life
+from src.utils.rng import RunRandom
 
 from src.Genome.types.reuse import reuse, config
 from src.Genome.types.factory import make_species
 from src.Behavior.Choosing_partner import choose_partners
 from src.Genome.GenePool import Genepool
-
-
-
-import numpy as np
 
 
 class GridWorldEnv:
@@ -40,8 +35,14 @@ class GridWorldEnv:
     def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None, life=None):
         self.size = size
 
-        # Single RNG for the whole run
-        self.rng = rng if rng is not None else random.Random()
+        # Every stream of chance in this run (src/utils/rng.py). The world
+        # asks it for named streams instead of sharing one: a fight over a
+        # cell must not move the next refill, and a birth must not move
+        # anything at all.
+        self.rng = rng if rng is not None else RunRandom(RunRandom.new_seed())
+
+        self.world_rng = self.rng.python("world")
+        self.movement_rng = self.rng.python("movement")
 
         # Childhood, aging and starvation - one set of rules for everybody
         # born in this world (see the `life` section of config.yml).
@@ -49,7 +50,10 @@ class GridWorldEnv:
 
         self.world = World(size=size, empty_ratio=empty_ratio, refill=refill)
         self.agents = AgentManager(
-            self.world, rng=self.rng, run_id=run_id, life=self.life
+            self.world,
+            rng=self.rng.python("population"),
+            run_id=run_id,
+            life=self.life,
         )
         self.agent_count = agent_count
 
@@ -57,9 +61,8 @@ class GridWorldEnv:
 
         self.genomes = Genepool()
 
-        # One numpy rng for everything genetic (genesis + mutation), seeded
-        # from the master rng so the whole run stays reproducible from one seed.
-        self.genome_rng = np.random.default_rng(self.rng.randrange(2 ** 32))
+        # One numpy stream for everything genetic (genesis + mutation).
+        self.genome_rng = self.rng.numpy("genome")
 
         # The reproduction strategy for this run, chosen ONCE by config.
         # Everything below calls self.species.reproduce(...) without ever
@@ -72,10 +75,11 @@ class GridWorldEnv:
             # Already running: never rebuild the world mid-run
             return self.get_states()
 
-        self.world.generate(rng=self.rng)
+        self.world.generate(rng=self.world_rng)
 
-        # Spawn AFTER the map is generated: the map keeps consuming the rng
-        # in the same order as before, so old seeds still produce old maps.
+        # The map and the population draw from two different streams, so
+        # the order of these two calls no longer decides what either of
+        # them gets - only the seed does.
         self.agents.spawn(self.agent_count)
         self.create_agents()
         self.current_step = 0
@@ -87,6 +91,21 @@ class GridWorldEnv:
         for agent_id in self.agents.ids():
             genome = self.species.make_first_genome(genome_config, self.genome_rng)
             self.genomes.put(agent_id, genome)
+
+    def make_phenotype(self, agent_id):
+        """
+        How this genotype reads, in this body.
+
+        The draw belongs to the agent and not to the run: mendel tosses a
+        coin for every pair of equal alleles, and that toss must not depend
+        on how many other agents were read before this one.
+        """
+        index = self.agents.get(agent_id).index
+
+        return self.species.make_phenotype(
+            self.genomes.get_genotype(agent_id),
+            self.rng.numpy("agent", index, "phenotype"),
+        )
 
     # --- birth: reproduction driven by this run's species ---
     def _reproduce(self):
@@ -287,13 +306,13 @@ class GridWorldEnv:
             else:
                 claims.setdefault(target, []).append(agent_id)
 
-        # One free cell, several claimants: the rng draws the winner and
-        # everybody else stays where they are. An uncontested claim costs no
-        # draw, so a lone agent leaves the rng stream untouched.
+        # One free cell, several claimants: the movement stream draws the
+        # winner and everybody else stays where they are. That stream is the
+        # only thing a fight consumes - the map and the minds never feel it.
         for target, claimants in claims.items():
             winner = (
                 claimants[0] if len(claimants) == 1
-                else self.rng.choice(claimants)
+                else self.movement_rng.choice(claimants)
             )
 
             for agent_id in claimants:

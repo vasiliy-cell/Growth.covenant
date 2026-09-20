@@ -2,8 +2,7 @@ from src.Brain.reward_shaping.intrinsic_rewards.curiosity.curiosity import Curio
 
 
 def test_new_state_has_high_reward():
-    config = {"beta": 1.0}
-    c = Curiosity(config)
+    c = Curiosity(beta=1.0)
 
     r1 = c.step("A")
     r2 = c.step("A")
@@ -12,8 +11,7 @@ def test_new_state_has_high_reward():
 
 
 def test_curiosity_decay_formula():
-    config = {"beta": 1.0}
-    c = Curiosity(config)
+    c = Curiosity(beta=1.0)
 
     r1 = c.step("A")
     r2 = c.step("A")
@@ -23,8 +21,7 @@ def test_curiosity_decay_formula():
 
 
 def test_reset_clears_counts():
-    config = {"beta": 1.0}
-    c = Curiosity(config)
+    c = Curiosity(beta=1.0)
 
     c.step("A")
     c.reset()
@@ -35,8 +32,7 @@ def test_reset_clears_counts():
 
 
 def test_beta_decay():
-    config = {"beta": 1.0, "decay": 0.5}
-    c = Curiosity(config)
+    c = Curiosity(beta=1.0, decay=0.5)
 
     c.reset()
     assert abs(c.beta - 0.5) < 1e-6
@@ -46,8 +42,7 @@ def test_beta_decay():
 
 
 def test_same_state_same_key():
-    config = {"beta": 1.0}
-    c = Curiosity(config)
+    c = Curiosity(beta=1.0)
 
     c.step("A")
     c.step("A")
