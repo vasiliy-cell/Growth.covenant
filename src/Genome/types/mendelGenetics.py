@@ -1,4 +1,4 @@
-from src.Genome.types.reuse import make_first_genome
+from src.Genome.types.reuse import reuse
 import copy
 import numpy as np
 import yaml
@@ -8,11 +8,14 @@ with open("config.yml", "r", encoding="utf-8") as f:
 genome_config = config["genome"]
 
 class MendelGeneticsSpecies:
+    partners_required = 1
     rng = np.random.default_rng()
+    def make_first_genome(self, genome_config, rng):
+        return reuse.make_first_genome(genome_config, rng)
 
-    def make_first_mendel_genome(self, rng):
-        draft_1 = make_first_genome(genome_config, rng)
-        draft_2 = make_first_genome(genome_config, rng)
+    def make_first_genome(self,genome_config, rng):
+        draft_1 = reuse.make_first_genome(self, genome_config, rng)
+        draft_2 = reuse.make_first_genome(self, genome_config, rng)
         genotype = {}
         
         for gene_name in draft_1:
@@ -24,7 +27,7 @@ class MendelGeneticsSpecies:
             genotype[gene_name] = [draft_1[gene_name],draft_2[gene_name]]
         return genotype
 
-    def mendel_mutate(self, genotype, rng): 
+    def mutate(self, genotype, rng): 
         mutated_genotype = copy.deepcopy(genotype)   
         i = rng.choice([0, 1])  
         sigma = genotype["sigma"][i][0]
@@ -79,17 +82,5 @@ class MendelGeneticsSpecies:
 
             if genome_config["genes"][gene_name].get("type") == "int":
                     phenotype[gene_name] = round(phenotype[gene_name])
-        print(phenotype)
         return phenotype
 
-
-rng = np.random.default_rng()          
-obj = MendelGeneticsSpecies()
-genome = obj.make_first_mendel_genome(rng)  
-obj.mendel_mutate(genome, rng)   
-
-dad_genotype = obj.make_first_mendel_genome(rng)  
-mom_genotype = obj.make_first_mendel_genome(rng)  
-
-child_genotype = obj.reproduce(dad_genotype, mom_genotype, rng)  
-phenotype = obj.make_phenotype(child_genotype, rng) 

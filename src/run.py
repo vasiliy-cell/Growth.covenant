@@ -5,7 +5,7 @@ from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.logger import Logger
 from src.Genome.GenePool import Genepool
 
-from src.phenotype.make_phenotype import make_phenotype
+from src.Genome.types.reuse import reuse
 
 
 import os
@@ -86,11 +86,14 @@ def choose_species(default="clons"):
     print("How do agents reproduce?")
     print("  1) clons       - asexual: energy-gated cloning")
     print("  2) non_linear  - sexual: BLX-a blend of two nearby parents")
-    choice = input(f"Enter choice (1/2) [{default}]: ").strip()
+    print("  3) mendel  - sexual: has dominance of genes the most biologicaly inspired of all")
+    choice = input(f"Enter choice (1/2/3) [{default}]: ").strip()
     if choice == "1":
         return "clons"
     if choice == "2":
         return "non_linear"
+    if choice == "3":
+        return "mendel"
     return default
 
 
@@ -291,9 +294,9 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
 
     try:
         for step in range(1, total_steps + 1):
-
+            rng = np.random.default_rng()
             phenotypes = {
-                aid: make_phenotype(env.genomes.get_genotype(aid))
+                aid: env.species.make_phenotype(env.genomes.get_genotype(aid), rng)
                 for aid in env.agents.ids()
             }
             brains.sync(env.agents, phenotypes)

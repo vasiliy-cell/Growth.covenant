@@ -3,7 +3,7 @@ import random
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
 
-from src.Genome.types.reuse import make_first_genome, mutate, config
+from src.Genome.types.reuse import reuse, config
 from src.Genome.types.factory import make_species
 from src.Behavior.Choosing_partner import choose_partners
 from src.Genome.GenePool import Genepool
@@ -73,19 +73,11 @@ class GridWorldEnv:
     def create_agents(self):
         genome_config = config["genome"]
         for agent_id in self.agents.ids():
-            genome = make_first_genome(genome_config, self.genome_rng)
+            genome = self.species.make_first_genome(genome_config, self.genome_rng)
             self.genomes.put(agent_id, genome)
 
     # --- birth: reproduction driven by this run's species ---
     def _reproduce(self):
-        """
-        One reproduction step for the whole population. The SPECIES decides HOW
-        a child genome is made (clone vs blend); this method only decides WHO
-        reproduces and does the world side (spawn + energy).
-
-        partners_required is DATA, not code: 0 -> asexual (energy-gated solo),
-        1 -> sexual (proximity+energy matched pairs). No `if species == ...`.
-        """
         cost = config["energy"]["reproduction_cost"]
 
         if self.species.partners_required == 0:
@@ -100,12 +92,14 @@ class GridWorldEnv:
         else:
             # sexual: choose_partners returns energy+proximity matched pairs
             for mother, father in choose_partners(self.agents):
+
                 g_mother = self.genomes.get_genotype(mother.agent_id)
                 g_father = self.genomes.get_genotype(father.agent_id)
                 child = self.species.reproduce(g_father, g_mother, self.genome_rng)
                 self._birth(child, cost)
                 mother.energy -= cost/2
                 father.energy -= cost/2
+
 
     def _birth(self, child_genotype, start_energy):
         """Give a new child genome a body and register it in every registry."""
