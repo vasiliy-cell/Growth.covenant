@@ -61,11 +61,16 @@ logging:
 #
 # dir holds the CHECKPOINTS: the whole run in one file - world, bodies,
 # DNA, every mind, every rng stream - written every `every_steps` ticks so
-# a crash costs minutes instead of a night. Those rotate: only the newest
-# `keep` survive, so a month of runs does not turn into a disk full of
-# 100 MB files. A checkpoint moved into dir/pinned/ is never deleted
-# (scripts/checkpoints.py pin <name>, or answer yes to "keep this run"
-# before the run starts and its last checkpoint is pinned for you).
+# a crash costs minutes instead of a night. It has two folders, and which
+# one a file sits in is all there is to being pinned:
+#
+#   <dir>/rolling/  every save lands here, only the newest `keep` survive
+#   <dir>/pinned/   nothing is ever deleted from here
+#
+# So pinning is moving a file - from the terminal, from a file manager,
+# from anywhere (scripts/checkpoints.py pin 3 is only shorthand). The two
+# folders never compete: a prune looks at rolling/ alone, so pinning four
+# checkpoints still leaves `keep` rolling ones.
 #
 # The replay buffers are most of the weight of a checkpoint, so they are
 # only written on every `replay_every`-th one. A mind resumed without its

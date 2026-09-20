@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import shutil
 
 import pytest
 import torch
@@ -254,6 +255,65 @@ def test_a_pinned_checkpoint_outlives_every_rotation(tmp_path):
 
     assert [c["step"] for c in store.list(pinned=True)] == [1]
     assert len(store.list(pinned=False)) == 2
+
+
+def test_pinning_never_costs_the_rolling_pool_a_slot(tmp_path):
+    """
+    Four kept runs must not mean one rolling checkpoint instead of five.
+    The two folders are counted separately, and only rolling/ is pruned.
+    """
+    store = CheckpointStore(directory=str(tmp_path), keep=5)
+
+    for step in range(1, 5):
+        store.save({"step": step}, run_id="keeper", step=step, pinned=True)
+
+    for step in range(10, 20):
+        store.save({"step": step}, run_id="run", step=step)
+
+    assert len(store.list(pinned=False)) == 5
+    assert len(store.list(pinned=True)) == 4
+
+
+def test_a_file_moved_into_the_pinned_folder_by_hand_is_pinned(tmp_path):
+    """
+    What a file manager does is the whole mechanism - there is no index
+    anywhere that a drag and drop could get out of step with.
+    """
+    store = CheckpointStore(directory=str(tmp_path), keep=1)
+    path = store.save({"step": 1}, run_id="run", step=1)
+
+    shutil.move(path, os.path.join(store.pinned_directory, os.path.basename(path)))
+
+    for step in range(2, 6):
+        store.save({"step": step}, run_id="run", step=step)
+
+    pinned = store.list(pinned=True)
+
+    assert [c["step"] for c in pinned] == [1]
+    assert os.path.isfile(pinned[0]["path"])
+
+
+def test_both_folders_exist_before_anything_is_written(tmp_path):
+    """A folder you cannot see is a folder you will not drag a file into."""
+    store = CheckpointStore(directory=str(tmp_path), keep=5)
+    store.prepare()
+
+    assert os.path.isdir(store.rolling_directory)
+    assert os.path.isdir(store.pinned_directory)
+
+
+def test_checkpoints_from_before_the_folder_split_are_still_found(tmp_path):
+    """Nobody loses a run to a refactor."""
+    store = CheckpointStore(directory=str(tmp_path), keep=5)
+    legacy = os.path.join(str(tmp_path), "old_step000000007.pt")
+    CheckpointStore._write({"step": 7}, legacy)
+
+    found = store.list(pinned=False)
+
+    assert [c["step"] for c in found] == [7]
+    assert store.pin("old_step000000007.pt").endswith(
+        os.path.join("pinned", "old_step000000007.pt")
+    )
 
 
 def test_unpinning_puts_it_back_in_reach_of_the_rotation(tmp_path):

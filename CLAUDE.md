@@ -123,10 +123,12 @@ named rng stream, plus `schema_version`, the config and the git commit.
   without memories refills its buffer from the world.
 - **Writes are atomic** (temp file → fsync → `os.replace`): a half written
   checkpoint would look resumable and not be.
-- **Rotation**: rolling checkpoints in `checkpoints/`, only the newest
-  `checkpoints.keep` survive. `checkpoints/pinned/` is never pruned. A
-  checkpoint is pinned at launch (answer yes to "keep this run's final
-  checkpoint") or at any time afterwards:
+- **Two folders, and the folder IS the state**: `checkpoints/rolling/`
+  (only the newest `checkpoints.keep` survive) and `checkpoints/pinned/`
+  (never deleted by anything). Pinning is moving the file, so a file
+  manager does it as well as the CLI does. A prune only ever looks at
+  `rolling/`, so pinning four checkpoints does not cost the rolling pool
+  one of its `keep` files.
 
   ```bash
   PYTHONPATH=. python scripts/checkpoints.py list      # numbered
@@ -134,8 +136,9 @@ named rng stream, plus `schema_version`, the config and the git commit.
   PYTHONPATH=. python scripts/checkpoints.py unpin 3   # or part of a name
   ```
 
-  Pinned checkpoints stay in the resume menu — pinning protects a run, it
-  does not retire it.
+  A run can also be pinned before it starts (answer yes to "keep this
+  run's final checkpoint"). Pinned checkpoints stay in the resume menu —
+  pinning protects a run, it does not retire it.
 - **The world outlives the run.** A continued world keeps the id it was born
   with, so agent ids stay in one lineage, and the index counter comes back
   with it (an index names an agent's rng streams — reusing one would hand a

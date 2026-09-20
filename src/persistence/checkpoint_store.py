@@ -14,16 +14,22 @@ class CheckpointStore:
     """
     Where checkpoints live, how many survive and which ones are safe.
 
-    Two pools, because a checkpoint is expensive and most of them are
-    worthless an hour later:
+    TWO FOLDERS, and which folder a file is in IS whether it is pinned:
 
-      rolling - <directory>/*.pt. Every periodic save lands here and the
-        oldest are deleted as new ones arrive, so the pool never grows past
-        `keep` files however long the run is and however many runs there
-        have been. A resume normally comes from here.
-      pinned  - <directory>/pinned/*.pt. Nothing is ever deleted from here.
-        A checkpoint is moved in by hand (scripts/checkpoints.py) or by a
-        run that was started as one worth keeping.
+        checkpoints/rolling/   every periodic save lands here, and the
+                               oldest are deleted as new ones arrive, so
+                               this folder never holds more than `keep`
+                               files however many runs there have been,
+        checkpoints/pinned/    nothing here is ever deleted by anything.
+
+    That is the whole of the mechanism, and it is a mechanism on purpose:
+    pinning is moving a file, so it works from the terminal, from a file
+    manager, from a script, from anywhere. scripts/checkpoints.py is a
+    convenience, not the authority.
+
+    The two folders do not compete. A prune only ever looks at rolling/, so
+    pinning four checkpoints does not cost the rolling pool a single one of
+    its `keep` files.
 
     Writing is atomic. A checkpoint is the one file that must never be half
     written: a crash in the middle of a save would leave a file that looks
@@ -35,17 +41,32 @@ class CheckpointStore:
 
     def __init__(self, directory="checkpoints", keep=5):
         self.directory = directory
+        self.rolling_directory = os.path.join(directory, "rolling")
         self.pinned_directory = os.path.join(directory, "pinned")
         self.keep = keep
+
+    def directory_for(self, pinned):
+        return self.pinned_directory if pinned else self.rolling_directory
+
+    def prepare(self):
+        """
+        Makes both folders, empty or not.
+
+        A folder you cannot see is a folder you will not use: the point of
+        the split is that you can open checkpoints/ and drag a file from
+        one side to the other.
+        """
+        for directory in (self.rolling_directory, self.pinned_directory):
+            os.makedirs(directory, exist_ok=True)
 
     # -----------------------------
     # WRITING
     # -----------------------------
     def save(self, record, run_id, step, pinned=False):
         """Writes one checkpoint, prunes the pool and returns its path."""
-        directory = self.pinned_directory if pinned else self.directory
-        os.makedirs(directory, exist_ok=True)
+        self.prepare()
 
+        directory = self.directory_for(pinned)
         path = os.path.join(directory, f"{run_id}_step{step:09d}.pt")
         self._write(record, path)
 
@@ -93,7 +114,13 @@ class CheckpointStore:
         pools = []
 
         if pinned is not True:
+            pools.append((self.rolling_directory, False))
+
+            # Loose files straight in checkpoints/ are from before the
+            # folder split. They are read and pruned like any other
+            # rolling checkpoint, so nobody loses a run to a refactor.
             pools.append((self.directory, False))
+
         if pinned is not False:
             pools.append((self.pinned_directory, True))
 
@@ -141,32 +168,38 @@ class CheckpointStore:
     # PINNING
     # -----------------------------
     def pin(self, name):
-        """Moves a rolling checkpoint where nothing will ever delete it."""
-        source = os.path.join(self.directory, name)
+        """
+        Moves a rolling checkpoint where nothing will ever delete it.
 
-        if not os.path.isfile(source):
-            raise FileNotFoundError(f"No rolling checkpoint named {name}")
-
-        os.makedirs(self.pinned_directory, exist_ok=True)
-        target = os.path.join(self.pinned_directory, name)
-
-        shutil.move(source, target)
-
-        return target
+        Exactly the same thing as dragging the file into pinned/ - this is
+        here to save typing, not because moving it by hand is second best.
+        """
+        return self._move(name, to_pinned=True)
 
     def unpin(self, name):
         """Back into the rolling pool - and into reach of the next prune."""
-        source = os.path.join(self.pinned_directory, name)
+        return self._move(name, to_pinned=False)
 
-        if not os.path.isfile(source):
-            raise FileNotFoundError(f"No pinned checkpoint named {name}")
+    def _move(self, name, to_pinned):
+        source = self._find(name, pinned=not to_pinned)
 
-        os.makedirs(self.directory, exist_ok=True)
-        target = os.path.join(self.directory, name)
+        if source is None:
+            side = "pinned" if to_pinned is False else "rolling"
+            raise FileNotFoundError(f"No {side} checkpoint named {name}")
+
+        self.prepare()
+        target = os.path.join(self.directory_for(to_pinned), name)
 
         shutil.move(source, target)
 
         return target
+
+    def _find(self, name, pinned):
+        for checkpoint in self.list(pinned=pinned):
+            if checkpoint["name"] == name:
+                return checkpoint["path"]
+
+        return None
 
     def __repr__(self):
         return (

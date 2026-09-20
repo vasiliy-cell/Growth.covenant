@@ -215,6 +215,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         directory=checkpoints_cfg.get("dir", "checkpoints"),
         keep=int(checkpoints_cfg.get("keep", 5)),
     )
+    store.prepare()
 
     if resume is None:
         resume = choose_checkpoint(store)
