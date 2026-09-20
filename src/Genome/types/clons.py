@@ -18,7 +18,9 @@ class ClonSpecies:
     def mutate(self, genotype, rng):
         return reuse.mutate(genotype, rng)
 
-    def make_phenotype(self, genotype):
+    def make_phenotype(self, genotype, rng):
+        # rng is part of the species interface, not of this species: only
+        # mendel has to toss a coin to read a genotype (equal alleles).
         return reuse.make_phenotype(genotype)
 
 

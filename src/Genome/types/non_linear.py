@@ -23,7 +23,9 @@ class NonLinearSpecies:
     def make_first_genome(self, genome_config, rng):
         return reuse.make_first_genome(genome_config, rng)
 
-    def make_phenotype(self, genotype):
+    def make_phenotype(self, genotype, rng):
+        # rng is part of the species interface, not of this species: only
+        # mendel has to toss a coin to read a genotype (equal alleles).
         return reuse.make_phenotype(genotype)
 
 
