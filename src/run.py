@@ -400,6 +400,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     written = 0
     last_step = start_step
 
+    # Windows closed by THIS process. The log counts episodes for the whole
+    # life of the world, so on a continued run the two numbers differ and
+    # both are worth seeing: one is progress, the other is history.
+    window = 0
+
     def write_checkpoint(step, with_replay, pinned=False):
         """The whole run in one file: world, bodies, minds, streams."""
         return store.save(
@@ -589,8 +594,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     non_empty_ratio=info["non_empty_ratio"],
                 )
 
+                window += 1
+
                 print(
-                    f"Episode {summary['episode'] + 1}/{episodes} | "
+                    f"Episode {window}/{episodes} "
+                    f"(world {summary['episode']}) | "
                     f"step={step} | "
                     f"reward={summary['shaped_reward']:.2f} | "
                     f"per_agent={summary['shaped_reward'] / max(summary['agents'], 1):.2f} | "

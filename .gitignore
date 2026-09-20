@@ -18,9 +18,10 @@ htmlcov/
 logs/
 simulation.log
 
-# --- Чекпойнты и веса (файлы по 100 МБ, история им не нужна) ---
+# --- Чекпойнты, веса и архивы логов (файлы по 100 МБ) ---
 checkpoints/
 models/
+archives/
 
 results
 tmp

@@ -155,26 +155,53 @@ GPU/cuDNN it is "almost" and not an axiom, even with
 `run.deterministic: true` (which sets `torch.use_deterministic_algorithms`
 with `warn_only`).
 
-### Logging
-`Logger` is run-scoped: **one file per run**, `logs/run_<timestamp>.jsonl`.
+### Logging: one folder per world, parquet inside
+`RunLog` (`src/persistence/run_log.py`) writes **one folder per WORLD**, not
+per process: a run continued from a checkpoint reopens the same folder and
+adds a **session** to its header, so ten continuations of one world are ten
+entries in one `run.json` and one set of tables.
 
-The log is flushed on the header, on every window summary and every
-`logging.flush_every` steps, so a run that is killed keeps everything but
-its last few steps. Each `episode_summary` also carries a `fingerprint`: a
-rolling hash of every step logged so far. Same seed → same fingerprints;
-the first window where two runs differ is where they diverged.
+```
+logs/<world_id>[_<label>]/
+  run.json     how to repeat it: schema_version, seed per session, config,
+               commit, species, gene set, library versions, and one entry
+               per session with the steps and episodes it covered
+  steps/       a row per agent per tick: position, action, rewards, energy, age
+  updates/     a row per gradient update, on the update's own counter
+  episodes/agents|population/   one row per window, per agent and for everybody
+  events/births|deaths/         a birth with its parents and DNA; a whole life
+  world/grid|agents/            the map every `world_snapshot_every` steps
+  rng/world.jsonl|agents.jsonl  stream states
+```
 
-- `run_info` — once, global seed and run parameters,
-- `step` — one per step, `step` is the global step index,
-- `episode_summary` — one per logging window, keeps the historical field
-  names so all visualizers keep working.
+- **A table is a folder of finished parquet parts.** Parquet only writes its
+  footer at `close()`, so a single open file would be unreadable after a
+  crash. Each part is written, fsynced and renamed into place;
+  `logging.flush_every_steps` bounds what a `kill -9` can cost.
+- **Floats are float32**, because a reward has three meaningful digits and
+  rounding the text would be cosmetics in the hot loop. Sums, wall clock,
+  hashes and rng states are not: those stay float64 or strings, and rng
+  never goes near parquet.
+- **Every row carries `session`.** A world can be resumed from a checkpoint
+  older than rows already on disk, so two rows can honestly claim one step —
+  they belong to different continuations.
+- **The reader ships with the writer** (`src/persistence/log_reader.py`,
+  `RunLogReader`). If you cannot load what you wrote, you did not write it;
+  the test writes ten episodes and reads them back. Everything comes back as
+  a `pyarrow.Table` (`.to_pandas()` if pandas is installed).
+- **An episode is a logging window and nothing else** — `run.episode_length`
+  steps, recorded in the header. It resets nothing in the world.
+- **The map snapshot keeps objects and bodies apart**: painting the agents
+  into the grid would hide the cell each one stands on.
+- **Nothing is ever deleted automatically.** A log lives until a human
+  decides the experiment is over: `scripts/logs.py archive <n> --note "..."`
+  packs a world into `archives/` with a note beside it (outside the tarball
+  too, so it can be grepped), and only `--delete` removes the original,
+  after reading the archive back.
 
-Full RNG states (python `random`, numpy, torch, cuda) are snapshotted once per
-`logging.rng_snapshot_every` episodes into `logs/rng/<run>.jsonl`. There are no
-per-episode local seeds anymore — those snapshots are the only way to replay a
-run from a given window. They are heavy (~24 KB per snapshot), so raise
-`rng_snapshot_every` for long runs.
-
+Each population row carries a `fingerprint`: a rolling hash of every step
+logged so far. Same seed → same fingerprints; the first window where two
+runs differ is where they diverged.
 
 ## Running
 
