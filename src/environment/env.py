@@ -141,10 +141,16 @@ class GridWorldEnv:
             "current_step": self.current_step,
             "species": self.species_name,
             "population": population,
+            # make_phenotype and not get_phenotype: a body born on the
+            # very tick that is being saved has DNA but has not been read
+            # yet - its mind is built on the next tick. Reading it here
+            # takes the draw that tick would have taken, from that agent's
+            # own stream and nobody else's, and the result is cached, so
+            # the run is not moved by having been saved.
             "genomes": {
                 record["agent_id"]: {
                     "genotype": self.genomes.get_genotype(record["agent_id"]),
-                    "phenotype": self.genomes.get_phenotype(record["agent_id"]),
+                    "phenotype": self.make_phenotype(record["agent_id"]),
                 }
                 for record in population["agents"]
             },
