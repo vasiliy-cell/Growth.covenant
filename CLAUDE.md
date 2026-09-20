@@ -175,8 +175,6 @@ per-episode local seeds anymore — those snapshots are the only way to replay a
 run from a given window. They are heavy (~24 KB per snapshot), so raise
 `rng_snapshot_every` for long runs.
 
-Anything that used to treat "one log file = one episode" must group steps by
-their `episode` field instead (`visualization/logs_visualization/episode_grouping.py`).
 
 ## Running
 
