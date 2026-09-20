@@ -106,6 +106,43 @@ randomness gets a new name.
 back, in this process or a fresh one: that is the half of a checkpoint that
 is not weights.
 
+### Checkpoints: continuing a run instead of restarting it
+A checkpoint is the whole run in one file (`src/persistence/checkpoint.py`),
+not a model file: world grid as it has been eaten, refill clock, every body
+(position, energy, age, DNA and the phenotype that DNA was read into), one
+full mind per agent (weights, target net **and its counter**, Adam, epsilon,
+curiosity visit counts, optionally the replay buffer) and the state of every
+named rng stream, plus `schema_version`, the config and the git commit.
+
+- **Restore order is part of the format.** World → minds → rng streams,
+  streams LAST, because construction can draw. `RunRandom.load_state`
+  restores **in place**: a policy is already holding its generator by then,
+  so replacing the objects would restore streams nobody draws from.
+- **The replay buffers are most of the file**, so only every
+  `checkpoints.replay_every`-th checkpoint carries them. A mind resumed
+  without memories refills its buffer from the world.
+- **Writes are atomic** (temp file → fsync → `os.replace`): a half written
+  checkpoint would look resumable and not be.
+- **Rotation**: rolling checkpoints in `checkpoints/`, only the newest
+  `checkpoints.keep` survive. `checkpoints/pinned/` is never pruned —
+  `scripts/checkpoints.py pin <name>`, or answer yes to "keep this run's
+  final checkpoint" at launch.
+- **The world outlives the run.** A continued world keeps the id it was born
+  with, so agent ids stay in one lineage, and the index counter comes back
+  with it (an index names an agent's rng streams — reusing one would hand a
+  newborn somebody else's mind). The process gets a **new** run id for its
+  log and its checkpoints.
+- A resumed run takes its seed, species, world and population from the
+  checkpoint, and reads the live `config.yml` for everything tunable
+  (life, energy, refill). When the two configs differ the runner says which
+  sections changed — an experiment whose rules moved silently is lost.
+
+**Determinism, honestly**: on CPU, same machine, a resume is bit-exact and
+so is a re-run of a seed (there is a test for both). Across machines or on
+GPU/cuDNN it is "almost" and not an axiom, even with
+`run.deterministic: true` (which sets `torch.use_deterministic_algorithms`
+with `warn_only`).
+
 ### Logging
 `Logger` is run-scoped: **one file per run**, `logs/run_<timestamp>.jsonl`.
 

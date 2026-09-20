@@ -303,6 +303,12 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     np.random.seed(seed % (2 ** 32))
     torch.manual_seed(seed % (2 ** 63))
 
+    # warn_only: an op with no deterministic kernel should cost a warning,
+    # not an hours-long run. On CPU the maths here is deterministic
+    # regardless; this is what keeps that true on a GPU.
+    if bool(run_cfg.get("deterministic", True)):
+        torch.use_deterministic_algorithms(True, warn_only=True)
+
     world_cfg = config.get("world", {})
     env = GridWorldEnv(
         size=(
@@ -581,6 +587,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     except BaseException:
         # Whatever went wrong, hours of training must not go with it. This
         # is the one checkpoint that carries everything, replay included.
+        #
+        # The tick it died on may be half applied - some bodies moved, no
+        # rewards paid - so this file is a rescue, not a clean boundary.
+        # The rolling pool still holds the last periodic checkpoint, and
+        # that one is always a whole tick.
         path = write_checkpoint(last_step, with_replay=True)
         print(f"[crash @ step {last_step}] checkpoint written: {path}")
         raise

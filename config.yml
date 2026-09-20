@@ -15,6 +15,13 @@
 run:
   episode_length: 20      # steps per window -> total_steps = episodes * episode_length
 
+  # Ask torch to refuse non-deterministic kernels (warn_only, so nothing
+  # crashes mid-run over an op that has no deterministic version). On CPU
+  # this project is bit-exact anyway; the flag is what keeps it that way
+  # if a GPU is ever used. Cross-machine bit-exactness is NOT promised by
+  # it - see the note on checkpoints in CLAUDE.md.
+  deterministic: true
+
 # --- AGENTS ---
 # How many agents share the one world. The value here is only the default
 # offered by the terminal prompt before the run: the population size is an
