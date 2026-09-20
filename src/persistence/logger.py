@@ -22,10 +22,16 @@ class Logger:
     they are big and would drown the main log. The `rng` subdirectory is
     ignored by log_selector, which only picks up *.jsonl files directly in
     logs/.
+
+    Nothing here waits for the end of the run to reach the disk. A run is
+    hours long and can die at any point - out of memory, a closed laptop, a
+    kill -9 - and what has been written must survive it, so the file is
+    flushed every `flush_every` steps and at every window boundary.
     """
 
-    def __init__(self, log_dir="logs", run_name=None):
+    def __init__(self, log_dir="logs", run_name=None, flush_every=100):
         self.log_dir = log_dir
+        self.flush_every = flush_every
         os.makedirs(self.log_dir, exist_ok=True)
 
         if run_name is None:
@@ -99,6 +105,10 @@ class Logger:
 
         self.file.write(json.dumps(data) + "\n")
 
+        # The header is what names the run and its seed: if it is not on
+        # disk, a crashed run cannot be identified at all.
+        self.file.flush()
+
     # -----------------------------
     # RNG SNAPSHOT
     # -----------------------------
@@ -122,6 +132,7 @@ class Logger:
         }
 
         self.rng_file.write(json.dumps(record) + "\n")
+        self.rng_file.flush()
 
     # -----------------------------
     # STEP
@@ -199,6 +210,9 @@ class Logger:
 
         self.file.write(json.dumps(data) + "\n")
 
+        if self.flush_every > 0 and self.total_steps % self.flush_every == 0:
+            self.file.flush()
+
     # -----------------------------
     # WINDOW SUMMARY
     # -----------------------------
@@ -252,6 +266,7 @@ class Logger:
             summary.update(extra)
 
         self.file.write(json.dumps(summary) + "\n")
+        self.file.flush()
 
         self.episode += 1
         self._reset_window()

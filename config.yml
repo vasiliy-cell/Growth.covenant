@@ -36,9 +36,14 @@ world:
     amount: 5             # how many cells to add per check
 
 # --- LOGGING ---
+# flush_every is crash insurance: python buffers writes, so a run that dies
+# between two window summaries loses everything it had not flushed. Every N
+# steps the log file is pushed out, and a killed run keeps all of its steps
+# but the last few. 0 turns it off (only the OS decides when to write).
 logging:
   log_dir: "logs"
   rng_snapshot_every: 1   # snapshot every rng state once per N episodes (0 = off)
+  flush_every: 100        # push the log file to disk every N steps
 
 # --- CHECKPOINTS ---
 # Every agent has its own brain, so there is no single model file anymore:
@@ -73,7 +78,7 @@ energy:
 # growing, so old age is not a number to compare against - it is a bill
 # that keeps rising until no amount of foraging can pay it.
 life:
-  childhood_steps: 1000   # ticks of guaranteed immortality after birth
+  childhood_steps: 20000   # ticks of guaranteed immortality after birth
   death_energy: 0.0       # an adult at or below this energy dies
   aging:
     every: 200            # every N ticks of a life...

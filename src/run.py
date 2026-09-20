@@ -277,7 +277,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
     logging_cfg = config.get("logging", {})
     rng_snapshot_every = int(logging_cfg.get("rng_snapshot_every", 1))
 
-    logger = Logger(log_dir=logging_cfg.get("log_dir", "logs"))
+    logger = Logger(
+        log_dir=logging_cfg.get("log_dir", "logs"),
+        flush_every=int(logging_cfg.get("flush_every", 100)),
+    )
     logger.log_run_start(
         seed=seed,
         extra={
