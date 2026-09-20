@@ -109,13 +109,51 @@ class Brain:
 
     def state(self):
         """
-        Everything of this mind worth writing down.
+        Everything of this mind worth writing down when it LEAVES the run.
 
         Weights alone would not be a record: without epsilon and age you
         cannot tell whether you are holding a cautious veteran or a reckless
-        newborn, and you cannot continue either of them.
+        newborn. This is the archive form - small, readable, and not meant
+        to be continued. full_state() is the one a checkpoint uses.
         """
         record = self.summary()
         record["policy_net"] = self.trainer.state_dict()
 
         return record
+
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def full_state(self, with_replay=True):
+        """
+        Everything needed to carry on being this mind.
+
+        with_replay=False leaves out the memories, which are by far the
+        heaviest part: the frequent checkpoints of a run skip them and the
+        milestones keep them. A mind resumed without its memories is not
+        broken - it is a mind that has forgotten, and it refills its buffer
+        from the world in min_buffer_size ticks.
+        """
+        state = {
+            "age": self.age,
+            "batch_size": self.batch_size,
+            "min_buffer_size": self.min_buffer_size,
+            "trainer": self.trainer.state(),
+            "policy": self.policy.state(),
+            "curiosity": self.reward_shaping.state(),
+            "replay": self.replay_buffer.state() if with_replay else None,
+        }
+
+        return state
+
+    def load_state(self, state):
+        self.age = state["age"]
+        self.batch_size = state["batch_size"]
+        self.min_buffer_size = state["min_buffer_size"]
+
+        self.trainer.load_state(state["trainer"])
+        self.policy.load_state(state["policy"])
+        self.reward_shaping.load_state(state["curiosity"])
+
+        if state["replay"] is not None:
+            self.replay_buffer.load_state(state["replay"])

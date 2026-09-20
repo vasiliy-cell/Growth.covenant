@@ -30,6 +30,27 @@ class Policy:
         if self.epsilon < self.epsilon_min:
             self.epsilon = self.epsilon_min
 
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        """
+        Where this agent's exploration schedule has got to.
+
+        The generator is NOT in here: it is a named stream of the run
+        (src/utils/rng.py) and is saved once, with all the others.
+        """
+        return {
+            "epsilon": self.epsilon,
+            "epsilon_decay": self.epsilon_decay,
+            "epsilon_min": self.epsilon_min,
+        }
+
+    def load_state(self, state):
+        self.epsilon = state["epsilon"]
+        self.epsilon_decay = state["epsilon_decay"]
+        self.epsilon_min = state["epsilon_min"]
+
     def select_action(
         self,
         q_values,

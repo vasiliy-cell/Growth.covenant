@@ -38,6 +38,31 @@ class DQNTrainer:
         """The learned part of this brain, for the checkpoint writer."""
         return self.policy_net.state_dict()
 
+    def state(self):
+        """
+        Everything needed to CONTINUE this optimisation, not just to look
+        at its result.
+
+        The target net is here with its own counter because it is a lagging
+        copy on a schedule: rebuilt from the policy net it would be too
+        fresh, and the next few thousand updates would chase a target they
+        were never meant to chase. Adam is here for the same reason - its
+        moments are momentum, and dropping them restarts the optimiser cold
+        in the middle of a run.
+        """
+        return {
+            "policy_net": self.policy_net.state_dict(),
+            "target_net": self.target_net.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "training_step": self.training_step,
+        }
+
+    def load_state(self, state):
+        self.policy_net.load_state_dict(state["policy_net"])
+        self.target_net.load_state_dict(state["target_net"])
+        self.optimizer.load_state_dict(state["optimizer"])
+        self.training_step = state["training_step"]
+
     # -------------------------
     # DQN UPDATE (batched)
     # -------------------------

@@ -32,3 +32,16 @@ class RewardShaping:
         """
         if self.curiosity is not None:
             self.curiosity.reset()
+
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        if self.curiosity is None:
+            return None
+
+        return self.curiosity.state()
+
+    def load_state(self, state):
+        if self.curiosity is not None and state is not None:
+            self.curiosity.load_state(state)

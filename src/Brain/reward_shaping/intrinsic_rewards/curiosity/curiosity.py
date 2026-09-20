@@ -60,6 +60,32 @@ class Curiosity:
         return r_curiosity
 
     # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        """
+        What this agent has already seen, and how loudly novelty still pays.
+
+        The visit counts are the expensive half and they cannot be left out:
+        without them a resumed agent finds the whole map new again and its
+        intrinsic reward jumps back to where it was at birth.
+        """
+        return {
+            "beta": self.beta,
+            "beta_start": self.beta_start,
+            "decay": self.decay,
+            "visit_counts": dict(self.visit_counts),
+        }
+
+    def load_state(self, state):
+        self.beta = state["beta"]
+        self.beta_start = state["beta_start"]
+        self.decay = state["decay"]
+
+        self.visit_counts.clear()
+        self.visit_counts.update(state["visit_counts"])
+
+    # -----------------------------
     # RESET (per episode)
     # -----------------------------
     def reset(self):

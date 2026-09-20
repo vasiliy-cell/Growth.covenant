@@ -26,5 +26,27 @@ class ReplayBuffer:
         states, actions, rewards, next_states, dones = zip(*batch)
         return states, actions, rewards, next_states, dones
 
+    # -----------------------------
+    # STATE (CHECKPOINT)
+    # -----------------------------
+    def state(self):
+        """
+        Every transition this mind still remembers.
+
+        By far the heaviest thing in a checkpoint - thousands of tensors per
+        agent - which is why the run only writes it on milestone
+        checkpoints and leaves it out of the frequent ones.
+
+        The sampling stream is NOT in here: it is a named stream of the run
+        (src/utils/rng.py) and is saved once, with all the others.
+        """
+        return {
+            "capacity": self.buffer.maxlen,
+            "transitions": list(self.buffer),
+        }
+
+    def load_state(self, state):
+        self.buffer = deque(state["transitions"], maxlen=state["capacity"])
+
     def __len__(self):
         return len(self.buffer)
