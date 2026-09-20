@@ -145,9 +145,18 @@ class RunRandom:
         return states
 
     def load_state(self, states):
-        """Puts every stream back where the snapshot found it."""
+        """
+        Puts every stream back where the snapshot found it, IN PLACE.
+
+        The objects are never replaced, and that is the whole of it: by the
+        time a run is restored, a policy is already holding its generator
+        and a replay buffer its sampler. Handing back fresh objects would
+        restore the state of streams nobody is drawing from, and every mind
+        in the world would carry on from an untouched generator - which
+        looks exactly like a resume that works, until the numbers are
+        compared.
+        """
         self.seed = int(states["seed"])
-        self._streams = {}
 
         for label, dumped in states["streams"].items():
             kind, name = self._parse(label)

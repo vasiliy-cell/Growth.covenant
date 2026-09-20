@@ -125,6 +125,25 @@ def test_a_snapshot_puts_every_stream_back():
     assert draws(rng) == expected
 
 
+def test_a_snapshot_restores_the_stream_objects_already_handed_out():
+    """
+    A policy holds its generator and a buffer its sampler long before a
+    run is restored. Handing back fresh objects would restore streams
+    nobody draws from, and every mind would carry on unrestored.
+    """
+    rng = RunRandom(3)
+    held = rng.python("agent", 2, "replay")
+
+    snapshot = rng.state()
+    expected = held.random()
+
+    held.random()
+    rng.load_state(snapshot)
+
+    assert rng.python("agent", 2, "replay") is held
+    assert held.random() == expected
+
+
 def test_a_snapshot_resumes_a_run_in_a_fresh_object():
     """What a checkpoint needs: continue the run, do not restart it."""
     rng = RunRandom(3)
