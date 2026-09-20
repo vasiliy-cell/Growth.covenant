@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from datetime import datetime
@@ -16,7 +17,14 @@ class Logger:
       run_info        - once, at the start (global seed + run params)
       step            - one per step (`step` is the GLOBAL step index)
       episode_summary - one per logging window (same fields as before, so all
-                        existing visualizers keep working unchanged)
+                        existing visualizers keep working unchanged), plus a
+                        `fingerprint`: a rolling hash of every step logged
+                        since the run started.
+
+    The fingerprint is what makes reproducibility something you can check
+    instead of something you hope for. Two runs of the same seed must print
+    the same fingerprints; the first window where they differ is the window
+    where the runs diverged, so a whole log diff is never needed to find it.
 
     Full RNG states go to a separate file, logs/rng/<run_name>.jsonl, because
     they are big and would drown the main log. The `rng` subdirectory is
@@ -50,6 +58,11 @@ class Logger:
         # index of the current logging window
         self.episode = 0
         self.total_steps = 0
+
+        # Rolling over the WHOLE run and never reset per window: a window's
+        # fingerprint covers everything up to it, so comparing two runs
+        # window by window finds the first tick that differs.
+        self._fingerprint = hashlib.blake2b(digest_size=8)
 
         self._reset_window()
 
@@ -208,7 +221,10 @@ class Logger:
         if q_prediction is not None:
             data["q_prediction"] = q_prediction
 
-        self.file.write(json.dumps(data) + "\n")
+        line = json.dumps(data)
+
+        self._fingerprint.update(line.encode("utf-8"))
+        self.file.write(line + "\n")
 
         if self.flush_every > 0 and self.total_steps % self.flush_every == 0:
             self.file.flush()
@@ -237,6 +253,7 @@ class Logger:
             "training_reward": self.training_reward,
             "intrinsic_reward": self.intrinsic_reward,
             "steps": self.steps,
+            "fingerprint": self._fingerprint.hexdigest(),
             "avg_loss": (
                 self._loss_sum / self._loss_count
                 if self._loss_count > 0 else None
