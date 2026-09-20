@@ -47,14 +47,20 @@ function replayFrom(source) {
   // A replay is not a continuation: it is a NEW world that starts from the
   // same seed, with every setting already filled in so only the one you
   // came to change has to be typed.
-  const config = source.config || {};
+  //
+  // The two callers hand over two different shapes - a catalog row and an
+  // opened world - so the seed is looked for in both places rather than
+  // silently coming out empty from one of them.
+  const first = (source.sessions && source.sessions[0]) || {};
+  const seed = (source.seeds && source.seeds[0]) ?? first.seed ?? "";
 
   setPrefill({
-    seed: (source.seeds && source.seeds[0]) ?? config.seed ?? "",
+    seed: seed ?? "",
     species: source.species,
     label: source.label ? `${source.label} (replay)` : "",
     series: source.series || "",
-    agents: (source.sessions && source.sessions[0]?.config?.agents?.count) || 1,
+    agents: first.config?.agents?.count ?? source.config?.agents?.count ?? 1,
+    episodes: first.to_episode || undefined,
   });
 
   show("launch");

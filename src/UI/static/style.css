@@ -7,6 +7,10 @@
  */
 
 :root {
+  /* The page is already dark: browsers and dark-mode extensions should
+     leave it alone rather than invert it into mud. */
+  color-scheme: dark;
+
   --bg: #0a0b0d;
   --panel: #101216;
   --panel-2: #14171c;
@@ -282,6 +286,16 @@ label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px
   z-index: 50;
   backdrop-filter: blur(3px);
 }
+
+/*
+ * Without this the overlay is never hidden at all.
+ *
+ * The browser hides [hidden] elements with `display: none` from its own
+ * stylesheet, which ANY author `display` overrides - so the line above
+ * quietly cancelled the attribute, and a blurred sheet sat over the whole
+ * panel swallowing every click.
+ */
+.modal-backdrop[hidden] { display: none; }
 
 .modal {
   width: min(520px, 92vw);
