@@ -207,7 +207,7 @@ runs differ is where they diverged.
 A local web panel: watch runs, read their logs, start new ones.
 
 ```bash
-PYTHONPATH=. python src/UI/server.py     # http://127.0.0.1:8000
+./panel.sh               # http://127.0.0.1:8000
 ```
 
 FastAPI serves an API and a page of plain ES modules — no build step, and
@@ -232,7 +232,7 @@ tool on your own machine, not a service.
 python src/run.py        # normal run (asks for episodes and seed)
 python src/run.py --episodes 2000 --seed 5 --agents 4 --species mendel \
     --label "leak 0.2" --series sweep --set energy.energy_leak=0.2
-PYTHONPATH=. python src/UI/server.py     # the control panel
+./panel.sh               # the control panel
 python src/visualized_run.py
 PYTHONPATH=. pytest      # tests
 ```
