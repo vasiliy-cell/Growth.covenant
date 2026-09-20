@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Growth.covenant</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/echarts.min.js"></script>
+  <script src="/static/vendor/d3.min.js"></script>
+</head>
+<body>
+  <header class="titlebar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Growth<span class="dim">.covenant</span></h1>
+    </div>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-view="catalog">Worlds</button>
+      <button class="tab" data-view="monitor">Monitor</button>
+      <button class="tab" data-view="launch">Launch</button>
+    </nav>
+
+    <div class="status" id="status">
+      <span class="pill" id="running-pill">0 running</span>
+      <span class="pill quiet" id="cpu-pill">—</span>
+    </div>
+  </header>
+
+  <main id="view"></main>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
