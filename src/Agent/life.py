@@ -17,6 +17,10 @@ class Life:
         starvation is the only way out: at or below `death_energy` it is
         removed from the run.
 
+    Birth is here too, as `start_energy`: what an agent has to spend before
+    it has foraged anything. Without it `death_energy` would mean nothing -
+    a body born at zero is already at the threshold.
+
     There is no hard age limit and there does not need to be one: the leak
     grows by `aging_amount` every `aging_every` ticks of a life and never
     stops growing, so sooner or later it outruns anything an agent can
@@ -30,17 +34,19 @@ class Life:
 
     def __init__(
         self,
-        childhood_steps=300,
+        childhood_steps=1000,
         base_leak=0.5,
         aging_every=200,
         aging_amount=0.05,
         death_energy=0.0,
+        start_energy=100.0,
     ):
         self.childhood_steps = childhood_steps
         self.base_leak = base_leak
         self.aging_every = aging_every
         self.aging_amount = aging_amount
         self.death_energy = death_energy
+        self.start_energy = start_energy
 
     @classmethod
     def from_config(cls, source=None):
@@ -50,12 +56,15 @@ class Life:
         life_cfg = source.get("life", {})
         aging_cfg = life_cfg.get("aging", {})
 
+        energy_cfg = source.get("energy", {})
+
         return cls(
-            childhood_steps=int(life_cfg.get("childhood_steps", 300)),
-            base_leak=float(source.get("energy", {}).get("energy_leak", 0.5)),
+            childhood_steps=int(life_cfg.get("childhood_steps", 1000)),
+            base_leak=float(energy_cfg.get("energy_leak", 0.5)),
             aging_every=int(aging_cfg.get("every", 200)),
             aging_amount=float(aging_cfg.get("amount", 0.05)),
             death_energy=float(life_cfg.get("death_energy", 0.0)),
+            start_energy=float(energy_cfg.get("start_energy", 100.0)),
         )
 
     # -----------------------------

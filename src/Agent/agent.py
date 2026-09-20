@@ -32,7 +32,6 @@ class Agent:
         self.index = index
         self.world = world
         self.position = position
-        self.energy = 0.0
 
         # Ticks lived. Starts at 0 for everybody - a newborn is a newborn
         # whether it was spawned at the start of the run or born into it.
@@ -40,6 +39,11 @@ class Agent:
 
         # The biology of this world, shared by the whole population.
         self.life = life if life is not None else Life.from_config()
+
+        # What it takes into the world. A body born at zero would already
+        # be at the starvation threshold, so this is what makes death by
+        # hunger a thing an agent can avoid rather than a countdown.
+        self.energy = self.life.start_energy
 
     # -----------------------------
     # MOVEMENT (INTENT -> APPLY)

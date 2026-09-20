@@ -205,15 +205,21 @@ class GridWorldEnv:
             if self.world.get_cell(position) != 0:
                 self.world.clear_cell(position)
 
-            # One tick lived, and the older the body the dearer that tick:
-            # the leak is personal and grows with age (src/Agent/life.py).
-            agent.grow_older()
+            # The cost of being alive, and it is personal: the older the
+            # body, the dearer the tick (src/Agent/life.py).
             agent.energy -= agent.energy_leak()
 
         # 4b. DEATH - starvation, once this tick's energy has settled.
         died = self._reap()
 
-        # 4c. BIRTH - energy-gated, on what is left alive.
+        # 4c. ONE TICK LIVED. Counted after the reaping and not before it,
+        #     so a newborn is immortal for exactly life.childhood_steps
+        #     ticks and the leak it paid above is the leak of the age it
+        #     actually had while living this tick.
+        for agent in self.agents:
+            agent.grow_older()
+
+        # 4d. BIRTH - energy-gated, on what is left alive.
         self._reproduce()
 
         # 5. REFILL - the world tops itself up once per TICK, however many
