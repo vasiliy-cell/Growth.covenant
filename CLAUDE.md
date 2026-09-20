@@ -84,8 +84,36 @@ in the terminal before the run starts.
 length, not only the brain) and is resolved relative to the repo root, so it
 works from any working directory.
 
+### Randomness: named streams, one seed
+Every draw in a run comes from `RunRandom` (`src/utils/rng.py`), asked for
+by name: `rng.python("world")`, `rng.numpy("genome")`, `rng.torch("agent",
+7, "policy")`. Streams are derived from the run seed through
+`SeedSequence`, so they are independent — a fight over a cell cannot move
+the next refill, and a birth cannot move anybody's exploration.
+
+- world / population / movement / genome are the world's streams,
+- every mind gets `agent/<index>/brain` (weights, through a forked global
+  torch state — torch takes no generator for layer init), `agent/<index>/
+  policy` (exploration) and `agent/<index>/replay` (batch sampling),
+- an agent's streams follow its **index**, never the order of birth, so a
+  run stays reproducible through births and deaths.
+
+Nothing may reach for a global generator (`random.sample`, `torch.rand`,
+`np.random.*`) — that is exactly what made runs unreproducible before. New
+randomness gets a new name.
+
+`rng.state()` snapshots every live stream and `load_state()` puts them
+back, in this process or a fresh one: that is the half of a checkpoint that
+is not weights.
+
 ### Logging
 `Logger` is run-scoped: **one file per run**, `logs/run_<timestamp>.jsonl`.
+
+The log is flushed on the header, on every window summary and every
+`logging.flush_every` steps, so a run that is killed keeps everything but
+its last few steps. Each `episode_summary` also carries a `fingerprint`: a
+rolling hash of every step logged so far. Same seed → same fingerprints;
+the first window where two runs differ is where they diverged.
 
 - `run_info` — once, global seed and run parameters,
 - `step` — one per step, `step` is the global step index,
