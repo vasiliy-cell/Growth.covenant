@@ -46,10 +46,29 @@ logging:
   flush_every: 100        # push the log file to disk every N steps
 
 # --- CHECKPOINTS ---
-# Every agent has its own brain, so there is no single model file anymore:
-# one file per agent under models/<run_id>/<agent_id>.pth.
+# Two different things live here and they answer different questions.
+#
+# models_dir holds the ARCHIVE: one file per agent, written when that agent
+# dies and at the end of the run, under models/<run_id>/<agent_id>.pth. It
+# says what a mind had learned. It is never read back.
+#
+# dir holds the CHECKPOINTS: the whole run in one file - world, bodies,
+# DNA, every mind, every rng stream - written every `every_steps` ticks so
+# a crash costs minutes instead of a night. Those rotate: only the newest
+# `keep` survive, so a month of runs does not turn into a disk full of
+# 100 MB files. A checkpoint moved into dir/pinned/ is never deleted
+# (scripts/checkpoints.py pin <name>, or answer yes to "keep this run"
+# before the run starts and its last checkpoint is pinned for you).
+#
+# The replay buffers are most of the weight of a checkpoint, so they are
+# only written on every `replay_every`-th one. A mind resumed without its
+# memories is not broken - it refills the buffer from the world.
 checkpoints:
   models_dir: "models"
+  dir: "checkpoints"
+  every_steps: 500        # write a checkpoint every N steps (0 = off)
+  replay_every: 5         # every Nth checkpoint also carries the buffers
+  keep: 5                 # rolling checkpoints kept; pinned ones are forever
 
 
 # --- energy ---
