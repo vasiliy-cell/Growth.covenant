@@ -55,11 +55,13 @@ class AgentManager:
     # -----------------------------
     # POPULATION
     # -----------------------------
-    def spawn(self, count=1):
+    def spawn(self, count=1, birth_step=0, parents=None):
         """Creates `count` agents and returns them."""
-        return [self._spawn_one() for _ in range(count)]
+        return [
+            self._spawn_one(birth_step, parents) for _ in range(count)
+        ]
 
-    def _spawn_one(self):
+    def _spawn_one(self, birth_step=0, parents=None):
         index = self._next_index
         self._next_index += 1
 
@@ -69,6 +71,8 @@ class AgentManager:
             world=self.world,
             position=self._spawn_position(),
             life=self.life,
+            birth_step=birth_step,
+            parents=parents,
         )
 
         self.agents[agent.agent_id] = agent
@@ -93,6 +97,10 @@ class AgentManager:
                     "position": agent.get_position(),
                     "energy": agent.energy,
                     "age": agent.age,
+                    "birth_step": agent.birth_step,
+                    "parents": list(agent.parents),
+                    "total_reward": agent.total_reward,
+                    "offspring": agent.offspring,
                 }
                 for agent in self.all()
             ],
@@ -121,9 +129,13 @@ class AgentManager:
                 world=self.world,
                 position=Position(*record["position"]),
                 life=self.life,
+                birth_step=record["birth_step"],
+                parents=record["parents"],
             )
             agent.energy = record["energy"]
             agent.age = record["age"]
+            agent.total_reward = record["total_reward"]
+            agent.offspring = record["offspring"]
 
             self.agents[agent.agent_id] = agent
 

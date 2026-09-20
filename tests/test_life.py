@@ -104,6 +104,45 @@ def test_nobody_dies_during_childhood():
     assert info["alive"] == 2
 
 
+def test_a_death_carries_the_whole_life_out_with_it():
+    """
+    Nothing else in the logs can answer "what happened to this one"
+    without a join across a million rows.
+    """
+    env = make_env(make_life(childhood_steps=1, base_leak=1000.0))
+
+    stand_still(env)
+    _, _, info = stand_still(env)
+
+    death = info["deaths"][0]
+
+    assert death["agent_id"] in info["died"]
+    assert death["cause_of_death"] == "starvation"
+    assert death["death_step"] == 2
+    assert death["lifespan"] == 1
+    assert death["num_offspring"] == 0
+    assert death["parents"] == []
+    assert "genotype" in death
+
+
+def test_a_birth_names_its_parents_and_counts_them(tmp_path):
+    """A lineage cannot be reconstructed from anything else afterwards."""
+    env = make_env(make_life(childhood_steps=10 ** 9))
+
+    for agent in env.agents:
+        agent.energy = 10000.0
+
+    _, _, info = stand_still(env)
+
+    assert info["births"], "well fed agents must reproduce"
+
+    birth = info["births"][0]
+    parent_id = birth["parents"][0]
+
+    assert env.agents.get(birth["agent_id"]).birth_step == 1
+    assert env.agents.get(parent_id).offspring >= 1
+
+
 def test_a_starving_adult_leaves_the_run():
     # a leak nothing on the map can pay for, so the outcome does not depend
     # on what the bodies happen to be standing on

@@ -4,7 +4,7 @@ from datetime import datetime
 # Bumped whenever the shape of a record changes in a way that makes an
 # older file unreadable. A refusal with a version number in it is a far
 # better afternoon than a resume that silently reads garbage.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def git_commit():

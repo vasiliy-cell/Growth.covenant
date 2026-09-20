@@ -180,7 +180,9 @@ class GridWorldEnv:
 
     # --- birth: reproduction driven by this run's species ---
     def _reproduce(self):
+        """Returns one record per child born this tick, parents named."""
         cost = config["energy"]["reproduction_cost"]
+        born = []
 
         if self.species.partners_required == 0:
             # asexual: everyone past the energy threshold clones itself
@@ -189,7 +191,7 @@ class GridWorldEnv:
             for parent in parents:
                 genotype = self.genomes.get_genotype(parent.agent_id)
                 child = self.species.reproduce(genotype, None, self.genome_rng)
-                self._birth(child, cost)
+                born.append(self._birth(child, cost, [parent]))
                 parent.energy -= cost
         else:
             # sexual: choose_partners returns energy+proximity matched pairs
@@ -198,15 +200,18 @@ class GridWorldEnv:
                 g_mother = self.genomes.get_genotype(mother.agent_id)
                 g_father = self.genomes.get_genotype(father.agent_id)
                 child = self.species.reproduce(g_father, g_mother, self.genome_rng)
-                self._birth(child, cost)
+                born.append(self._birth(child, cost, [mother, father]))
                 mother.energy -= cost/2
                 father.energy -= cost/2
+
+        return born
 
 
     # --- death: starvation, the only way out of this world ---
     def _reap(self):
         """
-        Removes everybody who starved this tick and returns their ids.
+        Removes everybody who starved this tick, and returns one whole
+        life per body: where it came from, what it ate, what it left.
 
         Death comes BEFORE birth on purpose: an agent that cannot feed
         itself does not get to spend its last tick reproducing. Childhood is
@@ -214,25 +219,55 @@ class GridWorldEnv:
         whatever its energy is.
 
         The genome stays in the gene pool - the pool is the record of who
-        lived in this run, and the run is allowed to outlive the body.
+        lived in this run, and the run is allowed to outlive the body -
+        and it is what a life summary carries out with it.
         """
         dead = [agent for agent in self.agents.all() if agent.is_dead()]
+        records = []
 
         for agent in dead:
             self.agents.remove(agent.agent_id)
+
+            record = agent.life_summary(self.current_step)
+            record["genotype"] = self.genomes.get_genotype(agent.agent_id)
+            records.append(record)
+
             print(
                 f"[death @ step {self.current_step}] -> {agent.agent_id}  "
                 f"(age {agent.age}, pop {len(self.agents)})"
             )
 
-        return [agent.agent_id for agent in dead]
+        return records
 
-    def _birth(self, child_genotype, start_energy):
-        """Give a new child genome a body and register it in every registry."""
-        baby = self.agents.spawn(1)[0]
+    def _birth(self, child_genotype, start_energy, parents):
+        """
+        Give a new child genome a body and register it in every registry.
+
+        The parents are named on the child and counted on them: a lineage
+        is the one thing about a population that cannot be reconstructed
+        afterwards from anything else in the logs.
+        """
+        baby = self.agents.spawn(
+            1,
+            birth_step=self.current_step,
+            parents=[parent.agent_id for parent in parents],
+        )[0]
+
         self.genomes.put(baby.agent_id, child_genotype)
         baby.energy = start_energy
+
+        for parent in parents:
+            parent.offspring += 1
+
         print(f"[birth @ step {self.current_step}] -> {baby.agent_id}  (pop {len(self.agents)})")
+
+        return {
+            "agent_id": baby.agent_id,
+            "index": baby.index,
+            "parents": list(baby.parents),
+            "energy": baby.energy,
+            "genotype": child_genotype,
+        }
 
     def get_states(self):
         """
@@ -290,6 +325,7 @@ class GridWorldEnv:
 
             rewards[agent.agent_id] = self.world.get_reward(position)
             agent.energy += rewards[agent.agent_id]
+            agent.total_reward += rewards[agent.agent_id]
 
             # good/bad cells turn empty once an agent touches them
             if self.world.get_cell(position) != 0:
@@ -300,7 +336,7 @@ class GridWorldEnv:
             agent.energy -= agent.energy_leak()
 
         # 4b. DEATH - starvation, once this tick's energy has settled.
-        died = self._reap()
+        deaths = self._reap()
 
         # 4c. ONE TICK LIVED. Counted after the reaping and not before it,
         #     so a newborn is immortal for exactly life.childhood_steps
@@ -310,7 +346,7 @@ class GridWorldEnv:
             agent.grow_older()
 
         # 4d. BIRTH - energy-gated, on what is left alive.
-        self._reproduce()
+        births = self._reproduce()
 
         # 5. REFILL - the world tops itself up once per TICK, however many
         #    agents there are, so world.refill.every keeps meaning what it
@@ -336,7 +372,9 @@ class GridWorldEnv:
             "available_actions": self.get_available_actions(),
             "refilled": refilled,
             "non_empty_ratio": self.world.non_empty_ratio(),
-            "died": died,
+            "died": [record["agent_id"] for record in deaths],
+            "deaths": deaths,
+            "births": births,
             "alive": len(self.agents),
         }
 

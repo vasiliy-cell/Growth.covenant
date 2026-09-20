@@ -27,11 +27,23 @@ class Agent:
     number and asks its Life rules (src/Agent/life.py) for the answer.
     """
 
-    def __init__(self, agent_id, index, world, position, life=None):
+    def __init__(self, agent_id, index, world, position, life=None,
+                 birth_step=0, parents=None):
         self.agent_id = agent_id
         self.index = index
         self.world = world
         self.position = position
+
+        # Who made it and when. A body that was there from the first tick
+        # has no parents and was born at step 0 - the run is its parent.
+        self.birth_step = birth_step
+        self.parents = list(parents or [])
+
+        # The two numbers a life is judged by, kept on the body because
+        # nothing else outlives the mind: the world reward this agent has
+        # eaten in total, and how many children it paid for.
+        self.total_reward = 0.0
+        self.offspring = 0
 
         # Ticks lived. Starts at 0 for everybody - a newborn is a newborn
         # whether it was spawned at the start of the run or born into it.
@@ -96,6 +108,28 @@ class Agent:
     def is_dead(self):
         """An adult that has run out of energy. A child never is."""
         return self.life.is_dead(self.age, self.energy)
+
+    def life_summary(self, step, cause="starvation"):
+        """
+        The whole life in one record, for the moment it ends.
+
+        cause is starvation and only starvation: it is the one way out of
+        this world. Everything else that could go wrong for an agent -
+        walking into danger, ageing, losing a cell to a neighbour - ends
+        here, as energy it could not replace.
+        """
+        return {
+            "agent_id": self.agent_id,
+            "index": self.index,
+            "parents": list(self.parents),
+            "birth_step": self.birth_step,
+            "death_step": step,
+            "lifespan": self.age,
+            "cumulative_reward": self.total_reward,
+            "num_offspring": self.offspring,
+            "cause_of_death": cause,
+            "energy": self.energy,
+        }
 
     # -----------------------------
     # POSITION
