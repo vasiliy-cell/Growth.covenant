@@ -2,6 +2,7 @@ import random
 
 from src.Agent.agent import Agent
 from src.Agent.identity import make_agent_id, new_run_id
+from src.Agent.life import Life
 from src.Agent.State.position import Position
 
 
@@ -27,8 +28,13 @@ class AgentManager:
     # How many random cells to try before giving up on a free one.
     SPAWN_ATTEMPTS = 100
 
-    def __init__(self, world, rng=None, run_id=None):
+    def __init__(self, world, rng=None, run_id=None, life=None):
         self.world = world
+
+        # The life rules of this run - one object handed to every body that
+        # is ever born here, so childhood, aging and starvation mean the
+        # same thing for the first agent and for the last one.
+        self.life = life if life is not None else Life.from_config()
 
         # The same rng as the map and the refills: every draw the population
         # makes is part of the one reproducible stream of the run.
@@ -62,6 +68,7 @@ class AgentManager:
             index=index,
             world=self.world,
             position=self._spawn_position(),
+            life=self.life,
         )
 
         self.agents[agent.agent_id] = agent

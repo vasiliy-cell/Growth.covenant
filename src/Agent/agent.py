@@ -1,4 +1,5 @@
 from src.Agent.State.observation import Observation
+from src.Agent.life import Life
 
 from src.Agent.Actions.movement.available_movements import get_available_movements
 from src.Agent.Actions.movement.movements import MOVEMENTS
@@ -18,14 +19,27 @@ class Agent:
     only thing that identifies an agent anywhere outside this process.
     index is its plain number inside this run, kept for the places that
     genuinely want a small integer (picking a color, printing a line).
+
+    A body also has an age and it is personal: it counts the ticks THIS
+    agent has lived, not the ticks of the run, so an agent born late is a
+    child while the veterans around it are already paying for old age.
+    What that age costs is not decided here - the agent only carries the
+    number and asks its Life rules (src/Agent/life.py) for the answer.
     """
 
-    def __init__(self, agent_id, index, world, position):
+    def __init__(self, agent_id, index, world, position, life=None):
         self.agent_id = agent_id
         self.index = index
         self.world = world
         self.position = position
         self.energy = 0.0
+
+        # Ticks lived. Starts at 0 for everybody - a newborn is a newborn
+        # whether it was spawned at the start of the run or born into it.
+        self.age = 0
+
+        # The biology of this world, shared by the whole population.
+        self.life = life if life is not None else Life.from_config()
 
     # -----------------------------
     # MOVEMENT (INTENT -> APPLY)
@@ -59,6 +73,25 @@ class Agent:
 
     def move_to(self, position):
         self.position.update(position)
+
+    # -----------------------------
+    # LIFE (AGE -> LEAK -> DEATH)
+    # -----------------------------
+    def grow_older(self):
+        """One tick lived. Called once per tick by the env, for everybody."""
+        self.age += 1
+
+    def is_child(self):
+        """Still inside the immortal period - nothing can kill this agent."""
+        return self.life.is_child(self.age)
+
+    def energy_leak(self):
+        """What this body pays for being alive this tick: base cost + age."""
+        return self.life.leak(self.age)
+
+    def is_dead(self):
+        """An adult that has run out of energy. A child never is."""
+        return self.life.is_dead(self.age, self.energy)
 
     # -----------------------------
     # POSITION
@@ -162,5 +195,6 @@ class Agent:
     def __repr__(self):
         return (
             f"Agent(index={self.index}, id={self.agent_id}, "
-            f"position={self.position.get()})"
+            f"position={self.position.get()}, age={self.age}, "
+            f"energy={self.energy:.1f})"
         )

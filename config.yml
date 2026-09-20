@@ -48,10 +48,35 @@ checkpoints:
 
 
 # --- energy ---
+# energy_leak is the BASE cost of being alive, paid by every agent on every
+# tick. Aging adds to it (see life.aging below), so this is what a newborn
+# pays and nobody ever pays less.
 energy:
   energy_leak: 0.5
   reproduction_threshold: 300
   reproduction_cost: 100
+
+# --- LIFE ---
+# A life has two periods, and the first one is free:
+#
+#   CHILDHOOD - the first `childhood_steps` ticks after birth. The agent
+#     ages and leaks energy like everybody else, but nothing can kill it:
+#     every newborn gets exactly the same amount of time to learn where the
+#     food is before the world starts charging for mistakes.
+#   ADULTHOOD - everything after that. The agent is mortal, and starvation
+#     is the only way out: once its energy falls to `death_energy` it is
+#     removed from the run.
+#
+# There is no hard age limit here on purpose. The personal leak grows by
+# `aging.amount` every `aging.every` ticks of a life and never stops
+# growing, so old age is not a number to compare against - it is a bill
+# that keeps rising until no amount of foraging can pay it.
+life:
+  childhood_steps: 300    # ticks of guaranteed immortality after birth
+  death_energy: 0.0       # an adult at or below this energy dies
+  aging:
+    every: 200            # every N ticks of a life...
+    amount: 0.05          # ...the personal leak grows by this much
 
 
 # ==>-------------<====== genome ======>-------------<== #
