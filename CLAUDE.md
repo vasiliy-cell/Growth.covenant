@@ -207,8 +207,14 @@ runs differ is where they diverged.
 A local web panel: watch runs, read their logs, start new ones.
 
 ```bash
-./panel.sh               # http://127.0.0.1:8000
+./panel.sh               # starts the server and opens the panel
+./panel.sh --no-browser  # just the server
 ```
+
+It opens in the browser you are looking at, or the default one when you
+are not looking at a browser, and only once the port actually answers -
+a browser pointed at a server that is still starting shows an error page
+nobody reloads.
 
 FastAPI serves an API and a page of plain ES modules — no build step, and
 ECharts and d3 are vendored into `static/vendor/`, so it works offline. It
