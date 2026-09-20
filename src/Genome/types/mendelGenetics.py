@@ -65,7 +65,7 @@ class MendelGeneticsSpecies:
             for i in range(2):
                 child_genotype[gene_name][i] = (mom_genotype if rng.random() < 0.5 else dad_genotype)[gene_name][i]
         genotype = child_genotype
-        child_genotype = self.mendel_mutate(child_genotype, rng)
+        child_genotype = self.mutate(child_genotype, rng)
         return child_genotype
 
     def make_phenotype(self, child_genotype, rng):

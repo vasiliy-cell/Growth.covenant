@@ -147,7 +147,7 @@ genome:
     # run, so every one of these is already personal - the genome only
     # decides that two newborns need not get the same schedule.
     epsilon:                      # policy.epsilon: start value
-      mean: 0.01
+      mean: 0.7
       scale: 0.1
       type: float
     epsilon_decay:                # policy.epsilon_decay, per logging window
