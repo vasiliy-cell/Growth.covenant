@@ -85,7 +85,7 @@ genome:
       scale: 0.5
       type: float
     sigma: # chance of huge mutation 
-      mean: 0.05
+      mean: 0.01
       scale: 0.5
       type: float
     # --- OPTIMIZER ---
