@@ -1,3 +1,4 @@
+import importlib.util
 import os
 
 import pytest
@@ -263,6 +264,53 @@ def test_unpinning_puts_it_back_in_reach_of_the_rotation(tmp_path):
 
     assert store.list(pinned=True) == []
     assert [c["step"] for c in store.list(pinned=False)] == [1]
+
+
+def load_cli():
+    """scripts/ is not a package, so the tool is loaded by path."""
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "scripts",
+        "checkpoints.py",
+    )
+    spec = importlib.util.spec_from_file_location("checkpoints_cli", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    return module
+
+
+def filled_store(tmp_path):
+    store = CheckpointStore(directory=str(tmp_path), keep=10)
+
+    for run_id, step in (("alpha", 1), ("beta", 2), ("beta", 3)):
+        store.save({"step": step}, run_id=run_id, step=step)
+
+    return store
+
+
+def test_a_checkpoint_can_be_picked_by_its_number_or_by_name(tmp_path):
+    cli = load_cli()
+    store = filled_store(tmp_path)
+
+    listing = store.list()
+
+    assert cli.find(store, "1")["name"] == listing[0]["name"]
+    assert cli.find(store, "latest")["name"] == listing[0]["name"]
+    assert cli.find(store, "alpha")["run_id"] == "alpha"
+    assert cli.find(store, listing[2]["name"])["name"] == listing[2]["name"]
+
+
+def test_an_ambiguous_name_is_an_error_and_not_a_guess(tmp_path):
+    """These files are the only copy of a run - never pin by coin toss."""
+    cli = load_cli()
+    store = filled_store(tmp_path)
+
+    with pytest.raises(SystemExit, match="several"):
+        cli.find(store, "beta")
+
+    with pytest.raises(SystemExit, match="Nothing matches"):
+        cli.find(store, "gamma")
 
 
 def test_a_save_leaves_no_half_written_file_behind(tmp_path):
