@@ -153,13 +153,17 @@ def population_summary(brains):
     Epsilon and curiosity belong to the individual now, so a run summary can
     only show the population mean.
 
-    Right now every agent is born at step 0 and the mean is the value every
-    one of them has. The moment agents start being born at different times
-    these numbers drift apart on their own - newborns exploring while the
-    veterans around them exploit - and the mean becomes the only honest
-    single number to print.
+    Agents are born and die at different times now, so these numbers drift
+    apart on their own - newborns exploring while the veterans around them
+    exploit - and the mean is the only honest single number to print.
+
+    An empty population is not an error: the last window of an extinct run
+    still has to be flushed, and it simply has nothing to average.
     """
     summaries = [brain.summary() for brain in brains]
+
+    if not summaries:
+        return 0.0, None
 
     epsilon = sum(s["epsilon"] for s in summaries) / len(summaries)
 
@@ -284,6 +288,8 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
             "agents": agent_count,
             "world_size": world_cfg.get("size", 64),
             "world_refill": world_cfg.get("refill", {}),
+            "life": config.get("life", {}),
+            "energy": config.get("energy", {}),
         },
     )
 
@@ -324,12 +330,28 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
             # Each agent remembers and learns on its own: its own curiosity
             # values the step, its own buffer stores it, its own network
             # takes the gradient. Nothing crosses between agents.
-            # done is always False: the process is continuous, there is no
-            # terminal state to cut the bootstrap on.
+            # done is always False: the world is continuous and has no
+            # terminal state to cut the bootstrap on. Death does not make
+            # one either - a starved agent is removed, and the transition
+            # that killed it is simply never stored.
             for agent_id in actions:
-                brain = brains.get(agent_id)
-
                 env_reward = env_rewards[agent_id]
+
+                # Starved on this very tick: the world removed the body
+                # before it could see where its move led. There is no next
+                # observation to shape a reward from and no mind left to
+                # train, so the step is only written down.
+                if agent_id not in next_observations:
+                    logger.log_step(
+                        step=step,
+                        position=observations[agent_id].position,
+                        action=actions[agent_id],
+                        reward=env_reward,
+                    )
+                    episode_reward += env_reward
+                    continue
+
+                brain = brains.get(agent_id)
                 next_observation = next_observations[agent_id]
 
                 shaped_reward, intrinsic_reward = brain.shape_reward(
@@ -375,6 +397,14 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None, species=Non
 
             if render_fn is not None:
                 render_fn(env, info)
+
+            # --- extinction ---
+            # Nothing acts, nothing learns and nothing can be born again:
+            # once the last body starves the run has no reason to keep
+            # ticking, so it ends here instead of at total_steps.
+            if len(env.agents) == 0:
+                print(f"Extinct at step {step}: the last agent starved")
+                break
 
             # --- logging window boundary ---
             # Nothing here touches the world or the agent position: only the

@@ -2,6 +2,7 @@ import random
 
 from src.world.world import World
 from src.Agent.AgentManager import AgentManager
+from src.Agent.life import Life
 
 from src.Genome.types.reuse import reuse, config
 from src.Genome.types.factory import make_species
@@ -18,8 +19,13 @@ class GridWorldEnv:
     One continuous world shared by the whole population. No episodes, no
     reset:
       - the map is generated exactly once, in start(),
-      - the agents are created once and keep their positions forever,
+      - the agents keep their positions for as long as they live - nobody
+        is ever teleported back to a starting cell,
       - instead of regeneration the world refills itself (World.maybe_refill).
+
+    The population is the only thing that turns over: a tick ends with the
+    starved removed and the well-fed reproducing, so the run outlives the
+    bodies that started it.
 
     The step API is PARALLEL: one call to step() is one tick of the world in
     which every agent acts simultaneously. Actions come in keyed by agent id
@@ -31,14 +37,20 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None):
+    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None, life=None):
         self.size = size
 
         # Single RNG for the whole run
         self.rng = rng if rng is not None else random.Random()
 
+        # Childhood, aging and starvation - one set of rules for everybody
+        # born in this world (see the `life` section of config.yml).
+        self.life = life if life is not None else Life.from_config(config)
+
         self.world = World(size=size, empty_ratio=empty_ratio, refill=refill)
-        self.agents = AgentManager(self.world, rng=self.rng, run_id=run_id)
+        self.agents = AgentManager(
+            self.world, rng=self.rng, run_id=run_id, life=self.life
+        )
         self.agent_count = agent_count
 
         self.current_step = 0
@@ -101,6 +113,30 @@ class GridWorldEnv:
                 father.energy -= cost/2
 
 
+    # --- death: starvation, the only way out of this world ---
+    def _reap(self):
+        """
+        Removes everybody who starved this tick and returns their ids.
+
+        Death comes BEFORE birth on purpose: an agent that cannot feed
+        itself does not get to spend its last tick reproducing. Childhood is
+        checked inside Agent.is_dead(), so a newborn survives this call
+        whatever its energy is.
+
+        The genome stays in the gene pool - the pool is the record of who
+        lived in this run, and the run is allowed to outlive the body.
+        """
+        dead = [agent for agent in self.agents.all() if agent.is_dead()]
+
+        for agent in dead:
+            self.agents.remove(agent.agent_id)
+            print(
+                f"[death @ step {self.current_step}] -> {agent.agent_id}  "
+                f"(age {agent.age}, pop {len(self.agents)})"
+            )
+
+        return [agent.agent_id for agent in dead]
+
     def _birth(self, child_genotype, start_energy):
         """Give a new child genome a body and register it in every registry."""
         baby = self.agents.spawn(1)[0]
@@ -159,7 +195,6 @@ class GridWorldEnv:
         #    nobody can eat it from under anybody. Competition happens a
         #    step earlier, over who is allowed to move there at all.
         rewards = {}
-        energy_leak = config["energy"]["energy_leak"]
         for agent in self.agents:
             position = agent.get_position()
 
@@ -170,9 +205,15 @@ class GridWorldEnv:
             if self.world.get_cell(position) != 0:
                 self.world.clear_cell(position)
 
-            agent.energy -= energy_leak
+            # One tick lived, and the older the body the dearer that tick:
+            # the leak is personal and grows with age (src/Agent/life.py).
+            agent.grow_older()
+            agent.energy -= agent.energy_leak()
 
-        # 4b. BIRTH - energy-gated cloning, once this tick's energy has settled.
+        # 4b. DEATH - starvation, once this tick's energy has settled.
+        died = self._reap()
+
+        # 4c. BIRTH - energy-gated, on what is left alive.
         self._reproduce()
 
         # 5. REFILL - the world tops itself up once per TICK, however many
@@ -188,15 +229,19 @@ class GridWorldEnv:
         #    sees the same world state.
         observations = self.get_states()
 
-        # No terminal state: this is a continuing task, so the training loop
-        # always bootstraps (done=False) and stops only when total_steps is
-        # reached.
+        # The world itself still has no terminal state - it never stops and
+        # never resets, so a living agent always bootstraps (done=False).
+        # Death is not a terminal state either, it is a removal: whoever is
+        # in `died` simply has no next observation, and the run goes on
+        # without them.
         info = {
             "step": self.current_step,
             "positions": self.agents.positions(),
             "available_actions": self.get_available_actions(),
             "refilled": refilled,
             "non_empty_ratio": self.world.non_empty_ratio(),
+            "died": died,
+            "alive": len(self.agents),
         }
 
         return observations, rewards, info
