@@ -31,6 +31,9 @@ export const api = {
 
   resume: (id, body) => post(world(id, "continue"), body),
   watch: (id, speed) => post(world(id, "watch"), { speed }),
+  stopWorld: (id) => post(world(id, "stop"), {}),
+  keep: (id) => post(world(id, "keep"), {}),
+  rename: (id, label) => post(world(id, "rename"), { label }),
   archive: (id, note, remove) => post(world(id, "archive"), { note, delete: remove }),
   remove: (id) => request(`/api/worlds/${encodeURI(id)}`, { method: "DELETE" }),
   compare: (worlds, metric) => post("/api/compare", { worlds, metric }),
@@ -95,6 +98,8 @@ const PATHS = {
   back: '<path d="M9.8 3.4 5.2 8l4.6 4.6"/>',
   dice: '<rect x="2.4" y="2.4" width="11.2" height="11.2" rx="2.4"/><circle cx="5.6" cy="5.6" r=".6" fill="currentColor"/><circle cx="10.4" cy="10.4" r=".6" fill="currentColor"/><circle cx="8" cy="8" r=".6" fill="currentColor"/>',
   console: '<path d="m3.4 5 3 3-3 3M8.4 11.4h4.2"/>',
+  rename: '<path d="M10.6 2.8 13.2 5.4 5.8 12.8 2.8 13.2 3.2 10.2Z"/>',
+  keep: '<path d="M4.4 2.4h7.2v11.2L8 11 4.4 13.6Z"/>',
 };
 
 export function icon(name) {

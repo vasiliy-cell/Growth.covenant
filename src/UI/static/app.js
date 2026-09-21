@@ -33,7 +33,10 @@ async function render() {
     }
 
     try {
-      await page(...match.slice(1).map(decodeURIComponent));
+      // An optional part of a route that is absent comes back undefined,
+      // and decodeURIComponent(undefined) is the STRING "undefined" - which
+      // is how Compare once received a step called "undefined".
+      await page(...match.slice(1).map((part) => (part === undefined ? undefined : decodeURIComponent(part))));
     } catch (error) {
       root.replaceChildren(h("div", { class: "page" }, h("div", { class: "panel" },
         h("div", { class: "empty" }, error.message))));
@@ -53,9 +56,13 @@ async function queue() {
     const { running, queued } = await api.runs();
     const pill = document.getElementById("queue-pill");
 
-    pill.textContent = running
-      ? `running${queued ? ` · ${queued} waiting` : ""}`
-      : queued ? `${queued} waiting` : "idle";
+    // Plain words, and nothing at all when nothing is happening.
+    const parts = [];
+    if (running) parts.push(`${running} run in progress`);
+    if (queued) parts.push(`${queued} waiting`);
+
+    pill.textContent = parts.join(" · ");
+    pill.hidden = !parts.length;
     pill.classList.toggle("on", running > 0);
   } catch { /* the title bar is not worth an error */ }
 }

@@ -3,7 +3,7 @@
 import {
   api, h, fmt, button, go, route, chartBase, chartIn, line, COLORS, cleanup,
 } from "../lib.js";
-import { replay, resume, archive, remove } from "./worlds.js";
+import { replay, resume, archive, remove, stop, keep, rename } from "./worlds.js";
 
 // All charts of a world move together: pick a range of episodes on one
 // and every other one shows the same range.
@@ -67,14 +67,23 @@ function header(entry, details) {
     button({ icon: "back", kind: "ghost", title: "Back to worlds", onclick: () => history.length > 1 ? history.back() : go(route.worlds()) }),
     h("h1", {}, details.label || details.world_id),
     h("span", { class: "badge" }, details.species),
-    entry.running ? h("span", { class: "badge live" }, [h("span", { class: "live-dot" }), "running"]) : null,
+    entry.running ? h("span", { class: "badge live" }, "running") : null,
     h("span", { class: "spacer" }),
     entry.running
       ? button({ label: "Watch", icon: "watch", kind: "primary", onclick: () => go(route.live(entry.id)) })
       : null,
+    entry.running
+      ? button({ label: "Stop", icon: "stop", kind: "danger", onclick: () => stop(world, () => location.reload()) })
+      : null,
     entry.checkpoint && !entry.running
       ? button({ label: "Continue", icon: "resume", kind: "primary", onclick: () => resume(world, () => location.reload()) })
       : null,
+    entry.checkpoint && !entry.checkpoint.pinned
+      ? button({ label: "Keep", icon: "keep", title: "This world's checkpoint is never rotated away", onclick: () => keep(world, () => location.reload()) })
+      : null,
+    entry.running
+      ? null
+      : button({ icon: "rename", title: "Rename", onclick: () => rename(world, () => go(route.worlds())) }),
     button({ label: "Replay", icon: "replay", onclick: () => replay(world) }),
     button({ icon: "archive", title: "Archive", onclick: () => archive(world, () => go(route.worlds())) }),
     button({ icon: "delete", kind: "danger", title: "Delete", onclick: () => remove(world, () => go(route.worlds())) }),

@@ -16,6 +16,8 @@ import asyncio
 import json
 import os
 import shutil
+import signal
+import subprocess
 import sys
 import tarfile
 import time
@@ -34,6 +36,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.persistence.checkpoint_store import CheckpointStore
+from src.persistence.run_log import RunLog
 from src.UI import reports
 from src.UI.launcher import Launcher
 
@@ -104,6 +107,10 @@ class ContinueRequest(BaseModel):
 
 class WatchRequest(BaseModel):
     speed: int = 0
+
+
+class RenameRequest(BaseModel):
+    label: str = ""
 
 
 class CompareRequest(BaseModel):
@@ -214,6 +221,93 @@ def watch_world(world: str, request: WatchRequest):
     os.replace(temporary, path)
 
     return {"speed": request.speed}
+
+
+def running_pid(reader):
+    """The pid of the run writing this world right now, or None."""
+    live = reports.read_live(LIVE_DIR, reader.world_id)
+
+    return live["pid"] if live and live["running"] else None
+
+
+@app.post("/api/worlds/{world:path}/stop")
+def stop_world(world: str):
+    """
+    Stop a running world early. SIGTERM, which the runner turns into its
+    crash path - so it writes a checkpoint on the way out and the world can
+    be continued later.
+    """
+    pid = running_pid(reader_for(world))
+
+    if pid is None:
+        raise HTTPException(status_code=409, detail="That world is not running")
+
+    # Only ever signal a process that really is one of our runs: a pid in
+    # a stale heartbeat could by now belong to anything.
+    try:
+        command = subprocess.check_output(["ps", "-p", str(pid), "-o", "command="]).decode()
+    except subprocess.CalledProcessError:
+        raise HTTPException(status_code=409, detail="That run has already ended")
+
+    if "src/run.py" not in command:
+        raise HTTPException(status_code=409, detail="That pid is not a run any more")
+
+    os.kill(pid, signal.SIGTERM)
+
+    return {"stopped": pid}
+
+
+@app.post("/api/worlds/{world:path}/keep")
+def keep_world(world: str):
+    """
+    Pin the world's newest checkpoint, so the rotation never takes it and
+    the world can always be continued.
+    """
+    reader = reader_for(world)
+    checkpoint = reports.latest_checkpoint(reader, reports.checkpoints_by_run(STORE))
+
+    if checkpoint is None:
+        raise HTTPException(status_code=404, detail="This world has no checkpoint left to keep")
+
+    if not checkpoint["pinned"]:
+        STORE.pin(checkpoint["name"])
+
+    return {"kept": checkpoint["name"]}
+
+
+@app.post("/api/worlds/{world:path}/rename")
+def rename_world(world: str, request: RenameRequest):
+    """
+    Give a world a new name: the label in its run.json, and its folder.
+
+    A running world cannot be renamed - its run rewrites run.json from
+    memory on every flush and would quietly put the old name back.
+    """
+    reader = reader_for(world)
+
+    if running_pid(reader) is not None:
+        raise HTTPException(status_code=409, detail="Stop the run first: it keeps rewriting its own name")
+
+    label = request.label.strip() or None
+    header = dict(reader.header)
+    header["label"] = label
+
+    header_path = os.path.join(reader.path, "run.json")
+    temporary = header_path + ".writing"
+
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(header, handle, indent=2)
+
+    os.replace(temporary, header_path)
+
+    # The folder follows the name. A continued run finds a world by the id
+    # at the front of the folder name, so only the part after it changes.
+    target = os.path.join(os.path.dirname(reader.path), RunLog.folder_name(reader.world_id, label))
+
+    if target != reader.path:
+        os.rename(reader.path, target)
+
+    return {"id": os.path.relpath(target, LOGS_DIR), "label": label}
 
 
 @app.post("/api/worlds/{world:path}/continue")

@@ -10,13 +10,13 @@
 // two frames every agent is moved smoothly from where it was to where it
 // is going, so the picture plays at the screen's own frame rate.
 
-import { api, h, fmt, route, cleanup, every } from "../lib.js";
+import { api, h, fmt, route, cleanup, every, button } from "../lib.js";
 
 // empty, food, danger: the map's own colours, which mean something and so
 // stay out of the orange of the panel.
 const CELLS = [[14, 14, 16], [46, 160, 67], [218, 54, 51]];
 
-const SIZE = 760;
+const SIZE = 520;
 const SPEEDS = [[5, "5/s"], [10, "10/s"], [30, "30/s"], [60, "60/s"], [0, "full speed"]];
 
 // Remembered between visits: whoever watches at 10 a second wants 10 next
@@ -54,6 +54,11 @@ export function livePage(root, id) {
       h("span", { class: "note" }, "watch at"),
       speeds,
       h("a", { class: "btn small", href: route.world(id) }, "Charts"),
+      button({
+        label: "Stop", icon: "stop", kind: "danger", small: true,
+        title: "Stop the run now; it writes a checkpoint on the way out",
+        onclick: () => api.stopWorld(id).catch((error) => { status.textContent = error.message; }),
+      }),
     ]),
     h("div", { class: "live-stage" }, [h("div", { class: "screen" }, canvas), side]),
   ])));
@@ -77,10 +82,7 @@ export function livePage(root, id) {
 
     title.textContent = frame.label || frame.world_id;
     status.className = frame.running ? "badge live" : "badge";
-    status.replaceChildren(
-      frame.running ? h("span", { class: "live-dot" }) : "",
-      frame.running ? (frame.rate ? `${frame.rate} steps/s` : "full speed") : "finished",
-    );
+    status.textContent = frame.running ? (frame.rate ? `running · ${frame.rate} steps/s` : "running · full speed") : "finished";
 
     side.replaceChildren(
       stat("step", fmt.int(frame.step)),
@@ -203,8 +205,6 @@ class Player {
     if (this.mapKey) context.drawImage(this.map, 0, 0, canvas.width, canvas.height);
 
     context.fillStyle = "#ffa657";
-    context.shadowColor = "rgba(240,136,62,.95)";
-    context.shadowBlur = scale * 0.9;
 
     for (const [x, y] of this.positions(now).values()) {
       context.beginPath();
@@ -212,7 +212,6 @@ class Player {
       context.fill();
     }
 
-    context.shadowBlur = 0;
     requestAnimationFrame(this.draw);
   }
 }

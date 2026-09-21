@@ -26,7 +26,6 @@
   --accent: #f0883e;
   --accent-soft: #ffa657;
   --accent-deep: #db6d28;
-  --accent-glow: rgba(240, 136, 62, .35);
 
   --gold: #e3b341;
   --rose: #ff7b72;
@@ -93,14 +92,6 @@ nav.tabs a {
 
 nav.tabs a:hover { color: var(--text); background: var(--hover); }
 nav.tabs a.active { color: var(--text); background: #1d1d21; border-color: var(--border-strong); }
-nav.tabs a.active::before {
-  content: "";
-  display: inline-block;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent);
-  margin-right: 7px;
-  vertical-align: 1px;
-}
 
 .titlebar .status { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
@@ -207,7 +198,7 @@ main { flex: 1 1 auto; overflow: auto; padding: 18px; }
 }
 
 .btn.primary .icon { color: #160a01; }
-.btn.primary:hover { background: var(--accent-soft); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 16px var(--accent-glow); }
+.btn.primary:hover { background: var(--accent-soft); }
 
 .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
 .btn.ghost:hover { background: var(--hover); border-color: var(--border); }
@@ -375,15 +366,7 @@ td.actions .row { justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
 .badge.warn { color: var(--gold); border-color: #4c3c14; }
 .badge.bad { color: var(--rose); border-color: #5c2b28; }
 
-.live-dot {
-  display: inline-block;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-  animation: pulse 1.4s ease-in-out infinite;
-}
 
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
 /* ---------------- charts ---------------- */
 .chart { width: 100%; height: 300px; }
@@ -413,7 +396,7 @@ td.actions .row { justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
 
 .live-stage canvas {
   width: 100%;
-  max-width: 760px;
+  max-width: 520px;
   aspect-ratio: 1;
   image-rendering: pixelated;
   border: 1px solid var(--border);

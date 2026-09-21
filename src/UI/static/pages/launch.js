@@ -154,10 +154,7 @@ function runRow(run) {
 
   return h("div", { style: "border-bottom:1px solid var(--border)" }, [
     h("div", { class: "row", style: "padding:11px 14px;flex-wrap:nowrap" }, [
-      h("span", { class: BADGES[run.state] || "badge" }, [
-        run.state === "running" ? h("span", { class: "live-dot" }) : null,
-        run.state,
-      ]),
+      h("span", { class: BADGES[run.state] || "badge" }, run.state),
       h("span", { class: "mono", style: "font-size:11px;overflow:hidden;text-overflow:ellipsis" }, what),
       h("span", { class: "spacer" }),
       run.state === "running"
