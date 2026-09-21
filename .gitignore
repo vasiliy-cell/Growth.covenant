@@ -57,8 +57,9 @@ temp_data
 temp_data/
 .claude
 
-# --- Рабочий план для Claude (не для истории) ---
-tasks.md
 
 # --- The control panel's own files (live frames, watch requests, consoles) ---
 .panel/
+
+# --- AI working files: spec, tasks, progress (never committed) ---
+.ai/
