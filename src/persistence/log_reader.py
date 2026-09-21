@@ -128,6 +128,22 @@ class RunLogReader:
     def world_agents(self):
         return self.table("world_agents")
 
+    def count(self, name):
+        """
+        How many rows a table has, without reading one.
+
+        A catalog of thirty worlds must not load thirty million step rows
+        to print thirty numbers: parquet keeps the count in the footer of
+        every part, so this only touches metadata.
+        """
+        folder, schema = self.TABLES[name]
+        path = os.path.join(self.path, *folder.split("/"))
+
+        if not os.path.isdir(path) or not os.listdir(path):
+            return 0
+
+        return ds.dataset(path, format="parquet", schema=schema).count_rows()
+
     def _read(self, folder, schema):
         path = os.path.join(self.path, *folder.split("/"))
 

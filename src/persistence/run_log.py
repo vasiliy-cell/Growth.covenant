@@ -649,6 +649,21 @@ class RunLog:
         self._session["finished_at"] = time.time()
         self.flush()
 
+        # A run that ended says so in its own heartbeat, instead of leaving
+        # a watcher to decide from a timestamp that it must have died.
+        if os.path.isfile(self.live_path):
+            try:
+                with open(self.live_path, encoding="utf-8") as handle:
+                    live = json.load(handle)
+
+                live["finished"] = True
+                live["updated_at"] = time.time()
+
+                with open(self.live_path, "w", encoding="utf-8") as handle:
+                    json.dump(live, handle)
+            except (OSError, ValueError):
+                pass
+
     def __repr__(self):
         return (
             f"RunLog(path={self.path}, session={self.session}, "
