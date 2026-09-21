@@ -67,8 +67,10 @@ frontmost_browser() {
 
 open_panel() {
     # Wait for the port to answer: a browser pointed at a server that is
-    # still starting shows an error page, and nobody reloads it.
-    for _ in $(seq 1 60); do
+    # still starting shows an error page, and nobody reloads it. Loading
+    # torch alone can take twenty seconds on a cold start.
+    echo "⏳ Waiting for the server to start..."
+    for _ in $(seq 1 240); do
         curl -s -o /dev/null --max-time 1 "$URL" && break
         sleep 0.25
     done

@@ -75,10 +75,11 @@ function header(entry, details) {
     entry.running
       ? button({ label: "Stop", icon: "stop", kind: "danger", onclick: () => stop(world, () => location.reload()) })
       : null,
-    entry.checkpoint && !entry.running
+    entry.extinct ? h("span", { class: "badge", title: "Every agent starved: nothing to continue" }, "extinct") : null,
+    entry.checkpoint && !entry.running && !entry.extinct
       ? button({ label: "Continue", icon: "resume", kind: "primary", onclick: () => resume(world, () => location.reload()) })
       : null,
-    entry.checkpoint && !entry.checkpoint.pinned
+    entry.checkpoint && !entry.checkpoint.pinned && !entry.extinct
       ? button({ label: "Keep", icon: "keep", title: "This world's checkpoint is never rotated away", onclick: () => keep(world, () => location.reload()) })
       : null,
     entry.running

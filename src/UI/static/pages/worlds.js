@@ -73,13 +73,16 @@ function runningPanel(running, reload) {
 }
 
 function row(world, reload) {
-  const canContinue = world.checkpoint && !world.running;
+  // An extinct world has nobody to continue and nothing worth keeping.
+  const canContinue = world.checkpoint && !world.running && !world.extinct;
+  const canKeep = world.checkpoint && !world.checkpoint.pinned && !world.extinct;
 
   return h("tr", { class: "clickable", onclick: (event) => { if (!event.target.closest("button")) go(route.world(world.id)); } }, [
     h("td", {}, [
       h("div", {}, [
         world.label || h("span", { class: "dim" }, "unnamed"),
         world.running ? h("span", { class: "badge live", style: "margin-left:8px" }, "running") : null,
+        world.extinct ? h("span", { class: "badge", style: "margin-left:8px", title: "Every agent starved: nothing to continue" }, "extinct") : null,
       ]),
       h("div", { class: "dim mono", style: "font-size:11px;margin-top:2px" }, world.world_id),
     ]),
@@ -100,7 +103,7 @@ function row(world, reload) {
       canContinue
         ? button({ label: "Continue", icon: "resume", small: true, onclick: () => resume(world, reload) })
         : null,
-      world.checkpoint && !world.checkpoint.pinned
+      canKeep
         ? button({ icon: "keep", small: true, title: "Keep: this world's checkpoint is never rotated away", onclick: () => keep(world, reload) })
         : null,
       world.running

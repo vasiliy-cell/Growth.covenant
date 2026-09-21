@@ -16,6 +16,8 @@ import json
 import os
 import time
 
+import pyarrow.dataset as ds
+
 from src.persistence.log_reader import RunLogReader
 
 # A live.json older than this belongs to a run that is no longer with us.
@@ -110,6 +112,7 @@ def catalog(logs_dir, store=None, live_dir=None):
     for reader in RunLogReader.find(logs_dir):
         sessions = reader.sessions
         live = read_live(live_dir, reader.world_id) if live_dir else None
+        population = last_population(reader)
 
         worlds.append({
             "id": os.path.relpath(reader.path, logs_dir),
@@ -130,6 +133,10 @@ def catalog(logs_dir, store=None, live_dir=None):
             "genes": len(reader.genes),
             "commit": reader.header.get("commit"),
             "running": bool(live and live["running"]),
+            "population": population,
+            # Nobody alive and nothing running: there is nothing to watch,
+            # stop or continue, and the panel must not pretend otherwise.
+            "extinct": population == 0 and not (live and live["running"]),
             "checkpoint": latest_checkpoint(reader, grouped),
             "live": {
                 "step": live["step"],
@@ -139,6 +146,29 @@ def catalog(logs_dir, store=None, live_dir=None):
         })
 
     return worlds
+
+
+def last_population(reader):
+    """
+    How many agents the world had at the end of its last logged episode,
+    or None if it has not closed one yet.
+
+    Only two columns of one small table are read - the catalog asks this of
+    every world every few seconds.
+    """
+    path = os.path.join(reader.path, "episodes", "population")
+
+    if not os.path.isdir(path) or not os.listdir(path):
+        return None
+
+    table = ds.dataset(path, format="parquet").to_table(columns=["step_end", "agents"])
+
+    if table.num_rows == 0:
+        return None
+
+    last = max(range(table.num_rows), key=lambda row: table["step_end"][row].as_py())
+
+    return table["agents"][last].as_py()
 
 
 def open_world(logs_dir, world):

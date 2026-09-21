@@ -323,6 +323,9 @@ def continue_world(world: str, request: ContinueRequest):
     if checkpoint is None:
         raise HTTPException(status_code=404, detail="This world has no checkpoint")
 
+    if reports.last_population(reader) == 0:
+        raise HTTPException(status_code=409, detail="This world is extinct: nobody is left to continue")
+
     launched = launcher.submit({
         "episodes": request.episodes,
         "resume": checkpoint["path"],

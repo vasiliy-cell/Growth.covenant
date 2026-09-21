@@ -39,6 +39,11 @@ class Run:
         self.finished_at = None
         self.returncode = None
 
+        # How a run that exited cleanly actually ended. Exit code 0 covers
+        # both "ran every episode" and "everybody starved"; only the run's
+        # own words tell them apart.
+        self.outcome = None
+
     def state(self):
         if self.process is None:
             return "stopped" if self.returncode is not None else "queued"
@@ -47,7 +52,7 @@ class Run:
             return "running"
 
         if self.returncode == 0:
-            return "finished"
+            return self.outcome or "finished"
 
         # 130 is the runner stopping on purpose; the negative codes are
         # the shell killing it before it could say so.
@@ -200,6 +205,9 @@ class Launcher:
                 if code is not None:
                     run.returncode = code
                     run.finished_at = time.time()
+
+                    if code == 0 and "Extinct at step" in run.tail(lines=40):
+                        run.outcome = "extinct"
 
     # -----------------------------
     # STOPPING
