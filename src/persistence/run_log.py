@@ -111,8 +111,8 @@ class RunLog:
         world_snapshot_every=100,
         rng_world_every=1,
         rng_agents_every=100,
+        live_dir=None,
         live_every=20,
-        render=0,
     ):
         self.path = self.folder_for(directory, world_id, label, series)
         os.makedirs(self.path, exist_ok=True)
@@ -123,8 +123,13 @@ class RunLog:
         self.episode_length = episode_length
         self.world_snapshot_every = world_snapshot_every
         self.live_every = live_every
-        self.render = render
-        self.live_path = os.path.join(self.path, "live.json")
+
+        # The live frame is a view for the panel, not part of the record:
+        # it goes wherever the panel keeps its files, named after the world,
+        # and without a live_dir there is no live frame at all.
+        self.live_path = (
+            os.path.join(live_dir, f"{world_id}.json") if live_dir else None
+        )
         self._live_at = (time.time(), 0)
         self.rng_world_every = rng_world_every
         self.rng_agents_every = rng_agents_every
@@ -433,7 +438,7 @@ class RunLog:
     # -----------------------------
     # LIVE
     # -----------------------------
-    def log_live(self, step, grid, positions, agents, reward, epsilon):
+    def log_live(self, step, grid, positions, agents, reward, epsilon, rate=0):
         """
         A few kilobytes saying what is happening RIGHT NOW, rewritten in
         place for whoever is watching.
@@ -461,7 +466,7 @@ class RunLog:
             "series": self.series,
             "path": self.path,
             "pid": os.getpid(),
-            "render": self.render,
+            "rate": rate,
             "updated_at": now,
             "step": step,
             "episode": self.episode,
@@ -476,6 +481,7 @@ class RunLog:
             ],
         }
 
+        os.makedirs(os.path.dirname(self.live_path), exist_ok=True)
         temporary = self.live_path + ".writing"
 
         with open(temporary, "w", encoding="utf-8") as handle:
@@ -485,8 +491,11 @@ class RunLog:
 
         self._live_at = (now, step)
 
-    def should_live(self, step):
-        if self.live_every <= 0 or step % self.live_every != 0:
+    def should_live(self, step, every=None):
+        """every: overrides live_every for this step - 1 while watched."""
+        every = self.live_every if every is None else every
+
+        if self.live_path is None or every <= 0 or step % every != 0:
             return False
 
         return time.time() - self._live_at[0] >= LIVE_MIN_INTERVAL
@@ -651,7 +660,7 @@ class RunLog:
 
         # A run that ended says so in its own heartbeat, instead of leaving
         # a watcher to decide from a timestamp that it must have died.
-        if os.path.isfile(self.live_path):
+        if self.live_path and os.path.isfile(self.live_path):
             try:
                 with open(self.live_path, encoding="utf-8") as handle:
                     live = json.load(handle)

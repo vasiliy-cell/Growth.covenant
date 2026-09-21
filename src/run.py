@@ -7,6 +7,7 @@ from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.run_log import RunLog
 
 from src.Genome.types.reuse import reuse
+from src.utils.pacing import Pacer
 from src.utils.rng import RunRandom
 
 
@@ -443,6 +444,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     # The folder belongs to the WORLD, not to this process: a continued run
     # writes into the same one and only opens a new session in its header.
     logging_cfg = config.get("logging", {})
+    panel_dir = os.path.join(REPO_ROOT, logging_cfg.get("panel_dir", ".panel"))
     flush_every_steps = int(logging_cfg.get("flush_every_steps", 1000))
 
     log = RunLog(
@@ -461,14 +463,13 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         world_snapshot_every=int(logging_cfg.get("world_snapshot_every", 100)),
         rng_world_every=int(logging_cfg.get("rng_world_every_episodes", 1)),
         rng_agents_every=int(logging_cfg.get("rng_agents_every_episodes", 100)),
-        # A rendered run shows every step; an unwatched one only needs a
-        # pulse now and then.
+        # The live frame lives with the panel's own files, never in logs/:
+        # it is a view of the run, not a record of it.
+        live_dir=os.path.join(panel_dir, "live"),
         live_every=(
-            1 if render else
             int(logging_cfg.get("live_every_steps", 20))
             if live_every is None else int(live_every)
         ),
-        render=render,
     )
     log.episode = record["run"]["episode"] if record is not None else 0
 
@@ -496,11 +497,14 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     written = 0
     last_step = start_step
 
-    # --- render pacing ---
-    # A rendered run is slowed down on purpose: at full speed a thousand
-    # steps pass between two frames and there is nothing to watch.
-    pace = 1.0 / render if render else 0.0
-    next_tick = time.monotonic()
+    # --- pacing ---
+    # Full speed, unless the run was started rendered or somebody is
+    # watching it in the panel right now: at full speed a thousand steps
+    # pass between two frames and there is nothing to watch.
+    pacer = Pacer(
+        render=render,
+        watch_path=os.path.join(panel_dir, "watch", f"{world_id}.json"),
+    )
 
     # Windows closed by THIS process. The log counts episodes for the whole
     # life of the world, so on a continued run the two numbers differ and
@@ -668,9 +672,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     positions=env.agents.positions(),
                 )
 
-            # What somebody watching the panel sees. Cheap, and the
-            # simulation never learns whether anybody is watching.
-            if log.should_live(step):
+            # What somebody watching the panel sees: a pulse now and then,
+            # and every single step while the run is slowed down for them.
+            rate = pacer.rate
+
+            if log.should_live(step, every=1 if rate else None):
                 log.log_live(
                     step=step,
                     grid=env.world.map.grid,
@@ -678,18 +684,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     agents=len(env.agents),
                     reward=log.window_reward,
                     epsilon=log.window_epsilon(brains),
+                    rate=rate,
                 )
 
-            if pace:
-                next_tick += pace
-                delay = next_tick - time.monotonic()
-
-                if delay > 0:
-                    time.sleep(delay)
-                else:
-                    # Fell behind (a slow gradient step): carry on from
-                    # now rather than sprinting through the backlog.
-                    next_tick = time.monotonic()
+            pacer.tick()
 
             observations = next_observations
 

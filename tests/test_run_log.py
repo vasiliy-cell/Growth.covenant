@@ -281,7 +281,7 @@ def test_the_live_file_says_what_is_happening_right_now(tmp_path):
     A few kilobytes for whoever is watching, and nothing at all for the
     simulation to know about them.
     """
-    log = make_log(tmp_path, live_every=5)
+    log = make_log(tmp_path, live_every=5, live_dir=str(tmp_path / ".panel" / "live"))
     grid = np.arange(64, dtype=np.int8).reshape(8, 8) % 3
 
     assert log.should_live(5)
@@ -299,6 +299,7 @@ def test_the_live_file_says_what_is_happening_right_now(tmp_path):
     with open(log.live_path, encoding="utf-8") as handle:
         live = json.load(handle)
 
+    assert os.path.dirname(log.live_path) == str(tmp_path / ".panel" / "live")
     assert live["step"] == 5
     assert live["agents"] == 1
     assert live["positions"] == [["a", 1, 2]]

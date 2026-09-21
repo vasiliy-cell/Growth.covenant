@@ -25,7 +25,7 @@ run:
 # --- AGENTS ---
 # How many agents share the one world. The value here is only the default
 # offered by the terminal prompt before the run: the population size is an
-# experiment parameter, so it is chosen next to the run length.
+# experiment parameter, so it is chosen next to the run length. Из действенного
 #
 # Every agent gets its OWN brain, replay buffer, epsilon and curiosity, so
 # the settings below are per agent and keep the meaning they had when a
@@ -74,6 +74,11 @@ logging:
                                   # random bytes that do not compress, and
                                   # the checkpoints carry them all anyway
   archive_dir: "archives"       # where scripts/logs.py puts packed runs
+  # The control panel's own files - the live frame of each running world,
+  # the watch requests that slow a run down while it is being looked at,
+  # the consoles of runs it started. Never inside `dir`: they are views of
+  # a run, not a record of it.
+  panel_dir: ".panel"
 
 # --- CHECKPOINTS ---
 # Two different things live here and they answer different questions.
