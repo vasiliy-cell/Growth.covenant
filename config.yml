@@ -92,13 +92,16 @@ logging:
 # a crash costs minutes instead of a night. It has two folders, and which
 # one a file sits in is all there is to being pinned:
 #
-#   <dir>/rolling/  every save lands here, only the newest `keep` survive
+#   <dir>/rolling/  every save lands here; the newest checkpoint of each
+#                   of the `keep` most recent RUNS survives, nothing else
 #   <dir>/pinned/   nothing is ever deleted from here
 #
 # So pinning is moving a file - from the terminal, from a file manager,
 # from anywhere (scripts/checkpoints.py pin 3 is only shorthand). The two
 # folders never compete: a prune looks at rolling/ alone, so pinning four
-# checkpoints still leaves `keep` rolling ones.
+# checkpoints still leaves `keep` runs that can be continued. Counting runs
+# and not files matters: a long run saves every `every_steps`, and counted
+# by file those saves would push every other run's checkpoint out.
 #
 # The replay buffers are most of the weight of a checkpoint, so they are
 # only written on every `replay_every`-th one. A mind resumed without its
@@ -108,7 +111,7 @@ checkpoints:
   dir: "checkpoints"
   every_steps: 500        # write a checkpoint every N steps (0 = off)
   replay_every: 5         # every Nth checkpoint also carries the buffers
-  keep: 5                 # rolling checkpoints kept; pinned ones are forever
+  keep: 5                 # runs whose newest checkpoint is kept; pinned are forever
 
 
 # --- energy ---

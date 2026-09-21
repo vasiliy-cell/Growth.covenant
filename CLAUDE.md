@@ -124,11 +124,12 @@ named rng stream, plus `schema_version`, the config and the git commit.
 - **Writes are atomic** (temp file → fsync → `os.replace`): a half written
   checkpoint would look resumable and not be.
 - **Two folders, and the folder IS the state**: `checkpoints/rolling/`
-  (only the newest `checkpoints.keep` survive) and `checkpoints/pinned/`
-  (never deleted by anything). Pinning is moving the file, so a file
-  manager does it as well as the CLI does. A prune only ever looks at
-  `rolling/`, so pinning four checkpoints does not cost the rolling pool
-  one of its `keep` files.
+  (the newest checkpoint of each of the `checkpoints.keep` most recent
+  **runs** — counted by run, not by file, or one long run's periodic saves
+  push every other run out) and `checkpoints/pinned/` (never deleted by
+  anything). Pinning is moving the file, so a file manager does it as well
+  as the CLI does. A prune only ever looks at `rolling/`, so pinning four
+  checkpoints does not cost the rolling pool one of its `keep` runs.
 
   ```bash
   PYTHONPATH=. python scripts/checkpoints.py list      # numbered

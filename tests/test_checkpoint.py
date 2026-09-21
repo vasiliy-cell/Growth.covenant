@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import shutil
+import time
 
 import pytest
 import torch
@@ -235,13 +236,45 @@ def test_config_drift_is_reported_section_by_section():
 # -----------------------------
 # THE STORE
 # -----------------------------
-def test_only_the_newest_rolling_checkpoints_survive(tmp_path):
+def test_a_run_keeps_only_its_newest_checkpoint(tmp_path):
+    """Continuing needs the newest one; the older periodic saves are clutter."""
     store = CheckpointStore(directory=str(tmp_path), keep=3)
 
     for step in range(1, 7):
         store.save({"step": step}, run_id="run", step=step)
 
-    assert [c["step"] for c in store.list(pinned=False)] == [6, 5, 4]
+    assert [c["step"] for c in store.list(pinned=False)] == [6]
+
+
+def test_one_long_run_cannot_push_the_other_runs_out(tmp_path):
+    """
+    The bug this rule fixes: a long run's periodic saves used to fill the
+    whole pool, and every other world lost the checkpoint it needed to be
+    continued.
+    """
+    store = CheckpointStore(directory=str(tmp_path), keep=3)
+
+    for run in ("first", "second"):
+        store.save({"run": run}, run_id=run, step=100)
+        time.sleep(0.01)
+
+    for step in range(500, 5000, 500):
+        store.save({"step": step}, run_id="long", step=step)
+        time.sleep(0.01)
+
+    kept = {c["run_id"]: c["step"] for c in store.list(pinned=False)}
+
+    assert kept == {"long": 4500, "second": 100, "first": 100}
+
+
+def test_the_oldest_run_goes_when_a_new_one_arrives(tmp_path):
+    store = CheckpointStore(directory=str(tmp_path), keep=2)
+
+    for run in ("a", "b", "c"):
+        store.save({"run": run}, run_id=run, step=1)
+        time.sleep(0.01)
+
+    assert sorted(c["run_id"] for c in store.list(pinned=False)) == ["b", "c"]
 
 
 def test_a_pinned_checkpoint_outlives_every_rotation(tmp_path):
@@ -250,8 +283,9 @@ def test_a_pinned_checkpoint_outlives_every_rotation(tmp_path):
     store.save({"step": 1}, run_id="run", step=1)
     store.pin("run_step000000001.pt")
 
-    for step in range(2, 9):
-        store.save({"step": step}, run_id="run", step=step)
+    for number in range(2, 9):
+        store.save({"step": number}, run_id=f"other{number}", step=number)
+        time.sleep(0.01)
 
     assert [c["step"] for c in store.list(pinned=True)] == [1]
     assert len(store.list(pinned=False)) == 2
@@ -267,8 +301,9 @@ def test_pinning_never_costs_the_rolling_pool_a_slot(tmp_path):
     for step in range(1, 5):
         store.save({"step": step}, run_id="keeper", step=step, pinned=True)
 
-    for step in range(10, 20):
-        store.save({"step": step}, run_id="run", step=step)
+    for number in range(10, 20):
+        store.save({"step": number}, run_id=f"run{number}", step=number)
+        time.sleep(0.01)
 
     assert len(store.list(pinned=False)) == 5
     assert len(store.list(pinned=True)) == 4
@@ -343,8 +378,11 @@ def load_cli():
 def filled_store(tmp_path):
     store = CheckpointStore(directory=str(tmp_path), keep=10)
 
-    for run_id, step in (("alpha", 1), ("beta", 2), ("beta", 3)):
+    # Two runs share "beta" in their name - which is what makes a piece
+    # of a name ambiguous.
+    for run_id, step in (("alpha", 1), ("beta-one", 2), ("beta-two", 3)):
         store.save({"step": step}, run_id=run_id, step=step)
+        time.sleep(0.01)
 
     return store
 
