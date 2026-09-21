@@ -13,6 +13,7 @@ from src.utils.rng import RunRandom
 import argparse
 import os
 import signal
+import sys
 import time
 import yaml
 import numpy as np
@@ -68,11 +69,27 @@ def stop_gracefully(signum, frame):
     """
     raise KeyboardInterrupt(f"stopped by signal {signum}")
 
+def ask(prompt):
+    """
+    ask(), except when there is nobody to answer.
+
+    A run started by the panel - or by any script - has no terminal, and
+    ask() would get end-of-file and kill the run before its first step.
+    Without a terminal every question gets an empty answer, which each
+    prompt below already takes as "use the default".
+    """
+    if not sys.stdin.isatty():
+        print(f"{prompt}(no terminal: default)")
+        return ""
+
+    return input(prompt)
+
+
 def make_seed():
     return RunRandom.new_seed()
 
 def choose_seed():
-    user_input = input("Enter global seed (number or 'r' / empty for random): ").strip()
+    user_input = ask("Enter global seed (number or 'r' / empty for random): ").strip()
     if user_input.lower() in ["r", ""]:
         return make_seed()
     try:
@@ -88,7 +105,7 @@ def choose_episodes(episode_length):
     """
     print(f"1 episode = {episode_length} steps")
 
-    user_input = input("Enter number of episodes: ").strip()
+    user_input = ask("Enter number of episodes: ").strip()
 
     try:
         return int(user_input)
@@ -106,7 +123,7 @@ def choose_agent_count(default=1):
     length and not buried in the config. config.yml only supplies the
     default offered here.
     """
-    user_input = input(f"Enter number of agents [{default}]: ").strip()
+    user_input = ask(f"Enter number of agents [{default}]: ").strip()
 
     if not user_input:
         return default
@@ -133,7 +150,7 @@ def choose_species(default="clons"):
     print("  1) clons       - asexual: energy-gated cloning")
     print("  2) non_linear  - sexual: BLX-a blend of two nearby parents")
     print("  3) mendel  - sexual: has dominance of genes the most biologicaly inspired of all")
-    choice = input(f"Enter choice (1/2/3) [{default}]: ").strip()
+    choice = ask(f"Enter choice (1/2/3) [{default}]: ").strip()
     if choice == "1":
         return "clons"
     if choice == "2":
@@ -168,7 +185,7 @@ def choose_checkpoint(store):
             f"  {checkpoint['saved_at']:%Y-%m-%d %H:%M}"
         )
 
-    answer = input(f"Enter choice (0-{len(found)}) [0]: ").strip()
+    answer = ask(f"Enter choice (0-{len(found)}) [0]: ").strip()
 
     if not answer or answer == "0":
         return None
@@ -186,7 +203,7 @@ def choose_label():
     month. It names the log folder and goes into its header - an empty
     answer is fine, the world id already makes the folder unique.
     """
-    return input("Name for this experiment (optional): ").strip()
+    return ask("Name for this experiment (optional): ").strip()
 
 
 def choose_pin(default=False):
@@ -197,7 +214,7 @@ def choose_pin(default=False):
     not worth a 100 MB file a week later. The ones that are get said so
     here, and are never deleted.
     """
-    answer = input("Keep this run's final checkpoint forever? [y/N]: ").strip()
+    answer = ask("Keep this run's final checkpoint forever? [y/N]: ").strip()
 
     return answer.lower().startswith("y") if answer else default
 
