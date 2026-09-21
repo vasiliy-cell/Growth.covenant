@@ -226,18 +226,19 @@ class RunLog:
             if name == world_id or name.startswith(world_id + "_"):
                 return root
 
-        name = world_id
-
-        if label:
-            safe = _slug(label)
-
-            if safe:
-                name = f"{world_id}_{safe}"
+        name = RunLog.folder_name(world_id, label)
 
         if series:
             return os.path.join(directory, _slug(series) or "series", name)
 
         return os.path.join(directory, name)
+
+    @staticmethod
+    def folder_name(world_id, label=None):
+        """<world id>_<label as a slug>, or just the id without a label."""
+        safe = _slug(label) if label else ""
+
+        return f"{world_id}_{safe}" if safe else world_id
 
     def _table(self, name, schema, max_rows):
         return PartWriter(
