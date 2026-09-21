@@ -203,42 +203,11 @@ Each population row carries a `fingerprint`: a rolling hash of every step
 logged so far. Same seed → same fingerprints; the first window where two
 runs differ is where they diverged.
 
-### The panel (src/UI/)
-A local web panel: watch runs, read their logs, start new ones.
-
-```bash
-./panel.sh               # starts the server and opens the panel
-./panel.sh --no-browser  # just the server
-```
-
-It opens in the browser you are looking at, or the default one when you
-are not looking at a browser, and only once the port actually answers -
-a browser pointed at a server that is still starting shows an error page
-nobody reloads.
-
-FastAPI serves an API and a page of plain ES modules — no build step, and
-ECharts and d3 are vendored into `static/vendor/`, so it works offline. It
-binds to localhost only: it starts processes and deletes data, so it is a
-tool on your own machine, not a service.
-
-- **It only reads files.** Charts come from the finished parquet parts, the
-  live view from `live.json`. A run never learns that anybody is watching,
-  so opening the panel cannot slow training down.
-- **Runs are separate processes** of `src/run.py` with every prompt given
-  as a flag. The launcher keeps `parallel` of them alive and gives each
-  child `cpu_count // (runs sharing the machine)` threads, because torch
-  otherwise takes the whole machine and two runs go slower than one.
-- **Stop is graceful**: SIGTERM becomes an exception in the runner, so a
-  stopped run writes its checkpoint on the way out and can be continued.
-
 ## Running
 
 ```bash
 ./run.sh                 # tests + normal or visualized run
 python src/run.py        # normal run (asks for episodes and seed)
-python src/run.py --episodes 2000 --seed 5 --agents 4 --species mendel \
-    --label "leak 0.2" --series sweep --set energy.energy_leak=0.2
-./panel.sh               # the control panel
 python src/visualized_run.py
 PYTHONPATH=. pytest      # tests
 ```

@@ -448,21 +448,6 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
     print(f"LOG: {log.path} (session {log.session})")
 
-    if record is None:
-        # The first population is born too. Without these rows a family
-        # tree has no roots and the run's founders have no description
-        # anywhere - they are the only agents nobody's reproduction made.
-        for agent in env.agents:
-            log.log_birth(
-                step=0,
-                agent_id=agent.agent_id,
-                index=agent.index,
-                parents=[],
-                energy=agent.energy,
-                genotype=env.genomes.get_genotype(agent.agent_id),
-                phenotype=env.make_phenotype(agent.agent_id),
-            )
-
     # --- checkpoints ---
     every_steps = int(checkpoints_cfg.get("every_steps", 500))
     replay_every = int(checkpoints_cfg.get("replay_every", 5))
@@ -781,10 +766,4 @@ if __name__ == "__main__":
     # writes a checkpoint on the way out.
     signal.signal(signal.SIGTERM, stop_gracefully)
 
-    try:
-        main(**vars(parse_args()))
-    except KeyboardInterrupt as stop:
-        # Asked for, not gone wrong: the checkpoint is already written by
-        # the time this is printed. 130 is the shell's word for "stopped".
-        print(f"\n{stop}")
-        raise SystemExit(130)
+    main(**vars(parse_args()))
