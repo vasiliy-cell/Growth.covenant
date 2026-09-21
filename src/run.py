@@ -294,6 +294,16 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     if record is not None:
         print(f"Continuing {Checkpoint.describe(record)}")
 
+        # Nobody alive, nobody to be born: continuing would open an empty
+        # session, write another checkpoint of nothing, and end one step
+        # later - leaving a dead world looking busier than it is.
+        if not record["env"]["population"]["agents"]:
+            print(
+                f"Extinct at step {record['run']['step']}: "
+                f"nobody is left in this world to continue"
+            )
+            return
+
         drift = Checkpoint.config_drift(record, config)
         if drift:
             print(
