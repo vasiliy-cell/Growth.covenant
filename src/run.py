@@ -809,4 +809,10 @@ if __name__ == "__main__":
     # writes a checkpoint on the way out.
     signal.signal(signal.SIGTERM, stop_gracefully)
 
-    main(**vars(parse_args()))
+    try:
+        main(**vars(parse_args()))
+    except KeyboardInterrupt as stop:
+        # Asked for, not gone wrong: the checkpoint is already written by
+        # the time this is printed. 130 is the shell's word for "stopped".
+        print(f"\n{stop}")
+        raise SystemExit(130)
