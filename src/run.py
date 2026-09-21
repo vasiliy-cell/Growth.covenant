@@ -13,6 +13,7 @@ from src.utils.rng import RunRandom
 import argparse
 import os
 import signal
+import time
 import yaml
 import numpy as np
 import torch
@@ -238,7 +239,7 @@ def encode_observation(obs):
 
 def main(render_fn=None, episodes=None, seed=None, agent_count=None,
          species=None, resume=None, pin=None, label=None, series=None,
-         live_every=None, overrides=None):
+         live_every=None, overrides=None, render=None):
     """
     resume:     path of a checkpoint to carry on, "" to force a new world,
                 None to ask.
@@ -249,7 +250,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                 folder and is written into run.json.
     live_every: how often to rewrite live.json for whoever is watching.
     overrides:  ["life.childhood_steps=2000", ...] for this run only.
+    render:     steps per second to run at so the world can be WATCHED -
+                every step goes to live.json and the loop waits between
+                steps. 0 or None runs at full speed.
     """
+    render = int(render or 0)
     config = apply_overrides(load_config(), overrides)
 
     # --- new world, or an old one continued? ---
@@ -439,10 +444,14 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         world_snapshot_every=int(logging_cfg.get("world_snapshot_every", 100)),
         rng_world_every=int(logging_cfg.get("rng_world_every_episodes", 1)),
         rng_agents_every=int(logging_cfg.get("rng_agents_every_episodes", 100)),
+        # A rendered run shows every step; an unwatched one only needs a
+        # pulse now and then.
         live_every=(
+            1 if render else
             int(logging_cfg.get("live_every_steps", 20))
             if live_every is None else int(live_every)
         ),
+        render=render,
     )
     log.episode = record["run"]["episode"] if record is not None else 0
 
@@ -454,6 +463,12 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
     written = 0
     last_step = start_step
+
+    # --- render pacing ---
+    # A rendered run is slowed down on purpose: at full speed a thousand
+    # steps pass between two frames and there is nothing to watch.
+    pace = 1.0 / render if render else 0.0
+    next_tick = time.monotonic()
 
     # Windows closed by THIS process. The log counts episodes for the whole
     # life of the world, so on a continued run the two numbers differ and
@@ -633,6 +648,17 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     epsilon=log.window_epsilon(brains),
                 )
 
+            if pace:
+                next_tick += pace
+                delay = next_tick - time.monotonic()
+
+                if delay > 0:
+                    time.sleep(delay)
+                else:
+                    # Fell behind (a slow gradient step): carry on from
+                    # now rather than sprinting through the backlog.
+                    next_tick = time.monotonic()
+
             observations = next_observations
 
             if render_fn is not None:
@@ -753,6 +779,8 @@ def parse_args():
     parser.add_argument("--no-pin", dest="pin", action="store_false")
     parser.add_argument("--live-every", type=int, dest="live_every",
                         help="rewrite live.json every N steps (0 = off)")
+    parser.add_argument("--render", type=int, metavar="STEPS_PER_SECOND",
+                        help="run slowly enough to watch, every step shown")
     parser.add_argument("--set", action="append", dest="overrides", default=[],
                         metavar="KEY=VALUE",
                         help="override one config value, e.g. energy.energy_leak=0.2")

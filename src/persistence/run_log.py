@@ -12,6 +12,10 @@ import pyarrow.parquet as pq
 from src.persistence import log_schema
 from src.persistence.checkpoint import git_commit
 
+# However often a live frame is asked for, the file is not rewritten faster
+# than a screen can show it - past that, writing more is pure cost.
+LIVE_MIN_INTERVAL = 1.0 / 60
+
 
 class PartWriter:
     """
@@ -108,6 +112,7 @@ class RunLog:
         rng_world_every=1,
         rng_agents_every=100,
         live_every=20,
+        render=0,
     ):
         self.path = self.folder_for(directory, world_id, label, series)
         os.makedirs(self.path, exist_ok=True)
@@ -118,6 +123,7 @@ class RunLog:
         self.episode_length = episode_length
         self.world_snapshot_every = world_snapshot_every
         self.live_every = live_every
+        self.render = render
         self.live_path = os.path.join(self.path, "live.json")
         self._live_at = (time.time(), 0)
         self.rng_world_every = rng_world_every
@@ -455,6 +461,7 @@ class RunLog:
             "series": self.series,
             "path": self.path,
             "pid": os.getpid(),
+            "render": self.render,
             "updated_at": now,
             "step": step,
             "episode": self.episode,
@@ -479,7 +486,10 @@ class RunLog:
         self._live_at = (now, step)
 
     def should_live(self, step):
-        return self.live_every > 0 and step % self.live_every == 0
+        if self.live_every <= 0 or step % self.live_every != 0:
+            return False
+
+        return time.time() - self._live_at[0] >= LIVE_MIN_INTERVAL
 
     def should_snapshot(self, step):
         return (
