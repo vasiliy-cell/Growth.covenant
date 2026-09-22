@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <!-- Already dark: Dark Reader must not darken it again. -->
+  <meta name="darkreader-lock">
+  <title>Growth.covenant</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/echarts.min.js"></script>
+  <script src="/static/vendor/d3.min.js"></script>
+</head>
+<body>
+  <header class="titlebar">
+    <a class="brand" href="#/">Growth<span class="dim">.covenant</span></a>
+
+    <nav class="tabs" id="tabs">
+      <a href="#/" data-page="worlds">Worlds</a>
+      <a href="#/compare" data-page="compare">Compare</a>
+      <a href="#/launch" data-page="launch">Launch</a>
+    </nav>
+
+    <div class="status">
+      <span class="pill" id="queue-pill" hidden></span>
+    </div>
+  </header>
+
+  <main id="view"></main>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

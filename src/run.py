@@ -7,6 +7,7 @@ from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.run_log import RunLog
 
 from src.Genome.types.reuse import reuse
+from src.utils.pacing import Pacer
 from src.utils.rng import RunRandom
 from src.world.Grid_world.objects import AGENT_CELL, OBJECTS
 
@@ -14,6 +15,7 @@ from src.world.Grid_world.objects import AGENT_CELL, OBJECTS
 import argparse
 import os
 import signal
+import sys
 import time
 import yaml
 import numpy as np
@@ -69,11 +71,27 @@ def stop_gracefully(signum, frame):
     """
     raise KeyboardInterrupt(f"stopped by signal {signum}")
 
+def ask(prompt):
+    """
+    ask(), except when there is nobody to answer.
+
+    A run started by the panel - or by any script - has no terminal, and
+    ask() would get end-of-file and kill the run before its first step.
+    Without a terminal every question gets an empty answer, which each
+    prompt below already takes as "use the default".
+    """
+    if not sys.stdin.isatty():
+        print(f"{prompt}(no terminal: default)")
+        return ""
+
+    return input(prompt)
+
+
 def make_seed():
     return RunRandom.new_seed()
 
 def choose_seed():
-    user_input = input("Enter global seed (number or 'r' / empty for random): ").strip()
+    user_input = ask("Enter global seed (number or 'r' / empty for random): ").strip()
     if user_input.lower() in ["r", ""]:
         return make_seed()
     try:
@@ -89,7 +107,7 @@ def choose_episodes(episode_length):
     """
     print(f"1 episode = {episode_length} steps")
 
-    user_input = input("Enter number of episodes: ").strip()
+    user_input = ask("Enter number of episodes: ").strip()
 
     try:
         return int(user_input)
@@ -107,7 +125,7 @@ def choose_agent_count(default=1):
     length and not buried in the config. config.yml only supplies the
     default offered here.
     """
-    user_input = input(f"Enter number of agents [{default}]: ").strip()
+    user_input = ask(f"Enter number of agents [{default}]: ").strip()
 
     if not user_input:
         return default
@@ -134,7 +152,7 @@ def choose_species(default="clons"):
     print("  1) clons       - asexual: energy-gated cloning")
     print("  2) non_linear  - sexual: BLX-a blend of two nearby parents")
     print("  3) mendel  - sexual: has dominance of genes the most biologicaly inspired of all")
-    choice = input(f"Enter choice (1/2/3) [{default}]: ").strip()
+    choice = ask(f"Enter choice (1/2/3) [{default}]: ").strip()
     if choice == "1":
         return "clons"
     if choice == "2":
@@ -169,7 +187,7 @@ def choose_checkpoint(store):
             f"  {checkpoint['saved_at']:%Y-%m-%d %H:%M}"
         )
 
-    answer = input(f"Enter choice (0-{len(found)}) [0]: ").strip()
+    answer = ask(f"Enter choice (0-{len(found)}) [0]: ").strip()
 
     if not answer or answer == "0":
         return None
@@ -187,7 +205,7 @@ def choose_label():
     month. It names the log folder and goes into its header - an empty
     answer is fine, the world id already makes the folder unique.
     """
-    return input("Name for this experiment (optional): ").strip()
+    return ask("Name for this experiment (optional): ").strip()
 
 
 def choose_pin(default=False):
@@ -198,7 +216,7 @@ def choose_pin(default=False):
     not worth a 100 MB file a week later. The ones that are get said so
     here, and are never deleted.
     """
-    answer = input("Keep this run's final checkpoint forever? [y/N]: ").strip()
+    answer = ask("Keep this run's final checkpoint forever? [y/N]: ").strip()
 
     return answer.lower().startswith("y") if answer else default
 
@@ -293,6 +311,16 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
     if record is not None:
         print(f"Continuing {Checkpoint.describe(record)}")
+
+        # Nobody alive, nobody to be born: continuing would open an empty
+        # session, write another checkpoint of nothing, and end one step
+        # later - leaving a dead world looking busier than it is.
+        if not record["env"]["population"]["agents"]:
+            print(
+                f"Extinct at step {record['run']['step']}: "
+                f"nobody is left in this world to continue"
+            )
+            return
 
         drift = Checkpoint.config_drift(record, config)
         if drift:
@@ -445,6 +473,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     # The folder belongs to the WORLD, not to this process: a continued run
     # writes into the same one and only opens a new session in its header.
     logging_cfg = config.get("logging", {})
+    panel_dir = os.path.join(REPO_ROOT, logging_cfg.get("panel_dir", ".panel"))
     flush_every_steps = int(logging_cfg.get("flush_every_steps", 1000))
 
     log = RunLog(
@@ -463,14 +492,13 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         world_snapshot_every=int(logging_cfg.get("world_snapshot_every", 100)),
         rng_world_every=int(logging_cfg.get("rng_world_every_episodes", 1)),
         rng_agents_every=int(logging_cfg.get("rng_agents_every_episodes", 100)),
-        # A rendered run shows every step; an unwatched one only needs a
-        # pulse now and then.
+        # The live frame lives with the panel's own files, never in logs/:
+        # it is a view of the run, not a record of it.
+        live_dir=os.path.join(panel_dir, "live"),
         live_every=(
-            1 if render else
             int(logging_cfg.get("live_every_steps", 20))
             if live_every is None else int(live_every)
         ),
-        render=render,
     )
     log.episode = record["run"]["episode"] if record is not None else 0
 
@@ -498,11 +526,14 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     written = 0
     last_step = start_step
 
-    # --- render pacing ---
-    # A rendered run is slowed down on purpose: at full speed a thousand
-    # steps pass between two frames and there is nothing to watch.
-    pace = 1.0 / render if render else 0.0
-    next_tick = time.monotonic()
+    # --- pacing ---
+    # Full speed, unless the run was started rendered or somebody is
+    # watching it in the panel right now: at full speed a thousand steps
+    # pass between two frames and there is nothing to watch.
+    pacer = Pacer(
+        render=render,
+        watch_path=os.path.join(panel_dir, "watch", f"{world_id}.json"),
+    )
 
     # Windows closed by THIS process. The log counts episodes for the whole
     # life of the world, so on a continued run the two numbers differ and
@@ -670,9 +701,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     positions=env.agents.positions(),
                 )
 
-            # What somebody watching the panel sees. Cheap, and the
-            # simulation never learns whether anybody is watching.
-            if log.should_live(step):
+            # What somebody watching the panel sees: a pulse now and then,
+            # and every single step while the run is slowed down for them.
+            rate = pacer.rate
+
+            if log.should_live(step, every=1 if rate else None):
                 log.log_live(
                     step=step,
                     grid=env.world.map.grid,
@@ -680,18 +713,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     agents=len(env.agents),
                     reward=log.window_reward,
                     epsilon=log.window_epsilon(brains),
+                    rate=rate,
                 )
 
-            if pace:
-                next_tick += pace
-                delay = next_tick - time.monotonic()
-
-                if delay > 0:
-                    time.sleep(delay)
-                else:
-                    # Fell behind (a slow gradient step): carry on from
-                    # now rather than sprinting through the backlog.
-                    next_tick = time.monotonic()
+            pacer.tick()
 
             observations = next_observations
 

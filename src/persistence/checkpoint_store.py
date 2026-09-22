@@ -16,10 +16,10 @@ class CheckpointStore:
 
     TWO FOLDERS, and which folder a file is in IS whether it is pinned:
 
-        checkpoints/rolling/   every periodic save lands here, and the
-                               oldest are deleted as new ones arrive, so
-                               this folder never holds more than `keep`
-                               files however many runs there have been,
+        checkpoints/rolling/   every periodic save lands here, and only
+                               the newest checkpoint of each of the `keep`
+                               most recent runs survives - however long a
+                               run is and however many there have been,
         checkpoints/pinned/    nothing here is ever deleted by anything.
 
     That is the whole of the mechanism, and it is a mechanism on purpose:
@@ -29,7 +29,7 @@ class CheckpointStore:
 
     The two folders do not compete. A prune only ever looks at rolling/, so
     pinning four checkpoints does not cost the rolling pool a single one of
-    its `keep` files.
+    its `keep` runs.
 
     Writing is atomic. A checkpoint is the one file that must never be half
     written: a crash in the middle of a save would leave a file that looks
@@ -88,13 +88,31 @@ class CheckpointStore:
         os.replace(temporary, path)
 
     def prune(self):
-        """Deletes the oldest rolling checkpoints and returns what went."""
-        rolling = self.list(pinned=False)
+        """
+        Keeps the newest checkpoint of each of the `keep` most recent runs,
+        deletes everything else in rolling/, and returns what went.
 
-        if self.keep <= 0 or len(rolling) <= self.keep:
+        Counted by RUN, not by file. One long run saves a checkpoint every
+        few hundred steps, and counted file by file those periodic saves
+        pushed every other run's last checkpoint out of the pool - leaving
+        one world that could be continued instead of five. A run only needs
+        its newest checkpoint to be picked up again, and since every write
+        is atomic the newest one is always whole.
+        """
+        if self.keep <= 0:
             return []
 
-        dropped = rolling[self.keep:]
+        runs = []
+        dropped = []
+
+        # Newest first, so the first file seen of a run is its newest one.
+        for checkpoint in self.list(pinned=False):
+            run = checkpoint["run_id"]
+
+            if run in runs or len(runs) >= self.keep:
+                dropped.append(checkpoint)
+            else:
+                runs.append(run)
 
         for checkpoint in dropped:
             os.remove(checkpoint["path"])
