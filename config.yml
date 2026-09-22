@@ -216,11 +216,11 @@ genome:
     # How far ahead this mind looks and how stale the target it chases is.
     gamma:                        # trainer.gamma: discount factor
       mean: 0.99
-      scale: 0.02
+      scale: 0.001
       type: float
     target_update_freq:           # trainer.target_update_freq, in updates
-      mean: 10000
-      scale: 2000
+      mean: 1000
+      scale: 200
       type: int
 
     # --- NETWORK SHAPE ---
@@ -265,7 +265,7 @@ genome:
       scale: 0.002
       type: float
     epsilon_min:                  # policy.epsilon_min: floor
-      mean: 0.01
+      mean: 0.05
       scale: 0.005
       type: float
 
