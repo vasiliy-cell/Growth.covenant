@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import os
 import shutil
 
@@ -98,15 +99,32 @@ def run_for(env, brains, observations, steps):
     return observations, trace
 
 
+def through_disk(record):
+    """
+    The record as a fresh process reads it back: serialized and loaded.
+
+    capture() hands out the live tensors of the run it describes - weights,
+    Adam moments, replay - and the store writes them to disk at once, so a
+    real resume only ever sees a copy taken at that moment. Restoring from
+    the object in memory would give the "resumed" minds the very tensors
+    the original keeps training - moved on by then, and sharing one Adam.
+    """
+    buffer = io.BytesIO()
+    torch.save(record, buffer)
+    buffer.seek(0)
+
+    return torch.load(buffer, weights_only=False)
+
+
 def capture(env, brains, rng, step=0, with_replay=True):
-    return Checkpoint.capture(
+    return through_disk(Checkpoint.capture(
         env,
         brains,
         rng,
         run={"run_id": "run-test", "world_id": "world-test", "seed": 1, "step": step},
         config={"world": {"size": 10}},
         with_replay=with_replay,
-    )
+    ))
 
 
 def resume(record, seed=999, species="clons"):
