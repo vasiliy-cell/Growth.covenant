@@ -20,6 +20,14 @@ class reuse:
 
         if genotype["sigma"] <0:
             genotype["sigma"] = 0.01
+
+        if genotype["max_norm"] < 0:
+            genotype["max_norm"] = abs(genotype["max_norm"])
+
+        if genotype["epsilon_decay"] >= 1:
+            genotype["epsilon_decay"] = 0.999
+        if genotype["curiosity_decay"] >= 1:
+            genotype["curiosity_decay"] = 0.999
             
         return genotype
 
@@ -42,6 +50,14 @@ class reuse:
 
         if mutated_genotype["sigma"] <0:
             mutated_genotype["sigma"] = 0.01
+
+        if mutated_genotype["max_norm"] < 0:
+            mutated_genotype["max_norm"] = abs(mutated_genotype["max_norm"])
+
+        if mutated_genotype["epsilon_decay"] >= 1:
+            mutated_genotype["epsilon_decay"] = 0.999
+        if mutated_genotype["curiosity_decay"] >= 1:
+            mutated_genotype["curiosity_decay"] = 0.999
 
         return mutated_genotype
 
