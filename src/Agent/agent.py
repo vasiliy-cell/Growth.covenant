@@ -28,11 +28,17 @@ class Agent:
     """
 
     def __init__(self, agent_id, index, world, position, life=None,
-                 birth_step=0, parents=None):
+                 birth_step=0, parents=None, view_size=7):
         self.agent_id = agent_id
         self.index = index
         self.world = world
         self.position = position
+
+        # Side of the square window this body sees, centered on itself -
+        # odd, so there is a center. It decides how much of the map a mind
+        # can plan over: a window that covers a small map almost whole is a
+        # keyhole on a big one.
+        self.view_size = view_size
 
         # Who made it and when. A body that was there from the first tick
         # has no parents and was born at step 0 - the run is its parent.
@@ -161,13 +167,13 @@ class Agent:
         map_view = self.get_local_view(
             self.world.map.grid,
             pos,
-            size=7
+            size=self.view_size
         )
         local_view = self.overlay_agents(
             map_view,
             pos,
             agent_positions,
-            size=7
+            size=self.view_size
         )
 
         return Observation(pos, local_view, map_view)

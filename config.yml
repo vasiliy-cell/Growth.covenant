@@ -33,6 +33,15 @@ run:
 agents:
   count: 1
 
+  # Side of the square window an agent sees around itself (odd, so the
+  # agent is its center). The network input is 2 + view_size^2, so this
+  # also sizes every mind. 7 was plenty on an 8x8 map - it showed almost
+  # all of it - and a keyhole on 64x64, where agents that ate out their
+  # surroundings saw nothing left and parked in a corner. 53 covers
+  # 53^2 / 64^2 = ~69% of a 64x64 map from its middle (less near a wall:
+  # what falls outside the map reads -1).
+  view_size: 53
+
 # --- WORLD ---
 world:
   size: 64

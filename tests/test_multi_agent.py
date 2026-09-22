@@ -117,6 +117,38 @@ def test_a_neighbour_shows_up_in_the_local_view():
     assert observation.local_view[3][3] != AGENT_CELL
 
 
+def test_the_window_is_as_wide_as_the_view_size():
+    env = GridWorldEnv(size=12, rng=RunRandom(0), agent_count=2, view_size=9)
+    env.start()
+    watcher, neighbour = place(env, (5, 5), (6, 5))
+
+    observation = env.get_states()[watcher]
+
+    assert len(observation.local_view) == 9
+    assert all(len(row) == 9 for row in observation.local_view)
+    assert observation.local_view[4][5] == AGENT_CELL
+
+
+def test_a_resume_sees_through_the_window_it_was_saved_with():
+    """
+    The networks of a world are sized to its window, so a checkpoint must
+    bring the window back - and one written before the window was a
+    setting was made with the old hardcoded 7x7.
+    """
+    saved = GridWorldEnv(size=12, rng=RunRandom(0), agent_count=1, view_size=9)
+    saved.start()
+    state = saved.state()
+
+    resumed = GridWorldEnv(size=12, rng=RunRandom(0), agent_count=1, view_size=53)
+    observation = next(iter(resumed.restore(state).values()))
+    assert len(observation.local_view) == 9
+
+    del state["view_size"]
+    legacy = GridWorldEnv(size=12, rng=RunRandom(0), agent_count=1, view_size=53)
+    observation = next(iter(legacy.restore(state).values()))
+    assert len(observation.local_view) == 7
+
+
 def test_the_map_view_never_shows_bodies():
     env = make_env()
     watcher, neighbour = place(env, (5, 5), (6, 5))

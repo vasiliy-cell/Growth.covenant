@@ -376,6 +376,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         agent_count=agent_count,
         run_id=world_id,
         species_name=species,
+        view_size=int(config.get("agents", {}).get("view_size", 7)),
     )
 
     # --- minds ---
@@ -398,7 +399,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         still has to build a manager, so fall back on the view itself."""
         obs_size = (
             len(encode_observation(next(iter(observations.values()))))
-            if observations else 2 + 7 * 7
+            if observations else 2 + env.agents.view_size ** 2
         )
 
         return BrainManager(
