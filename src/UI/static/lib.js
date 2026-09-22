@@ -100,6 +100,7 @@ const PATHS = {
   console: '<path d="m3.4 5 3 3-3 3M8.4 11.4h4.2"/>',
   rename: '<path d="M10.6 2.8 13.2 5.4 5.8 12.8 2.8 13.2 3.2 10.2Z"/>',
   keep: '<path d="M4.4 2.4h7.2v11.2L8 11 4.4 13.6Z"/>',
+  more: '<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>',
 };
 
 export function icon(name) {
@@ -250,6 +251,45 @@ export function every(ms, fn) {
 }
 
 // ---------------- modal ----------------
+
+// A "more" button that opens a short list of actions under itself - for
+// the things a row can do that do not all fit on the row.
+// items: [{ label, icon, danger, onclick }], null entries are skipped.
+export function menu(items) {
+  const trigger = button({ icon: "more", small: true, title: "More" });
+
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    document.querySelector(".menu")?.remove();
+
+    const list = h("div", { class: "menu" }, items.filter(Boolean).map((item) =>
+      h("button", {
+        class: `menu-item ${item.danger ? "danger" : ""}`,
+        onclick: (click) => { click.stopPropagation(); list.remove(); item.onclick(); },
+      }, [item.icon ? icon(item.icon) : null, h("span", {}, item.label)])));
+
+    document.body.append(list);
+
+    // Under the button, right edges aligned, kept inside the window.
+    const box = trigger.getBoundingClientRect();
+    list.style.top = `${Math.min(box.bottom + 4, window.innerHeight - list.offsetHeight - 8)}px`;
+    list.style.left = `${Math.max(8, box.right - list.offsetWidth)}px`;
+
+    const close = (other) => {
+      if (other.type === "keydown" && other.key !== "Escape") return;
+      list.remove();
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", close);
+    };
+
+    setTimeout(() => {
+      document.addEventListener("click", close);
+      document.addEventListener("keydown", close);
+    }, 0);
+  });
+
+  return trigger;
+}
 
 export function modal({ title, body, confirm, danger, onConfirm }) {
   const backdrop = document.getElementById("modal-backdrop");

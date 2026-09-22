@@ -1,6 +1,6 @@
 // The first page: every world in logs/, and everything you can do to one.
 
-import { api, h, fmt, button, modal, toggle, go, route, every } from "../lib.js";
+import { api, h, fmt, button, menu, modal, toggle, go, route, every } from "../lib.js";
 
 export async function worldsPage(root) {
   const holder = h("div", { class: "page" });
@@ -37,7 +37,7 @@ function content(worlds, reload) {
   return [
     head,
     running.length ? runningPanel(running, reload) : null,
-    h("div", { class: "panel" }, [
+    h("div", { class: "panel table-scroll" }, [
       h("table", {}, [
         h("thead", {}, h("tr", {}, [
           h("th", {}, "World"),
@@ -94,6 +94,8 @@ function row(world, reload) {
     h("td", {}, checkpointCell(world)),
     h("td", { class: "muted" }, fmt.ago(world.created_at)),
     h("td", { class: "actions" }, h("div", { class: "row" }, [
+      // One button for what this world is doing right now; everything
+      // else lives in the menu, so a row never runs off the edge.
       world.running
         ? button({ label: "Watch", icon: "watch", kind: "primary", small: true, onclick: () => go(route.live(world.id)) })
         : null,
@@ -103,15 +105,13 @@ function row(world, reload) {
       canContinue
         ? button({ label: "Continue", icon: "resume", small: true, onclick: () => resume(world, reload) })
         : null,
-      canKeep
-        ? button({ icon: "keep", small: true, title: "Keep: this world's checkpoint is never rotated away", onclick: () => keep(world, reload) })
-        : null,
-      world.running
-        ? null
-        : button({ icon: "rename", small: true, title: "Rename", onclick: () => rename(world, reload) }),
-      button({ icon: "replay", small: true, title: "Replay: a new world from the same seed", onclick: () => replay(world) }),
-      button({ icon: "archive", small: true, title: "Archive", onclick: () => archive(world, reload) }),
-      button({ icon: "delete", small: true, kind: "danger", title: "Delete", onclick: () => remove(world, reload) }),
+      menu([
+        canKeep ? { label: "Keep checkpoint", icon: "keep", onclick: () => keep(world, reload) } : null,
+        world.running ? null : { label: "Rename", icon: "rename", onclick: () => rename(world, reload) },
+        { label: "Replay with the same seed", icon: "replay", onclick: () => replay(world) },
+        { label: "Archive", icon: "archive", onclick: () => archive(world, reload) },
+        { label: "Delete", icon: "delete", danger: true, onclick: () => remove(world, reload) },
+      ]),
     ])),
   ]);
 }
@@ -120,7 +120,7 @@ function checkpointCell(world) {
   if (!world.checkpoint) {
     return h("span", {
       class: "dim",
-      title: "No checkpoint left: only the newest checkpoint of the last 5 runs is kept. Press Keep on a world to protect its checkpoint.",
+      title: "No checkpoint left: only the newest checkpoint of the last 5 runs is kept. Keep a world to protect its checkpoint.",
     }, "none");
   }
 
