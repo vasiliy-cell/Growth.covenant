@@ -33,14 +33,12 @@ run:
 agents:
   count: 1
 
-  # Side of the square window an agent sees around itself (odd, so the
-  # agent is its center). The network input is 2 + view_size^2, so this
-  # also sizes every mind. 7 was plenty on an 8x8 map - it showed almost
-  # all of it - and a keyhole on 64x64, where agents that ate out their
-  # surroundings saw nothing left and parked in a corner. 53 covers
-  # 53^2 / 64^2 = ~69% of a 64x64 map from its middle (less near a wall:
-  # what falls outside the map reads -1).
-  view_size: 53
+  # Side of the square window an agent sees around itself. The window
+  # reaches view_size // 2 cells to every side, so an even value is
+  # rounded up: 10 is really an 11x11 window. The network input is
+  # 4 channels x the window, so this also sizes every mind. 53 was tried
+  # and was worse: one useful cell drowned among 2809 inputs.
+  view_size: 10
 
 # --- WORLD ---
 world:
@@ -151,7 +149,7 @@ energy:
 # growing, so old age is not a number to compare against - it is a bill
 # that keeps rising until no amount of foraging can pay it.
 life:
-  childhood_steps: 20000   # ticks of guaranteed immortality after birth
+  childhood_steps: 200000000   # ticks of guaranteed immortality after birth
   death_energy: 0.0       # an adult at or below this energy dies
   aging:
     every: 200            # every N ticks of a life...
