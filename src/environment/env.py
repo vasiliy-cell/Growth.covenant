@@ -32,7 +32,7 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None, life=None):
+    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7):
         self.size = size
 
         # Every stream of chance in this run (src/utils/rng.py). The world
@@ -54,6 +54,7 @@ class GridWorldEnv:
             rng=self.rng.python("population"),
             run_id=run_id,
             life=self.life,
+            view_size=view_size,
         )
         self.agent_count = agent_count
 
@@ -140,6 +141,10 @@ class GridWorldEnv:
             },
             "current_step": self.current_step,
             "species": self.species_name,
+            # The window every network of this world was sized to. A resume
+            # must see through the same one, or the saved weights no longer
+            # fit the input.
+            "view_size": self.agents.view_size,
             "population": population,
             # make_phenotype and not get_phenotype: a body born on the
             # very tick that is being saved has DNA but has not been read
@@ -168,6 +173,9 @@ class GridWorldEnv:
         self.world.restore(state["world"], rng=self.world_rng)
         self.size = self.world.size
 
+        # A checkpoint from before the window was a setting was made with
+        # the 7x7 view that used to be hardcoded.
+        self.agents.view_size = state.get("view_size", 7)
         self.agents.restore(state["population"])
 
         for agent_id, genome in state["genomes"].items():
@@ -440,5 +448,5 @@ class GridWorldEnv:
     def get_observation_space(self):
         return {
             "position": (self.size, self.size),
-            "local_view": (7, 7)
+            "local_view": (self.agents.view_size, self.agents.view_size)
         }

@@ -28,8 +28,13 @@ class AgentManager:
     # How many random cells to try before giving up on a free one.
     SPAWN_ATTEMPTS = 100
 
-    def __init__(self, world, rng=None, run_id=None, life=None):
+    def __init__(self, world, rng=None, run_id=None, life=None, view_size=7):
         self.world = world
+
+        # One field of view for the whole population, handed to every body
+        # like the life rules: a mind is sized to its input, so two bodies
+        # seeing different windows could not share a species of networks.
+        self.view_size = view_size
 
         # The life rules of this run - one object handed to every body that
         # is ever born here, so childhood, aging and starvation mean the
@@ -73,6 +78,7 @@ class AgentManager:
             life=self.life,
             birth_step=birth_step,
             parents=parents,
+            view_size=self.view_size,
         )
 
         self.agents[agent.agent_id] = agent
@@ -131,6 +137,7 @@ class AgentManager:
                 life=self.life,
                 birth_step=record["birth_step"],
                 parents=record["parents"],
+                view_size=self.view_size,
             )
             agent.energy = record["energy"]
             agent.age = record["age"]
