@@ -45,11 +45,13 @@ agents:
 # --- WORLD ---
 world:
   size: 64
-  empty_ratio: 0.8        # share of empty cells at the FIRST (and only) generation
+  empty_ratio: 0.7        # share of empty cells at the FIRST (and only) generation;
+                          # the rest is split evenly: 15% food, 15% danger
   refill:
     every: 5              # check the map every N steps
-    threshold: 0.2        # if colored cells drop below this share -> refill
-    amount: 5             # how many cells to add per check
+    threshold: 0.15       # food and danger are EACH topped back up to this
+                          # share of the map - counted separately, so eating
+                          # the food cannot let danger take its place
 
 # --- LOGGING ---
 # One folder per WORLD, not per process: a run continued from a checkpoint
@@ -122,6 +124,14 @@ checkpoints:
   replay_every: 5         # every Nth checkpoint also carries the buffers
   keep: 5                 # runs whose newest checkpoint is kept; pinned are forever
 
+
+# --- REWARD SHAPING ---
+# What a mind learns from, on top of what the world pays. The world keeps
+# paying +5 for food and -5 for danger (and energy follows the world), but
+# every step the world paid something positive, the mind adds food_bonus
+# to its own reward - so food is learned as +10 against danger's -5.
+reward_shaping:
+  food_bonus: 5
 
 # --- energy ---
 # energy_leak is the BASE cost of being alive, paid by every agent on every
