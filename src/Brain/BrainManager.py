@@ -86,7 +86,10 @@ class BrainManager:
                 curiosity=Curiosity(
                     beta=phenotype["curiosity_beta"],
                     decay=phenotype["curiosity_decay"],
-                )
+                ),
+                food_bonus=float(
+                    self.config.get("reward_shaping", {}).get("food_bonus", 0.0)
+                ),
             ),
             batch_size=phenotype["batch_size"],
             min_buffer_size=phenotype["min_buffer_size"],

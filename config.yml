@@ -117,6 +117,14 @@ checkpoints:
   keep: 5                 # rolling checkpoints kept; pinned ones are forever
 
 
+# --- REWARD SHAPING ---
+# What a mind learns from, on top of what the world pays. The world keeps
+# paying +5 for food and -5 for danger (and energy follows the world), but
+# every step the world paid something positive, the mind adds food_bonus
+# to its own reward - so food is learned as +10 against danger's -5.
+reward_shaping:
+  food_bonus: 5
+
 # --- energy ---
 # energy_leak is the BASE cost of being alive, paid by every agent on every
 # tick. Aging adds to it (see life.aging below), so this is what a newborn
