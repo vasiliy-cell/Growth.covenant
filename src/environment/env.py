@@ -137,7 +137,6 @@ class GridWorldEnv:
             "refill": {
                 "every": self.world.refill_every,
                 "threshold": self.world.refill_threshold,
-                "amount": self.world.refill_amount,
             },
             "current_step": self.current_step,
             "species": self.species_name,

@@ -78,9 +78,13 @@ class Map:
     # -----------------------------
     # REFILL
     # -----------------------------
-    def refill(self, amount, exclude=None):
+    def count(self, obj):
+        """How many cells hold this kind of object right now."""
+        return int(np.count_nonzero(self.grid == obj))
+
+    def refill(self, obj, amount, exclude=None):
         """
-        Drop `amount` random objects into random EMPTY cells.
+        Drop `amount` objects of kind `obj` into random EMPTY cells.
         The map is never regenerated, only topped up, so everything the
         agent already ate elsewhere stays eaten.
 
@@ -115,7 +119,7 @@ class Map:
 
         for i in indexes:
             y, x = empty_cells[i]
-            self.grid[y, x] = self.rng.choice(self.non_empty_ids)
+            self.grid[y, x] = obj
 
         return count
 

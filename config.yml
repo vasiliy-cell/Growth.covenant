@@ -45,11 +45,13 @@ agents:
 # --- WORLD ---
 world:
   size: 64
-  empty_ratio: 0.8        # share of empty cells at the FIRST (and only) generation
+  empty_ratio: 0.7        # share of empty cells at the FIRST (and only) generation;
+                          # the rest is split evenly: 15% food, 15% danger
   refill:
     every: 5              # check the map every N steps
-    threshold: 0.2        # if colored cells drop below this share -> refill
-    amount: 5             # how many cells to add per check
+    threshold: 0.15       # food and danger are EACH topped back up to this
+                          # share of the map - counted separately, so eating
+                          # the food cannot let danger take its place
 
 # --- LOGGING ---
 # One folder per WORLD, not per process: a run continued from a checkpoint

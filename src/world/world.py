@@ -8,11 +8,12 @@ class World:
         self.empty_ratio = empty_ratio
         self.map = None
 
-        # Refill rules (see world.refill in config.yml)
+        # Refill rules (see world.refill in config.yml). The threshold is
+        # the share of the map EACH kind of object is kept at, not the
+        # share of all of them together.
         refill = refill or {}
         self.refill_every = refill.get("every", 5)
-        self.refill_threshold = refill.get("threshold", 0.2)
-        self.refill_amount = refill.get("amount", 5)
+        self.refill_threshold = refill.get("threshold", 0.15)
 
     # --- generate world using provided RNG (ONCE per run) ---
     def generate(self, rng):
@@ -57,9 +58,14 @@ class World:
     # --- keeping the world alive instead of regenerating it ---
     def maybe_refill(self, step, exclude=None):
         """
-        Every refill_every steps: if colored cells dropped below
-        refill_threshold, add refill_amount random objects.
+        Every refill_every steps: every kind of object (food, danger) that
+        dropped below refill_threshold of the map is topped back up to it.
         The map is NOT generated from scratch.
+
+        Each kind is counted on its own. Counted together, the danger that
+        agents learn to walk around kept the total up while the food was
+        eaten, the refill never fired, and the map drifted towards one
+        food per two dangers - until touching anything was a losing bet.
 
         exclude: iterable of (x, y) cells to leave alone - the positions of
                  every agent, so nothing spawns under a body.
@@ -72,10 +78,16 @@ class World:
         if self.refill_every <= 0 or step % self.refill_every != 0:
             return 0
 
-        if self.map.non_empty_ratio() >= self.refill_threshold:
-            return 0
+        target = int(self.refill_threshold * self.size * self.size)
+        added = 0
 
-        return self.map.refill(self.refill_amount, exclude=exclude)
+        for obj in self.map.non_empty_ids:
+            missing = target - self.map.count(obj)
+
+            if missing > 0:
+                added += self.map.refill(obj, missing, exclude=exclude)
+
+        return added
 
     # -----------------------------
     # STATE (CHECKPOINT)
