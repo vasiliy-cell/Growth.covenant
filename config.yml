@@ -188,7 +188,7 @@ genome:
       type: float
     sigma: # chance of huge mutation 
       mean: 0.01
-      scale: 0.5
+      scale: 0.001
       type: float
     # --- OPTIMIZER ---
     # The step size of every gradient update, and how much of the update is
