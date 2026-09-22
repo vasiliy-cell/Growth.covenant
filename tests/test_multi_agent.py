@@ -195,3 +195,23 @@ def test_a_spawn_is_drawn_from_the_population_stream_alone():
     env.start()
 
     assert env.agents.all()[0].get_position() == expected
+
+
+# -----------------------------
+# NETWORK INPUT
+# -----------------------------
+def test_the_network_sees_the_window_one_hot_and_not_the_position():
+    from src.run import CELL_CHANNELS, encode_observation
+    from src.world.Grid_world.objects import AGENT_CELL
+
+    env = make_env()
+    watcher, neighbour = place(env, (5, 5), (6, 5))
+    env.world.map.grid[5][4] = 1                      # food left of the watcher
+
+    observation = env.get_states()[watcher]
+    encoded = encode_observation(observation).reshape(len(CELL_CHANNELS), 7, 7)
+
+    assert encoded.shape[0] * 49 == len(encode_observation(observation))
+    assert encoded[CELL_CHANNELS.index(1), 3, 2] == 1
+    assert encoded[CELL_CHANNELS.index(AGENT_CELL), 3, 4] == 1
+    assert encoded[:, 3, 4].sum() == 1                # one kind per cell

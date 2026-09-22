@@ -8,6 +8,7 @@ from src.persistence.run_log import RunLog
 
 from src.Genome.types.reuse import reuse
 from src.utils.rng import RunRandom
+from src.world.Grid_world.objects import AGENT_CELL, OBJECTS
 
 
 import argparse
@@ -228,13 +229,30 @@ def population_state(env, brains):
     return state
 
 
+# The kinds of cell the network tells apart, one input channel each: every
+# object of the world (food, danger), another agent, and off the map (-1).
+# Empty has no channel - a cell with all its channels at 0 is empty.
+CELL_CHANNELS = tuple(obj for obj in OBJECTS if obj != 0) + (AGENT_CELL, -1)
+
+
 def encode_observation(obs):
-    x, y = obs.position
-    flat = []
-    for row in obs.local_view:
-        for cell in row:
-            flat.append(cell)
-    return torch.tensor([x, y] + flat, dtype=torch.float32)
+    """
+    What the network sees: the window around the agent, one-hot, and
+    nothing else.
+
+    No position. In a world that is eaten and refilled at random, "where
+    am I" says nothing about where the food is, yet as raw 0..63 numbers
+    it was the loudest input - the networks valued places instead of what
+    they saw, and walked into walls. A wall is still seen, as the
+    off-the-map channel, whenever it is close enough to matter.
+
+    One-hot instead of the cell's id as a number: as a single number,
+    danger (2) reads as "twice the food" and another agent (3) as three
+    times. As channels, "food here" is one input of its own.
+    """
+    view = torch.tensor(obs.local_view, dtype=torch.float32).flatten()
+
+    return torch.cat([(view == kind).float() for kind in CELL_CHANNELS])
 
 
 def main(render_fn=None, episodes=None, seed=None, agent_count=None,
@@ -399,7 +417,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         still has to build a manager, so fall back on the view itself."""
         obs_size = (
             len(encode_observation(next(iter(observations.values()))))
-            if observations else 2 + env.agents.view_size ** 2
+            if observations else len(CELL_CHANNELS) * env.agents.view_size ** 2
         )
 
         return BrainManager(

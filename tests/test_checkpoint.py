@@ -11,10 +11,10 @@ from src.Brain.BrainManager import BrainManager
 from src.environment.env import GridWorldEnv
 from src.persistence.checkpoint import SCHEMA_VERSION, Checkpoint
 from src.persistence.checkpoint_store import CheckpointStore
-from src.run import encode_observation
+from src.run import CELL_CHANNELS, encode_observation
 from src.utils.rng import RunRandom
 
-OBS_SIZE = 2 + 7 * 7
+OBS_SIZE = len(CELL_CHANNELS) * 7 * 7
 
 
 def make_run(seed=1, size=10, agents=2, species="clons"):
