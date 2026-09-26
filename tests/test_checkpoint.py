@@ -188,7 +188,11 @@ def test_a_resumed_mind_is_the_mind_that_was_saved():
 
     resumed_brains = resume(capture(env, brains, rng, step=10))[1]
 
-    for agent_id, brain in brains.items():
+    # Every mind whose BODY came back. A mind whose body starved on the
+    # last tick is still in the registry until the next sync retires it,
+    # and a world that resumes without that body has nothing to compare.
+    for agent_id in env.agents.ids():
+        brain = brains.get(agent_id)
         twin = resumed_brains.get(agent_id)
 
         saved = brain.trainer.state()
