@@ -71,13 +71,20 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
   color: var(--text);
   font: 13px/1.45 var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
-body { display: flex; flex-direction: column; overflow: hidden; }
+/*
+ * The surface colour lives on html and NOWHERE else. The light below is
+ * `body::before` at z-index -1: give the body a background of its own and
+ * that light is painted underneath it, which is how the blur ended up
+ * invisible - a perfectly even wall of grey.
+ */
+html { background: var(--bg); }
+
+body { display: flex; flex-direction: column; overflow: hidden; background: transparent; }
 
 /* The light behind the fog: three blooms, blurred into each other and into
    the black. It sits under everything (z-index) and is spread past the edges
@@ -90,10 +97,10 @@ body::before {
   pointer-events: none;
   filter: blur(120px);
   background:
-    radial-gradient(44vmax 30vmax at 50% -8%, rgba(126, 212, 230, .22), transparent 66%),
-    radial-gradient(34vmax 36vmax at -6% 28%, rgba(96, 170, 196, .20), transparent 68%),
-    radial-gradient(34vmax 36vmax at 106% 38%, rgba(96, 170, 196, .18), transparent 68%),
-    radial-gradient(30vmax 24vmax at 50% 108%, rgba(120, 160, 180, .12), transparent 66%);
+    radial-gradient(46vmax 32vmax at 50% -10%, rgba(126, 212, 230, .30), transparent 68%),
+    radial-gradient(36vmax 38vmax at -8% 26%, rgba(96, 178, 206, .26), transparent 70%),
+    radial-gradient(36vmax 38vmax at 108% 40%, rgba(84, 150, 190, .24), transparent 70%),
+    radial-gradient(32vmax 26vmax at 50% 110%, rgba(120, 165, 190, .16), transparent 68%);
 }
 
 ::selection { background: rgba(224, 139, 62, .32); }
