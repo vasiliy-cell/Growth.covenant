@@ -1,231 +1,107 @@
 # =====================================================================
-#  Main run config. Lives in the repo root because it drives not only
-#  the brain, but also the world, the logging and the run length.
+#  Every setting of a run. One line per key on purpose - what each one
+#  means, and why it is that value, is written in docs/config.md.
+#
+#  One-off override, no editing:  python src/run.py --set world.size=32
 # =====================================================================
 
 # --- RUN ---
-# The world is NOT recreated anymore: one continuous process of
-# episodes * episode_length steps.
-# An "episode" is now ONLY a logging window (and the boundary where
-# epsilon / curiosity decay). It resets nothing in the world and never
-# teleports the agent back to the start of the map.
-#
-# The number of episodes is asked in the terminal before the run, not set
-# here - only the window length is a config value.
 run:
-  episode_length: 20      # steps per window -> total_steps = episodes * episode_length
-
-  # Ask torch to refuse non-deterministic kernels (warn_only, so nothing
-  # crashes mid-run over an op that has no deterministic version). On CPU
-  # this project is bit-exact anyway; the flag is what keeps it that way
-  # if a GPU is ever used. Cross-machine bit-exactness is NOT promised by
-  # it - see the note on checkpoints in CLAUDE.md.
-  deterministic: true
+  episode_length: 20      # steps per logging window; episodes are asked in the terminal
+  deterministic: true     # ask torch for deterministic kernels (warn_only)
 
 # --- AGENTS ---
-# How many agents share the one world. The value here is only the default
-# offered by the terminal prompt before the run: the population size is an
-# experiment parameter, so it is chosen next to the run length. Из действенного
-#
-# Every agent gets its OWN brain, replay buffer, epsilon and curiosity, so
-# the settings below are per agent and keep the meaning they had when a
-# single agent lived in the world.
 agents:
-  count: 1
-
-  # Side of the square window an agent sees around itself. The window
-  # reaches view_size // 2 cells to every side, so an even value is
-  # rounded up: 10 is really an 11x11 window. The network input is
-  # 4 channels x the window, so this also sizes every mind. 53 was tried
-  # and was worse: one useful cell drowned among 2809 inputs.
-  view_size: 10
+  count: 1                # default offered by the terminal prompt
+  view_size: 10           # window side; reaches view_size // 2 each way, so really 11x11
 
 # --- WORLD ---
 world:
   size: 64
-  empty_ratio: 0.7        # share of empty cells at the FIRST (and only) generation;
-                          # the rest is split evenly: 15% food, 15% danger
+  empty_ratio: 0.7        # empty share at the one generation; the rest is 15% food, 15% danger
   refill:
     every: 5              # check the map every N steps
-    threshold: 0.15       # food and danger are EACH topped back up to this
-                          # share of the map - counted separately, so eating
-                          # the food cannot let danger take its place
+    threshold: 0.15       # food and danger are EACH topped back up to this share
 
 # --- LOGGING ---
-# One folder per WORLD, not per process: a run continued from a checkpoint
-# writes into the same folder and opens a new session in its run.json.
-#
-#   logs/<world_id>[_<label>]/
-#     run.json            how to repeat it: seed, config, commit, schema,
-#                         species, gene set, library versions, sessions
-#     steps/              a row per agent per tick
-#     updates/            a row per gradient update
-#     episodes/           per agent and per population, one row per window
-#     events/             births (with parents and DNA) and whole lives
-#     world/              the map and the bodies on it, every N steps
-#     rng/                stream states, world often and agents rarely
-#
-# Each table is a folder of finished parquet parts. Parquet writes its
-# footer at close, so one open file would be unreadable after a crash; a
-# part is closed and renamed into place, and flush_every_steps bounds what
-# a kill -9 can cost.
-#
-# NOTHING here is ever deleted automatically. A log is deleted by a human
-# who has decided the experiment is over - scripts/logs.py archives one
-# with a note attached when the disk gets tight.
+# One folder per WORLD, not per process: logs/<world_id>[_<label>]/
 logging:
   dir: "logs"
-  flush_every_steps: 1000       # close a part of every table this often
-  max_rows_per_part: 50000      # ...or when a table has this many rows
-  world_snapshot_every: 100     # snapshot the map every N steps (0 = off)
-  rng_world_every_episodes: 1   # map/movement/genome streams, per window
-  rng_agents_every_episodes: 100  # the agents' own streams: ~16 KB each,
-                                  # random bytes that do not compress, and
-                                  # the checkpoints carry them all anyway
-  archive_dir: "archives"       # where scripts/logs.py puts packed runs
-  # The control panel's own files - the live frame of each running world,
-  # the watch requests that slow a run down while it is being looked at,
-  # the consoles of runs it started. Never inside `dir`: they are views of
-  # a run, not a record of it.
-  panel_dir: ".panel"
+  flush_every_steps: 1000         # close a part of every table this often
+  max_rows_per_part: 50000        # ...or when a table has this many rows
+  world_snapshot_every: 100       # snapshot the map every N steps (0 = off)
+  rng_world_every_episodes: 1     # map/movement/genome streams, per window
+  rng_agents_every_episodes: 100  # the agents' own streams, per window
+  archive_dir: "archives"         # where scripts/logs.py puts packed runs
+  panel_dir: ".panel"             # the control panel's files; never inside dir
 
 # --- CHECKPOINTS ---
-# Two different things live here and they answer different questions.
-#
-# models_dir holds the ARCHIVE: one file per agent, written when that agent
-# dies and at the end of the run, under models/<run_id>/<agent_id>.pth. It
-# says what a mind had learned. It is never read back.
-#
-# dir holds the CHECKPOINTS: the whole run in one file - world, bodies,
-# DNA, every mind, every rng stream - written every `every_steps` ticks so
-# a crash costs minutes instead of a night. It has two folders, and which
-# one a file sits in is all there is to being pinned:
-#
-#   <dir>/rolling/  every save lands here; the newest checkpoint of each
-#                   of the `keep` most recent RUNS survives, nothing else
-#   <dir>/pinned/   nothing is ever deleted from here
-#
-# So pinning is moving a file - from the terminal, from a file manager,
-# from anywhere (scripts/checkpoints.py pin 3 is only shorthand). The two
-# folders never compete: a prune looks at rolling/ alone, so pinning four
-# checkpoints still leaves `keep` runs that can be continued. Counting runs
-# and not files matters: a long run saves every `every_steps`, and counted
-# by file those saves would push every other run's checkpoint out.
-#
-# The replay buffers are most of the weight of a checkpoint, so they are
-# only written on every `replay_every`-th one. A mind resumed without its
-# memories is not broken - it refills the buffer from the world.
+# models_dir: one file per agent, an archive, never read back.
+# dir: the whole run in one file, in rolling/ and pinned/.
 checkpoints:
   models_dir: "models"
   dir: "checkpoints"
   every_steps: 500        # write a checkpoint every N steps (0 = off)
   replay_every: 5         # every Nth checkpoint also carries the buffers
-  keep: 5                 # runs whose newest checkpoint is kept; pinned are forever
-
+  keep: 5                 # runs kept in rolling/; pinned ones are forever
 
 # --- REWARD SHAPING ---
-# What a mind learns from, on top of what the world pays. The world keeps
-# paying +5 for food and -5 for danger (and energy follows the world), but
-# every step the world paid something positive, the mind adds food_bonus
-# to its own reward - so food is learned as +10 against danger's -5.
 reward_shaping:
-  food_bonus: 5
+  food_bonus: 5           # added to the intrinsic reward on a step the world paid food
 
-# --- energy ---
-# energy_leak is the BASE cost of being alive, paid by every agent on every
-# tick. Aging adds to it (see life.aging below), so this is what a newborn
-# pays and nobody ever pays less.
+# --- ENERGY ---
+# The world's reward IS energy: a food cell is +5 reward and +5 energy.
 energy:
-  energy_leak: 0.5
-  start_energy: 100       # what a body is born with, newborn or first agent
-  reproduction_threshold: 300
-  reproduction_cost: 100
+  energy_leak: 0.5        # base cost of a tick, before aging
+  start_energy: 50        # what the first agents are born with
+  reproduction_threshold: 100  # energy at which an agent makes a child
+  reproduction_cost: 50   # what the parents pay, and what the child is born with
 
 # --- LIFE ---
-# A life has two periods, and the first one is free:
-#
-#   CHILDHOOD - the first `childhood_steps` ticks after birth. The agent
-#     ages and leaks energy like everybody else, but nothing can kill it:
-#     every newborn gets exactly the same amount of time to learn where the
-#     food is before the world starts charging for mistakes.
-#   ADULTHOOD - everything after that. The agent is mortal, and starvation
-#     is the only way out: once its energy falls to `death_energy` it is
-#     removed from the run.
-#
-# There is no hard age limit here on purpose. The personal leak grows by
-# `aging.amount` every `aging.every` ticks of a life and never stops
-# growing, so old age is not a number to compare against - it is a bill
-# that keeps rising until no amount of foraging can pay it.
 life:
-  childhood_steps: 200000000   # ticks of guaranteed immortality after birth
-  death_energy: 0.0       # an adult at or below this energy dies
+  childhood_steps: 12000  # ticks after birth in which nothing can kill the agent
+  death_energy: 0         # an adult at or below this energy dies
   aging:
     every: 200            # every N ticks of a life...
-    amount: 0.05          # ...the personal leak grows by this much
+    amount: 0.05          # ...the personal leak grows by this much, forever
 
-
-# ==>-------------<====== genome ======>-------------<== #
-# ==>-------------<====== genome ======>-------------<== #
-# ==>-------------<====== genome ======>-------------<== #
-# ==>-------------<====== genome ======>-------------<== #
-
-
-# Every value in the project that changes HOW an agent learns, written as a
-# gene: a distribution to draw a newborn from instead of a single number
-# shared by everybody. `mean` is the value the sections above use today, so
-# a population born with scale = 0 is exactly the run you have now.
-#
-# Shape of a gene - the same for all of them, so the sampler never has to
-# special-case anything:
-#   mean  - center of the draw (the current, hand-tuned value)
-#   scale - stddev of the draw; 0 freezes the gene at `mean`
-#   type  - float | int, how the drawn number is rounded
-#   step  - round to a multiple of this (view_size must stay odd)
-#
-# This section is now the SOURCE OF TRUTH: every newborn's brain is built
-# from a genome sampled here (make_first_genome -> make_phenotype ->
-# BrainManager -> DQNTrainer/MLP/Policy/Curiosity). The old flat sections
-# (policy / trainer / replay_buffer / curiosity / learning_rate / gamma) are
-# gone - their values live here now as gene `mean`s.
+# --- GENOME ---
+# Every value that changes HOW an agent learns, as a distribution a newborn
+# is drawn from: mean (center), scale (stddev, 0 freezes it), type, step.
 genome:
-  type: clons          # which reproduction species this run uses: clons | non_linear
+  type: clons             # reproduction species: clons | non_linear | mendel
   genes:
-    alpha:
+    # --- REPRODUCTION ---
+    alpha:                        # non_linear: how far outside the parents a child may fall
       mean: 0.5
       scale: 0.5
       type: float
-    sigma: # chance of huge mutation 
+    sigma:                        # width of mutation, and the chance of a huge one
       mean: 0.01
       scale: 0.001
       type: float
+
     # --- OPTIMIZER ---
-    # The step size of every gradient update, and how much of the update is
-    # allowed through at all. max_norm is the tightest clip in the project
-    # (0.01), so it decides the effective learning rate far more than
-    # learning_rate does - it belongs in the genome next to it.
-    learning_rate:                # trainer: Adam lr (config root learning_rate)
+    learning_rate:                # Adam lr
       mean: 0.001
       scale: 0.0005
       type: float
-    max_norm:                     # trainer.max_norm: gradient clipping
+    max_norm:                     # gradient clipping; decides the effective lr
       mean: 0.01
       scale: 0.005
       type: float
 
     # --- DQN TARGETS ---
-    # How far ahead this mind looks and how stale the target it chases is.
-    gamma:                        # trainer.gamma: discount factor
+    gamma:                        # discount factor
       mean: 0.99
       scale: 0.001
       type: float
-    target_update_freq:           # trainer.target_update_freq, in updates
+    target_update_freq:           # updates between two target-net syncs
       mean: 1000
       scale: 200
       type: int
 
     # --- NETWORK SHAPE ---
-    # The capacity of the mind itself. Both are hardcoded in MLP today
-    # (hidden_size=64, two hidden layers) and have no config key at all.
     hidden_size:
       mean: 64
       scale: 8
@@ -235,57 +111,40 @@ genome:
       scale: 0.5
       type: int
 
-    # --- MEMORY ---
-    # One agent stores exactly one transition per tick, so these are ticks
-    # of personal history: how far back this mind can remember, how much of
-    # it it revisits at once, and how long it waits before learning at all.
-    buffer_size:                  # replay_buffer.buffer_size
+    # --- MEMORY --- (one transition per tick, so these are ticks of history)
+    buffer_size:                  # how far back this mind remembers
       mean: 10000
       scale: 2000
       type: int
-    batch_size:                   # replay_buffer.batch_size
+    batch_size:                   # how much it revisits per update
       mean: 32
       scale: 4
       type: int
-    min_buffer_size:              # replay_buffer.min_buffer_size (warmup)
+    min_buffer_size:              # warmup before the first update
       mean: 500
       scale: 100
       type: int
 
-    # --- EXPLORATION ---
-    # The schedule follows the age of the individual, not the age of the
-    # run, so every one of these is already personal - the genome only
-    # decides that two newborns need not get the same schedule.
-    epsilon:                      # policy.epsilon: start value
+    # --- EXPLORATION --- (per logging window, on the agent's own age)
+    epsilon:                      # start value
       mean: 0.7
       scale: 0.1
       type: float
-    epsilon_decay:                # policy.epsilon_decay, per logging window
+    epsilon_decay:
       mean: 0.995
       scale: 0.002
       type: float
-    epsilon_min:                  # policy.epsilon_min: floor
+    epsilon_min:                  # floor; too low and a shuttle at a wall never breaks
       mean: 0.05
       scale: 0.005
       type: float
 
-    # --- CURIOSITY ---
-    # The intrinsic half of the reward: how loudly novelty pays, and how
-    # fast that voice fades. beta = 4.0 against a food cell worth +5 means
-    # a newborn is driven mostly by curiosity, so this gene moves behaviour
-    # harder than almost anything else here.
-    curiosity_beta:               # curiosity.beta
+    # --- CURIOSITY --- (intrinsic reward for novelty, cleared every window)
+    curiosity_beta:               # strength, against a food cell worth +5
       mean: 4.0
       scale: 0.5
       type: float
-    curiosity_decay:              # curiosity.decay, per logging window
+    curiosity_decay:
       mean: 0.995
       scale: 0.002
       type: float
-
-
-
-
-
-
-
