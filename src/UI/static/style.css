@@ -1,10 +1,11 @@
 /*
  * Deep colours, and one blurred light a long way behind them.
  *
- * The page is near-black with three wide blooms of colour blurred into the
- * background - a light source behind the fog, never a filter over anything
- * that has to be read. Panels float over it, solid and a shade lighter,
- * drawn with TWO rounded lines: a dark outer border and a faint cold
+ * The page is a cold graphite surface with three wide blooms of colour
+ * blurred into it - a light source behind the fog, never a filter over
+ * anything that has to be read. The panels are DARKER than that surface and
+ * solid: they read as cut into it rather than laid on top, and each one is
+ * drawn with two rounded lines - a dark outer border and a faint cold
  * hairline just inside it.
  *
  * Colour is a language here, not decoration:
@@ -19,13 +20,13 @@
 :root {
   color-scheme: dark;
 
-  --bg: #0a0b0c;
-  --panel: #131517;
-  --panel-2: #181b1e;
-  --inset: #0d0f11;
-  --hover: #1d2126;
+  --bg: #16191c;
+  --panel: #0f1113;
+  --panel-2: #131619;
+  --inset: #0b0d0f;
+  --hover: #1a1e22;
   --border: #23272b;
-  --border-strong: #31373d;
+  --border-strong: #333940;
   --ring: rgba(170, 205, 220, .05);
   --hairline: rgba(180, 212, 226, .07);
 
@@ -85,9 +86,9 @@ body::before {
   pointer-events: none;
   filter: blur(90px);
   background:
-    radial-gradient(34vmax 26vmax at 22% 10%, rgba(224, 139, 62, .20), transparent 62%),
-    radial-gradient(32vmax 26vmax at 80% 6%, rgba(86, 146, 176, .16), transparent 64%),
-    radial-gradient(30vmax 24vmax at 58% 96%, rgba(150, 62, 54, .12), transparent 62%);
+    radial-gradient(34vmax 26vmax at 22% 10%, rgba(224, 139, 62, .26), transparent 62%),
+    radial-gradient(32vmax 26vmax at 80% 6%, rgba(86, 146, 176, .22), transparent 64%),
+    radial-gradient(30vmax 24vmax at 58% 96%, rgba(150, 62, 54, .16), transparent 62%);
 }
 
 ::selection { background: rgba(224, 139, 62, .32); }
@@ -104,7 +105,7 @@ a { color: inherit; text-decoration: none; }
   gap: 20px;
   height: 52px;
   padding: 0 18px;
-  background: rgba(13, 15, 17, .82);
+  background: rgba(18, 21, 24, .72);
   border-bottom: 1px solid var(--border-strong);
   box-shadow: inset 0 -1px 0 var(--ring);
   flex: 0 0 auto;
@@ -151,7 +152,7 @@ nav.tabs a.active { color: var(--accent-soft); background: #1c2024; border-color
 .pill.on { color: var(--accent-soft); border-color: var(--accent-edge); background: var(--accent-back); }
 
 /* ---------------- layout ---------------- */
-main { flex: 1 1 auto; overflow: auto; padding: var(--gap); }
+main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
 
 .page { max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--gap); }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
@@ -303,8 +304,6 @@ label.field-label { display: block; font-size: 11px; color: var(--muted); margin
 .hint { font-size: 11px; color: var(--dim); margin-top: 6px; }
 .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 12px; }
 
-.input-with-button { display: flex; gap: 6px; }
-
 /* a checkbox drawn as a switch */
 input.switch {
   appearance: none;
@@ -433,7 +432,7 @@ td.name .ellipsis { display: block; }
   z-index: 45;
   min-width: 190px;
   padding: 4px;
-  background: #16191c;
+  background: #16191a;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
   box-shadow: inset 0 0 0 1px var(--hairline), 0 12px 30px rgba(0, 0, 0, .6);
@@ -503,7 +502,7 @@ td.name .ellipsis { display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #08090a;
+  background: #07080a;
 }
 
 .live-stage canvas {
@@ -680,7 +679,7 @@ pre.console {
   overflow: auto;
   font: 11px/1.55 var(--mono);
   color: #b6c3ca;
-  background: #08090a;
+  background: #07080a;
   border-top: 1px solid var(--border);
   white-space: pre-wrap;
 }

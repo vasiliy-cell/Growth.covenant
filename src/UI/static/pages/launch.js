@@ -124,12 +124,6 @@ function form(config, prefill) {
     (key) => { values.species = key; },
   );
 
-  const dice = button({
-    icon: "dice",
-    title: "Random seed",
-    onclick: () => { seed.value = Math.floor(Math.random() * 1e9); },
-  });
-
   const message = h("span", { class: "mono accent", style: "font-size:12px" });
 
   const start = button({
@@ -174,7 +168,7 @@ function form(config, prefill) {
       field("Agents", agents),
       field("Series", runs, "how many runs: same settings, a new seed each, one after another"),
     ]),
-    field("Seed", h("div", { class: "input-with-button" }, [seed, dice]), "empty = a random one; in a series each next run takes the next seed"),
+    field("Seed", seed, "empty = a random one; in a series each next run takes the next seed"),
     field("Label", label),
     h("div", { class: "option" }, [
       toggle(false, (on) => { values.pin = on; }),
