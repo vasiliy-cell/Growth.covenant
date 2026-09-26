@@ -344,7 +344,7 @@ class GridWorldEnv:
 
             # The cost of being alive, and it is personal: the older the
             # body, the dearer the tick (src/Agent/life.py).
-            agent.energy -= agent.energy_leak()
+            agent.pay_leak()
 
         # 4b. DEATH - starvation, once this tick's energy has settled.
         deaths = self._reap()

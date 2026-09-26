@@ -62,7 +62,8 @@ def test_a_parent_grows_up_in_the_world_the_tick_it_breeds():
     env = make_env(make_life(max_childhood_steps=10 ** 9))
 
     parent = env.agents.all()[0]
-    parent.energy = 200.0
+    # Over any reproduction threshold config.yml might carry.
+    parent.energy = 100_000.0
     assert parent.is_child()
 
     stand_still(env)
@@ -92,11 +93,28 @@ def test_an_adult_dies_at_the_threshold_and_not_above_it():
 # -----------------------------
 # AGING
 # -----------------------------
-def test_a_child_pays_nothing_for_being_alive():
-    life = make_life(max_childhood_steps=3, base_leak=1.0)
+def test_a_child_pays_the_base_cost_and_no_age():
+    life = make_life(max_childhood_steps=3, base_leak=1.0, aging_every=2, aging_amount=0.5)
 
-    assert life.leak(0) == 0.0
-    assert life.leak(2) == 0.0
+    assert life.leak(0) == 1.0
+    assert life.leak(2) == 1.0      # old enough to have aged, too young to be charged for it
+
+
+def test_a_child_pays_down_to_zero_and_never_into_debt():
+    """
+    A childhood that costs nothing is a savings account: a good forager
+    walked into adulthood with thousands and bought a child with it every
+    tick. A childhood that costs more than a body has is a debt it starves
+    on the day it grows up. So it pays what it has, and stops.
+    """
+    life = make_life(max_childhood_steps=3, base_leak=10.0)
+
+    assert life.pay(50.0, age=0) == 40.0
+    assert life.pay(4.0, age=0) == 0.0
+    assert life.pay(0.0, age=0) == 0.0
+
+    # an adult pays in full, and death_energy is what catches it
+    assert life.pay(4.0, age=3) == -6.0
 
 
 def test_the_leak_starts_at_adulthood_and_grows_from_there():
@@ -140,7 +158,7 @@ def test_eating_stops_at_the_ceiling():
     """
     # A ceiling under the reproduction threshold of config.yml: what is
     # measured here is the stomach, not what a full one then spends.
-    env = make_env(make_life(max_childhood_steps=1000, max_energy=80.0))
+    env = make_env(make_life(max_childhood_steps=1000, max_energy=80.0, base_leak=0.0))
 
     agent = env.agents.all()[0]
     agent.energy = 79.0

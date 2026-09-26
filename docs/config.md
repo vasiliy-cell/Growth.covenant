@@ -203,18 +203,23 @@ A life has two periods, and the first one is free.
 
 **Childhood** - at most the first `max_childhood_steps` ticks after birth:
 a ceiling and not a length, because breeding ends it sooner. A child ages
-and eats like everybody else, but it pays no leak and nothing can kill it,
-so every newborn gets the same amount of time to learn where the food is
-before the world starts charging at all.
+and eats like everybody else and pays the base leak, but **only down to
+zero**: it cannot go into debt, and nothing can kill it. So every newborn
+gets the same amount of time to learn where the food is, and the worst
+that can happen to it in that time is an empty body.
 
 **Breeding ends childhood on the spot**, however young the parent is. An
 agent that fed itself up to the reproduction threshold has shown it can
 forage, and a population of immortal parents only fills the map. Aging is
 counted from that moment for such a body, not from `max_childhood_steps`.
 
-A leak during childhood only moved the bill: a child that ate less than it
-leaked went into debt for the whole of its childhood and starved on the
-tick it grew up, however well it had learned to feed itself by then.
+Both halves of that were learned the hard way. A leak with no floor only
+moved the bill: a child that ate less than it leaked went into debt for
+the whole of its childhood and starved on the tick it grew up, however
+well it had learned to feed itself by then. No leak at all turned
+childhood into a savings account: a good forager walked into adulthood
+with thousands of energy and bought a child with it on every tick until
+it ran out.
 
 **Adulthood** - everything after that. The agent is mortal, and starvation
 is the only way out: once its energy falls to `death_energy` it is removed
@@ -229,7 +234,8 @@ keeps rising until no amount of foraging can pay it.
   of guaranteed immortality after birth, unless it breeds first.
 - **`death_energy`** - an adult at or below this energy dies.
 - **`aging.every`** / **`aging.amount`** - every N ticks of adult life,
-  the personal leak grows by this much. The leak is 0 for a child, and for
+  the personal leak grows by this much. The leak is `energy_leak` flat for
+  a child (bounded by what it has), and for
   an adult it is `energy_leak + (adult ticks lived // every) * amount`,
   counted from whenever its childhood ended - `max_childhood_steps` or its
   first child, whichever came first. So the bill starts rising the tick the

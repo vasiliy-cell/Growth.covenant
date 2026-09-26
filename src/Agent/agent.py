@@ -121,6 +121,10 @@ class Agent:
         """What this body pays for being alive this tick: base cost + age."""
         return self.life.leak(self.age, self.adult_at)
 
+    def pay_leak(self):
+        """Pays it, and a child's payment stops at an empty body."""
+        self.energy = self.life.pay(self.energy, self.age, self.adult_at)
+
     def is_dead(self):
         """An adult that has run out of energy. A child never is."""
         return self.life.is_dead(self.age, self.energy, self.adult_at)

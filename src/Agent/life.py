@@ -122,20 +122,20 @@ class Life:
         """
         What being alive costs this body right now.
 
-        A child pays nothing. Childhood is meant to be the period where the
-        world does not charge for mistakes, and a leak it could not yet
-        forage against only moved the bill: a child that ate less than it
-        leaked went into debt for the whole of its childhood and starved on
-        the tick it grew up, however well it had learned to feed itself by
-        then.
+        A child pays the base cost and no more: age costs nothing yet, and
+        `pay` stops the bill at an empty body, so childhood can end at zero
+        but never in debt. Paying nothing at all made childhood a savings
+        account instead - a good forager walked into adulthood with
+        thousands of energy and bought a child with it every tick.
 
         An adult pays the base cost, and a step - not a smooth curve - for
         age on top of it: one `aging_amount` for every full `aging_every`
         ticks of ADULT life, counted from the end of childhood, so the bill
-        starts rising the tick the charging starts.
+        starts rising the tick the charging starts and not where the body
+        left off as a child.
         """
         if self.is_child(age, adult_at):
-            return 0.0
+            return self.base_leak
 
         if self.aging_every <= 0:
             return self.base_leak
@@ -143,6 +143,22 @@ class Life:
         adult_age = age - self.adulthood(adult_at)
 
         return self.base_leak + (adult_age // self.aging_every) * self.aging_amount
+
+    def pay(self, energy, age, adult_at=None):
+        """
+        What is left of a body after one tick of being alive.
+
+        A child cannot go into debt: it pays what it has and stops at zero,
+        which is also the only mark a childhood can end on when nothing was
+        foraged. An adult pays in full and may go below zero - that is what
+        `death_energy` is there to catch.
+        """
+        leak = self.leak(age, adult_at)
+
+        if self.is_child(age, adult_at):
+            return max(energy - leak, 0.0)
+
+        return energy - leak
 
     # -----------------------------
     # DEATH
