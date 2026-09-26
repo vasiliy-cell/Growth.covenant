@@ -92,7 +92,7 @@ class Brain:
         stopped being shared.
         """
         self.policy.next_episode()
-        self.reward_shaping.reset()
+        self.reward_shaping.next_episode()
 
     # -----------------------------
     # RECORD

@@ -35,12 +35,10 @@ class RewardShaping:
 
         return total_reward, r_intrinsic
 
-    def reset(self):
-        """
-        Reset intrinsic modules (e.g. curiosity)
-        """
+    def next_episode(self):
+        """Carries the logging window boundary to the intrinsic modules."""
         if self.curiosity is not None:
-            self.curiosity.reset()
+            self.curiosity.next_episode()
 
     # -----------------------------
     # STATE (CHECKPOINT)

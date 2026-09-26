@@ -20,24 +20,27 @@ def test_curiosity_decay_formula():
     assert abs(r2 - (1 / (2 ** 0.5))) < 1e-6
 
 
-def test_reset_clears_counts():
+def test_counts_outlive_the_logging_window():
+    """
+    Cleared every window, novelty never ran out: twenty steps later every
+    cell was new again and curiosity paid beta on every step for ever.
+    """
     c = Curiosity(beta=1.0)
 
     c.step("A")
-    c.reset()
+    c.next_episode()
 
-    r = c.step("A")
-
-    assert r == 1.0
+    assert c.step("A") < 1.0
+    assert c.visit_counts["A"] == 2
 
 
 def test_beta_decay():
     c = Curiosity(beta=1.0, decay=0.5)
 
-    c.reset()
+    c.next_episode()
     assert abs(c.beta - 0.5) < 1e-6
 
-    c.reset()
+    c.next_episode()
     assert abs(c.beta - 0.25) < 1e-6
 
 

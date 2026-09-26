@@ -86,15 +86,18 @@ class Curiosity:
         self.visit_counts.update(state["visit_counts"])
 
     # -----------------------------
-    # RESET (per episode)
+    # LOGGING WINDOW BOUNDARY
     # -----------------------------
-    def reset(self):
+    def next_episode(self):
         """
-        Called at the start of each episode
+        Fades the voice of novelty a little. The visit counts STAY.
+
+        They used to be cleared here, every logging window, and that made
+        novelty inexhaustible: twenty steps later almost every cell was
+        new again, so curiosity paid about `beta` on every single step for
+        ever - a salary for moving, twenty times what the food was worth.
+        Counting for the whole life of an agent is what makes "I have been
+        here" mean anything, and what lets curiosity run out once the
+        world is known.
         """
-
-        # clear episodic memory
-        self.visit_counts.clear()
-
-        # apply decay once per episode
         self.beta *= self.decay
