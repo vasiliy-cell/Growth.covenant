@@ -40,6 +40,7 @@ class Life:
         aging_amount=0.05,
         death_energy=0.0,
         start_energy=100.0,
+        max_energy=None,
     ):
         self.childhood_steps = childhood_steps
         self.base_leak = base_leak
@@ -47,6 +48,7 @@ class Life:
         self.aging_amount = aging_amount
         self.death_energy = death_energy
         self.start_energy = start_energy
+        self.max_energy = max_energy
 
     @classmethod
     def from_config(cls, source=None):
@@ -65,6 +67,10 @@ class Life:
             aging_amount=float(aging_cfg.get("amount", 0.05)),
             death_energy=float(life_cfg.get("death_energy", 0.0)),
             start_energy=float(energy_cfg.get("start_energy", 100.0)),
+            max_energy=(
+                float(energy_cfg["max_energy"])
+                if energy_cfg.get("max_energy") is not None else None
+            ),
         )
 
     # -----------------------------
@@ -72,6 +78,27 @@ class Life:
     # -----------------------------
     def is_child(self, age):
         return age < self.childhood_steps
+
+    # -----------------------------
+    # EATING
+    # -----------------------------
+    def cap(self, energy):
+        """
+        How much of what it just ate a body can actually keep.
+
+        A stomach, not a bank account: without a ceiling an agent that
+        forages well through a long childhood walks into adulthood with
+        thousands of energy and can pay the reproduction cost on every
+        single tick until it runs out - in one run three of them made 494
+        children in 480 ticks. With a ceiling, how often an agent breeds
+        is set by how fast it can FIND food, not by what it once saved.
+
+        None means no ceiling.
+        """
+        if self.max_energy is None:
+            return energy
+
+        return min(energy, self.max_energy)
 
     # -----------------------------
     # AGING

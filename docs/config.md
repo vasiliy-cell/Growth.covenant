@@ -176,6 +176,14 @@ cell is +5 reward AND +5 energy.
   less.
 - **`start_energy`** - what a body is born with. A newborn gets
   `reproduction_cost` from its parents instead.
+- **`max_energy`** - the stomach ceiling. Whatever an agent eats above it
+  is not kept. Remove the key (or set it to nothing) for no ceiling.
+
+  A body without a ceiling is a bank account: through a childhood that
+  costs nothing a good forager stored more than 12000 energy, and from the
+  tick it grew up it could pay the reproduction cost every single tick.
+  Three such agents made 494 children in 480 ticks. With a ceiling, how
+  often an agent breeds is set by how fast it can FIND food.
 - **`reproduction_threshold`** - an agent at or above this energy makes a
   child (asexually; the sexual species also matches partners by distance).
 - **`reproduction_cost`** - what the parents pay for it, and what the child

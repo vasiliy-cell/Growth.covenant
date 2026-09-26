@@ -336,7 +336,9 @@ class GridWorldEnv:
             position = agent.get_position()
 
             rewards[agent.agent_id] = self.world.get_reward(position)
-            agent.energy += rewards[agent.agent_id]
+            # A stomach holds only so much: what the world paid is added,
+            # and whatever would go above the ceiling is not kept.
+            agent.energy = self.life.cap(agent.energy + rewards[agent.agent_id])
             agent.total_reward += rewards[agent.agent_id]
 
             # good/bad cells turn empty once an agent touches them

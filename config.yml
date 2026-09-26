@@ -54,6 +54,7 @@ reward_shaping:
 energy:
   energy_leak: 0.5        # base cost of a tick, before aging
   start_energy: 50        # what the first agents are born with
+  max_energy: 300         # stomach ceiling: energy never goes above this
   reproduction_threshold: 100  # energy at which an agent makes a child
   reproduction_cost: 50   # what the parents pay, and what the child is born with
 

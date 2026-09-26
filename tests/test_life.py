@@ -87,6 +87,34 @@ def test_aging_can_be_switched_off():
 # -----------------------------
 # BIRTH
 # -----------------------------
+def test_a_full_stomach_does_not_keep_what_it_cannot_hold():
+    life = make_life(max_energy=300.0)
+
+    assert life.cap(299.0) == 299.0
+    assert life.cap(10_000.0) == 300.0
+
+
+def test_without_a_ceiling_energy_is_kept_whole():
+    assert make_life(max_energy=None).cap(10_000.0) == 10_000.0
+
+
+def test_eating_stops_at_the_ceiling():
+    """
+    The ceiling belongs to the tick, not just to the rules object: without
+    it a long childhood of good foraging pays for a child every tick.
+    """
+    env = make_env(make_life(childhood_steps=1000, max_energy=300.0))
+
+    agent = env.agents.all()[0]
+    agent.energy = 299.0
+    x, y = agent.get_position()
+    env.world.map.set_cell(x, y, 1)      # food under its feet
+
+    stand_still(env)
+
+    assert agent.energy == 300.0         # 299 + 5 of food, capped
+
+
 def test_a_body_is_born_with_its_start_energy():
     env = make_env(make_life(start_energy=42.0))
 
