@@ -16,6 +16,7 @@ import json
 import os
 import time
 
+import numpy as np
 import pyarrow.dataset as ds
 
 from src.persistence.log_reader import RunLogReader
@@ -250,6 +251,60 @@ def learning(reader):
         "curiosity_beta": column(table, "mean_curiosity_beta"),
         "sessions": column(table, "session"),
     }
+
+
+def heatmap(reader, recent_share=0.2):
+    """
+    How often a cell of the map had a body standing on it.
+
+    Read from the world snapshots, not from the step table: the snapshots
+    are every `world_snapshot_every`-th tick of every agent, which is tens
+    of thousands of rows instead of millions, and a heat map of where a
+    population lives does not get truer by counting every tick of it.
+
+    Two grids come back, because they answer different questions: `all` is
+    the whole run, `recent` only its last fifth - a population that has
+    just walked into the corners looks exactly like one that never left
+    the middle, if you only ever add the two up.
+    """
+    table = reader.world_agents()
+    size = world_size(reader)
+
+    if table.num_rows == 0 or size <= 0:
+        return {"size": 0, "all": [], "recent": [], "steps": [], "samples": 0}
+
+    step = table["step"].to_numpy()
+    x = table["x"].to_numpy().astype(int)
+    y = table["y"].to_numpy().astype(int)
+
+    inside = (x >= 0) & (x < size) & (y >= 0) & (y < size)
+    first, last = int(step.min()), int(step.max())
+    from_step = last - int((last - first) * recent_share)
+
+    def grid(mask):
+        counts = np.zeros((size, size), dtype=np.int64)
+        np.add.at(counts, (y[mask], x[mask]), 1)
+        return counts.tolist()
+
+    return {
+        "size": size,
+        "all": grid(inside),
+        "recent": grid(inside & (step >= from_step)),
+        "steps": [first, last],
+        "recent_from": from_step,
+        "samples": int(inside.sum()),
+    }
+
+
+def world_size(reader):
+    """The side of the map, as the run that wrote this log had it."""
+    for session in reversed(reader.sessions):
+        size = (session.get("config") or {}).get("world", {}).get("size")
+
+        if size:
+            return int(size)
+
+    return 0
 
 
 def family(reader):

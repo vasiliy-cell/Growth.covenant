@@ -163,6 +163,11 @@ def world_family(world: str):
     return reports.family(reader_for(world))
 
 
+@app.get("/api/worlds/{world:path}/heatmap")
+def world_heatmap(world: str):
+    return reports.heatmap(reader_for(world))
+
+
 @app.get("/api/worlds/{world:path}/stream")
 async def world_stream(world: str, request: Request):
     """

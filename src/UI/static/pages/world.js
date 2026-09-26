@@ -10,8 +10,9 @@ import { replay, resume, archive, remove, stop, keep, rename } from "./worlds.js
 const GROUP = "world-charts";
 
 export async function worldPage(root, id) {
-  const [catalog, details, rewards, learning, family] = await Promise.all([
+  const [catalog, details, rewards, learning, family, heat] = await Promise.all([
     api.worlds(), api.details(id), api.rewards(id), api.learning(id), api.family(id),
+    api.heatmap(id),
   ]);
 
   const entry = catalog.worlds.find((world) => world.id === id) || { id, seeds: [] };
@@ -21,6 +22,7 @@ export async function worldPage(root, id) {
   const learningNode = h("div", { class: "chart" });
   const populationNode = h("div", { class: "chart" });
   const treeNode = h("div", { class: "tree" });
+  const heatNode = h("div", { class: "chart tall" });
 
   root.replaceChildren(h("div", { class: "page" }, [
     header(entry, details),
@@ -30,6 +32,7 @@ export async function worldPage(root, id) {
         "Reward per episode",
         h("span", { class: "note" }, "env · curiosity · what the networks learned from"),
         h("span", { class: "spacer" }),
+        rewardModeButtons(rewards),
         rangeButtons(episodes),
       ]),
       h("div", { class: "body" }, rewardNode),
@@ -46,6 +49,15 @@ export async function worldPage(root, id) {
     ]),
     h("div", { class: "panel" }, [
       h("header", {}, [
+        "Where the agents are",
+        h("span", { class: "note" }, `${fmt.int(heat.samples)} snapshots of a body on a cell`),
+        h("span", { class: "spacer" }),
+        heatButtons(heatNode, heat),
+      ]),
+      h("div", { class: "body" }, heatNode),
+    ]),
+    h("div", { class: "panel" }, [
+      h("header", {}, [
         "Family tree",
         h("span", { class: "note" }, `${family.nodes.length} agents · ${family.nodes.filter((n) => n.alive).length} alive · hover a node`),
       ]),
@@ -54,6 +66,7 @@ export async function worldPage(root, id) {
   ]));
 
   drawRewards(rewardNode, rewards);
+  drawHeatmap(heatNode, heat, "recent");
   drawLearning(learningNode, learning);
   drawPopulation(populationNode, rewards);
   echarts.connect(GROUP);
@@ -149,6 +162,52 @@ function rangeButtons(episodes) {
   return box;
 }
 
+// ---------------- per agent, or the whole population ----------------
+// A sum over a population that grows says nothing about whether the
+// agents got better at anything: twice as many mouths earn twice as much
+// while each one stays as hungry as before.
+
+let rewardMode = "agent";
+
+function perAgent(values, agents) {
+  return values.map((value, index) => (agents[index] ? value / agents[index] : null));
+}
+
+function rewardSeries(rewards) {
+  const scale = (values) => (rewardMode === "agent" ? perAgent(values, rewards.agents) : values);
+
+  return [
+    line("shaped", scale(rewards.shaped), COLORS.orange, {
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: "rgba(240,136,62,.25)" },
+          { offset: 1, color: "rgba(240,136,62,0)" },
+        ]),
+      },
+    }),
+    line("env", scale(rewards.env), COLORS.blue),
+    line("curiosity", scale(rewards.intrinsic), COLORS.rose),
+  ];
+}
+
+function rewardModeButtons(rewards) {
+  const box = h("div", { class: "row", style: "gap:4px" });
+
+  const pick = (mode) => {
+    rewardMode = mode;
+
+    for (const child of box.children) child.classList.toggle("on", child.dataset.mode === mode);
+    if (rewardChart) rewardChart.setOption({ series: rewardSeries(rewards) });
+  };
+
+  for (const [mode, text] of [["agent", "per agent"], ["total", "total"]]) {
+    box.append(h("button", { class: "chip", "data-mode": mode, style: "margin:0", onclick: () => pick(mode) }, text));
+  }
+
+  box.firstChild.classList.add("on");
+  return box;
+}
+
 function zoomed(base) {
   return {
     ...base,
@@ -185,18 +244,7 @@ function drawRewards(node, rewards) {
   chart.setOption({
     ...base,
     xAxis: { ...base.xAxis, data: rewards.episodes, name: "episode", nameTextStyle: { color: "#62626c" } },
-    series: [
-      line("shaped", rewards.shaped, COLORS.orange, {
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: "rgba(240,136,62,.25)" },
-            { offset: 1, color: "rgba(240,136,62,0)" },
-          ]),
-        },
-      }),
-      line("env", rewards.env, COLORS.blue),
-      line("curiosity", rewards.intrinsic, COLORS.rose),
-    ],
+    series: rewardSeries(rewards),
   });
 }
 
@@ -238,6 +286,108 @@ function drawPopulation(node, rewards) {
       { name: "deaths", type: "bar", data: rewards.deaths, itemStyle: { color: COLORS.red }, barMaxWidth: 6 },
     ],
   });
+}
+
+// ---------------- where the agents are ----------------
+// One hue, dark to bright: a heat map answers "how much", and a rainbow
+// would turn an amount into four different-looking things. The map is
+// drawn the way the world is watched live - y downwards, (0,0) top left.
+
+const HEAT_COLORS = ["#131316", "#3d2718", "#7a4318", "#bd671d", "#f0883e", "#ffd2a1"];
+
+let heatChart = null;
+
+function drawHeatmap(node, heat, mode) {
+  if (!heat.size) {
+    node.replaceChildren(h("div", { class: "empty" }, "no world snapshots in this log yet"));
+    return;
+  }
+
+  const chart = heatChart || chartIn(node);
+  heatChart = chart;
+  cleanup(() => { heatChart = null; });
+
+  const grid = mode === "recent" ? heat.recent : heat.all;
+  const labels = Array.from({ length: heat.size }, (_, i) => String(i));
+  const data = [];
+  let max = 0;
+  let total = 0;
+
+  for (let y = 0; y < heat.size; y++) {
+    for (let x = 0; x < heat.size; x++) {
+      const value = grid[y][x];
+      total += value;
+      if (value > max) max = value;
+      data.push([x, y, value]);
+    }
+  }
+
+  const base = chartBase();
+  const axis = {
+    type: "category",
+    data: labels,
+    axisLine: { lineStyle: { color: "#26262b" } },
+    axisTick: { show: false },
+    splitArea: { show: false },
+    axisLabel: { interval: Math.max(1, Math.round(heat.size / 8)) - 1, color: "#62626c" },
+  };
+
+  chart.setOption({
+    ...base,
+    grid: { left: 44, right: 24, top: 14, bottom: 58 },
+    legend: { show: false },
+    tooltip: {
+      ...base.tooltip,
+      trigger: "item",
+      formatter: (point) => {
+        const [x, y, value] = point.data;
+        const share = total ? (value / total) * 100 : 0;
+        return `x ${x} · y ${y}<br/>${fmt.int(value)} snapshots · ${share.toFixed(2)}% of the time`;
+      },
+    },
+    xAxis: axis,
+    yAxis: { ...axis, inverse: true },
+    visualMap: {
+      min: 0,
+      max: Math.max(max, 1),
+      calculable: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: 6,
+      itemWidth: 10,
+      itemHeight: 90,
+      textStyle: { color: "#9d9da8", fontSize: 11 },
+      inRange: { color: HEAT_COLORS },
+    },
+    series: [{
+      type: "heatmap",
+      data,
+      progressive: 0,
+      itemStyle: { borderWidth: 0 },
+      emphasis: { itemStyle: { borderColor: "#ededf0", borderWidth: 1 } },
+    }],
+  });
+}
+
+function heatButtons(node, heat) {
+  const box = h("div", { class: "row", style: "gap:4px" });
+
+  const pick = (mode) => {
+    for (const child of box.children) child.classList.toggle("on", child.dataset.mode === mode);
+    drawHeatmap(node, heat, mode);
+  };
+
+  const choices = [
+    ["recent", `last ${fmt.int(Math.max(0, (heat.steps[1] || 0) - (heat.recent_from || 0)))} steps`],
+    ["all", "whole run"],
+  ];
+
+  for (const [mode, text] of choices) {
+    box.append(h("button", { class: "chip", "data-mode": mode, style: "margin:0", onclick: () => pick(mode) }, text));
+  }
+
+  box.firstChild.classList.add("on");
+  return box;
 }
 
 // ---------------- family tree ----------------
