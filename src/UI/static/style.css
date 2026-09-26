@@ -24,15 +24,15 @@
      the cards on it are almost neutral grey a shade darker, and the deepest
      thing on the page - an input, a console - is still grey. The only
      tinted things are the light behind the page and the accents. */
-  --bg: #15201f;
-  --panel: #1a1e21;
-  --panel-2: #1e2327;
-  --inset: #171b1e;
-  --hover: #262c30;
-  --border: #2e3439;
-  --border-strong: #3c4348;
+  --bg: #212425;
+  --panel: #1b1d1e;
+  --panel-2: #1f2122;
+  --inset: #181a1b;
+  --hover: #272a2b;
+  --border: #303334;
+  --border-strong: #3d4042;
   --ring: rgba(170, 205, 220, .05);
-  --hairline: rgba(206, 224, 232, .07);
+  --hairline: rgba(216, 224, 228, .06);
 
   --text: #e7ecef;
   --muted: #93a2ab;
@@ -85,17 +85,17 @@ html, body {
  * background image anyway, and a blurred layer at a negative z-index sits
  * under the first background anybody gives the body.
  *
- * Cold teal in the top corners, a deeper green-black pulling the bottom
- * right down, and one small amber ember low on the left: the page is lit
- * from behind and not evenly.
+ * The light is nearly colourless - cool grey above, a heavier grey-black
+ * pulling the bottom right down, and one small amber ember low on the left.
+ * What it gives the page is UNEVENNESS, not colour.
  */
 html {
   background-color: var(--bg);
   background-image:
-    radial-gradient(62vmax 46vmax at 10% -8%, rgba(46, 172, 152, .42), transparent 62%),
-    radial-gradient(54vmax 42vmax at 94% 2%, rgba(84, 176, 208, .32), transparent 64%),
-    radial-gradient(50vmax 40vmax at 74% 98%, rgba(10, 46, 52, .55), transparent 66%),
-    radial-gradient(30vmax 24vmax at 4% 92%, rgba(224, 139, 62, .14), transparent 66%);
+    radial-gradient(62vmax 46vmax at 10% -8%, rgba(164, 186, 190, .16), transparent 62%),
+    radial-gradient(54vmax 42vmax at 94% 2%, rgba(150, 175, 195, .13), transparent 64%),
+    radial-gradient(50vmax 40vmax at 74% 98%, rgba(10, 14, 16, .5), transparent 66%),
+    radial-gradient(30vmax 24vmax at 4% 92%, rgba(224, 139, 62, .08), transparent 66%);
   background-attachment: fixed;
 }
 
@@ -108,6 +108,9 @@ a { color: inherit; text-decoration: none; }
 /* ---------------- titlebar ---------------- */
 /* Three columns, not a row: the tabs are centred on the WINDOW, so the name
    on the left and the state on the right cannot push them off centre. */
+/* No background, no line, no shadow: the light behind the page runs straight
+   through the title bar, so the top of the window is not cut off from the
+   rest of it. */
 .titlebar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -115,9 +118,7 @@ a { color: inherit; text-decoration: none; }
   gap: 20px;
   height: 52px;
   padding: 0 18px;
-  background: rgba(28, 33, 37, .68);
-  border-bottom: 1px solid var(--border-strong);
-  box-shadow: inset 0 -1px 0 var(--ring);
+  background: transparent;
   flex: 0 0 auto;
 }
 
@@ -146,7 +147,7 @@ nav.tabs a {
 }
 
 nav.tabs a:hover { color: var(--cyan); background: var(--hover); }
-nav.tabs a.active { color: var(--accent-soft); background: #2a3135; border-color: var(--border-strong); }
+nav.tabs a.active { color: var(--accent-soft); background: #2c2f30; border-color: var(--border-strong); }
 
 .titlebar .status { justify-self: end; display: flex; gap: 8px; align-items: center; }
 
@@ -248,7 +249,7 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
   padding: 0 12px;
   font: 500 12px/1 var(--sans);
   color: var(--text);
-  background: #272d31;
+  background: #292c2d;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
@@ -256,8 +257,8 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
   white-space: nowrap;
 }
 
-.btn:hover { background: #30373b; border-color: #4d555a; }
-.btn:active { background: #20262a; }
+.btn:hover { background: #333738; border-color: #4e5254; }
+.btn:active { background: #222526; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 .btn .icon { display: inline-flex; color: var(--steel); }
 .btn:hover .icon { color: var(--text); }
@@ -320,7 +321,7 @@ input.switch {
   width: 34px; height: 20px;
   padding: 0;
   border-radius: 999px;
-  background: #333a3f;
+  background: #363a3b;
   border: 1px solid var(--border-strong);
   position: relative;
   cursor: pointer;
@@ -396,7 +397,7 @@ input.switch:checked::after { transform: translateX(14px); background: #fff; }
   cursor: pointer;
 }
 
-.chip:hover { color: var(--cyan); border-color: #515a60; }
+.chip:hover { color: var(--cyan); border-color: #53585a; }
 .chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); font-weight: 600; }
 
 .facet { padding: 12px 14px; border-bottom: 1px solid var(--border); }
@@ -442,7 +443,7 @@ td.name .ellipsis { display: block; }
   z-index: 45;
   min-width: 190px;
   padding: 4px;
-  background: #232a2e;
+  background: #26292a;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
   box-shadow: inset 0 0 0 1px var(--hairline), 0 12px 30px rgba(0, 0, 0, .6);
@@ -512,7 +513,7 @@ td.name .ellipsis { display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1b1f22;
+  background: #1c1e1f;
 }
 
 .live-stage canvas {
@@ -541,14 +542,14 @@ td.name .ellipsis { display: block; }
 .tree svg { width: 100%; height: 100%; }
 .node circle { stroke: var(--bg); stroke-width: 2px; cursor: pointer; }
 .node.dead circle { opacity: .5; }
-.link { fill: none; stroke: #3d4449; stroke-width: 1.3px; }
+.link { fill: none; stroke: #3f4345; stroke-width: 1.3px; }
 
 .card {
   position: fixed;
   z-index: 40;
   min-width: 270px;
   max-width: 370px;
-  background: #212629;
+  background: #232526;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px var(--hairline), 0 18px 44px rgba(0, 0, 0, .75);
@@ -598,7 +599,7 @@ td.name .ellipsis { display: block; }
   font: 600 10px var(--mono);
   letter-spacing: .4px;
   text-transform: uppercase;
-  background: #2a3135;
+  background: #2c2f30;
   border: 1px solid var(--border-strong);
 }
 
@@ -654,7 +655,7 @@ td.name .ellipsis { display: block; }
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(22, 27, 30, .55);
+  background: rgba(24, 26, 27, .55);
   backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
@@ -703,8 +704,8 @@ pre.console {
   max-height: 240px;
   overflow: auto;
   font: 11px/1.55 var(--mono);
-  color: #c2c9cd;
-  background: #171b1e;
+  color: #c4c8ca;
+  background: #181a1b;
   border-top: 1px solid var(--border);
   white-space: pre-wrap;
 }
@@ -714,5 +715,5 @@ pre.console {
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #363d42; border-radius: 10px; border: 2px solid var(--bg); }
-::-webkit-scrollbar-thumb:hover { background: #485158; }
+::-webkit-scrollbar-thumb { background: #383c3d; border-radius: 10px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #4a4f51; }

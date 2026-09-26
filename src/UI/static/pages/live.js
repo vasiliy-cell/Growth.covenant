@@ -17,7 +17,7 @@ import { api, h, fmt, route, cleanup, every, button } from "../lib.js";
 // are the one warm colour in the interface. An empty cell is graphite, not
 // black: a black hole in the middle of the page would cut straight through
 // the fog everything else sits in.
-const CELLS = [[38, 44, 48], [142, 196, 163], [200, 69, 60]];
+const CELLS = [[42, 45, 46], [142, 196, 163], [200, 69, 60]];
 
 const SIZE = 520;
 const SPEEDS = [[5, "5/s"], [10, "10/s"], [30, "30/s"], [60, "60/s"], [0, "full speed"]];
@@ -220,7 +220,7 @@ class Player {
     const scale = canvas.width / this.size;
 
     context.imageSmoothingEnabled = false;
-    context.fillStyle = "#1b1f22";
+    context.fillStyle = "#1c1e1f";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     if (this.mapKey) context.drawImage(this.map, 0, 0, canvas.width, canvas.height);

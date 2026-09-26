@@ -186,8 +186,8 @@ export const SERIES_COLORS = [
 // thing with colour in the box.
 export const CHART_INK = {
   label: "#93a2ab",
-  axis: "#2e3439",
-  split: "#242a2e",
+  axis: "#303334",
+  split: "#26292a",
   name: "#7ed4e6",
 };
 
@@ -204,11 +204,11 @@ export function chartBase() {
     grid: { left: 64, right: 26, top: 34, bottom: 52 },
     tooltip: {
       trigger: "axis",
-      backgroundColor: "#212629",
-      borderColor: "#3c4348",
+      backgroundColor: "#232526",
+      borderColor: "#3d4042",
       borderWidth: 1,
       textStyle: { color: "#e7ecef", fontSize: 11 },
-      axisPointer: { lineStyle: { color: "#4a545a" } },
+      axisPointer: { lineStyle: { color: "#4c5052" } },
     },
     legend: {
       top: 6,
