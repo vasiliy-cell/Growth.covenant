@@ -12,7 +12,7 @@ run:
 
 # --- AGENTS ---
 agents:
-  count: 1                # default offered by the terminal prompt
+  count: 4                # default offered by the terminal prompt
   view_size: 10           # window side; reaches view_size // 2 each way, so really 11x11
 
 # --- WORLD ---
@@ -56,12 +56,12 @@ energy:
   start_energy: 50        # what the first agents are born with
   max_energy: 300         # stomach ceiling: energy never goes above this
   reproduction_threshold: 100  # energy at which an agent makes a child
-  reproduction_cost: 50   # what the parents pay, and what the child is born with
+  reproduction_cost: 100   # what the parents pay, and what the child is born with
 
 # --- LIFE ---
 life:
-  max_childhood_steps: 12000  # longest childhood; breeding ends it sooner
-  death_energy: 0         # an adult at or below this energy dies
+  max_childhood_steps: 2500  # longest childhood; breeding ends it sooner
+  death_energy: -20         # an adult at or below this energy dies
   aging:
     every: 200            # every N ticks of a life...
     amount: 0.05          # ...the personal leak grows by this much, forever
@@ -142,7 +142,7 @@ genome:
 
     # --- CURIOSITY --- (intrinsic reward for novelty, cleared every window)
     curiosity_beta:               # strength, against a food cell worth +5
-      mean: 4.0
+      mean: 1.0
       scale: 0.5
       type: float
     curiosity_decay:
