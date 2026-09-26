@@ -301,7 +301,7 @@ function table(result, color) {
       ])),
       h("td", { class: "num" }, fmt.int(row.series.episodes.length)),
       h("td", { class: "num accent" }, fmt.number(row.end, 2)),
-      h("td", { class: "num" }, fmt.number(row.best, 2)),
+      h("td", { class: "num good" }, fmt.number(row.best, 2)),
       h("td", { class: "num" }, fmt.number(row.last, 2)),
     ]))),
   ]);

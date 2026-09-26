@@ -221,7 +221,7 @@ class Player {
 
     if (this.mapKey) context.drawImage(this.map, 0, 0, canvas.width, canvas.height);
 
-    context.fillStyle = "#ffb454";
+    context.fillStyle = "#f0aa63";
 
     for (const [x, y] of this.positions(now).values()) {
       context.beginPath();

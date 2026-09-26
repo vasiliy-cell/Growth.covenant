@@ -1,10 +1,11 @@
 /*
- * Solid deep colours, no blur.
+ * Deep colours, and one blurred light a long way behind them.
  *
- * The page is near-black with one soft light behind it - a gradient in the
- * body, not a filter over the panels, so nothing on screen is ever blurred.
- * Panels float over it, a shade lighter, drawn with TWO rounded lines: a
- * dark outer border and a faint cold hairline just inside it.
+ * The page is near-black with three wide blooms of colour blurred into the
+ * background - a light source behind the fog, never a filter over anything
+ * that has to be read. Panels float over it, solid and a shade lighter,
+ * drawn with TWO rounded lines: a dark outer border and a faint cold
+ * hairline just inside it.
  *
  * Colour is a language here, not decoration:
  *   - hazard orange is the only warm colour and always means something -
@@ -32,13 +33,15 @@
   --muted: #93a2ab;
   --dim: #5c6870;
 
-  --accent: #ff8c1a;
-  --accent-soft: #ffb454;
-  --accent-deep: #c4620c;
-  --accent-wash: rgba(255, 140, 26, .14);
-  --accent-ink: #160a01;
-  --accent-edge: #5a3a1e;
-  --accent-back: #1b1209;
+  /* Hazard amber seen through dust: warm enough to be the only signal on
+     the page, muted enough to sit next to cold greys without shouting. */
+  --accent: #e08b3e;
+  --accent-soft: #f0aa63;
+  --accent-deep: #a25f22;
+  --accent-wash: rgba(224, 139, 62, .14);
+  --accent-ink: #140a02;
+  --accent-edge: #55381c;
+  --accent-back: #191108;
 
   --cyan: #7ed4e6;
   --steel: #557584;
@@ -47,11 +50,8 @@
   --crimson: #c8453c;
   --yellow: #e6c34d;
 
-  /* Kept as names the rest of the sheet already uses. */
-  --gold: var(--yellow);
+  /* Crimson, lightened: the colour of a warning about to be read. */
   --rose: #d9695f;
-  --red: var(--crimson);
-  --green: var(--sage);
 
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
@@ -74,30 +74,37 @@ html, body {
 
 body { display: flex; flex-direction: column; overflow: hidden; }
 
-/* The light source behind everything: two wide gradients, no blur. */
+/* The light behind the fog: three blooms, blurred into each other and into
+   the black. It sits under everything (z-index) and is spread past the edges
+   of the window (inset) so the blur has nowhere to fade out on screen. */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -25vmax;
   z-index: -1;
   pointer-events: none;
+  filter: blur(90px);
   background:
-    radial-gradient(1000px 640px at 8% -12%, rgba(255, 140, 26, .07), transparent 70%),
-    radial-gradient(1200px 760px at 108% -4%, rgba(126, 212, 230, .05), transparent 72%);
+    radial-gradient(34vmax 26vmax at 22% 10%, rgba(224, 139, 62, .20), transparent 62%),
+    radial-gradient(32vmax 26vmax at 80% 6%, rgba(86, 146, 176, .16), transparent 64%),
+    radial-gradient(30vmax 24vmax at 58% 96%, rgba(150, 62, 54, .12), transparent 62%);
 }
 
-::selection { background: rgba(255, 140, 26, .3); }
+::selection { background: rgba(224, 139, 62, .32); }
 
 a { color: inherit; text-decoration: none; }
 
 /* ---------------- titlebar ---------------- */
+/* Three columns, not a row: the tabs are centred on the WINDOW, so the name
+   on the left and the state on the right cannot push them off centre. */
 .titlebar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 20px;
   height: 52px;
   padding: 0 18px;
-  background: #0d0f11;
+  background: rgba(13, 15, 17, .82);
   border-bottom: 1px solid var(--border-strong);
   box-shadow: inset 0 -1px 0 var(--ring);
   flex: 0 0 auto;
@@ -110,6 +117,7 @@ a { color: inherit; text-decoration: none; }
 
 nav.tabs {
   display: flex;
+  justify-self: center;
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -126,10 +134,10 @@ nav.tabs a {
   border: 1px solid transparent;
 }
 
-nav.tabs a:hover { color: var(--text); background: var(--hover); }
+nav.tabs a:hover { color: var(--cyan); background: var(--hover); }
 nav.tabs a.active { color: var(--accent-soft); background: #1c2024; border-color: var(--border-strong); }
 
-.titlebar .status { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.titlebar .status { justify-self: end; display: flex; gap: 8px; align-items: center; }
 
 .pill {
   font: 11px/1 var(--mono);
@@ -157,7 +165,7 @@ main { flex: 1 1 auto; overflow: auto; padding: var(--gap); }
 
 .page-head { display: flex; align-items: center; gap: 12px; }
 .page-head h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: -.1px; min-width: 0; }
-.page-head .sub { color: var(--muted); font: 12px var(--mono); }
+.page-head .sub { color: var(--steel); font: 12px var(--mono); }
 
 .panel {
   position: relative;
@@ -193,8 +201,13 @@ main { flex: 1 1 auto; overflow: auto; padding: var(--gap); }
   font-weight: 600;
 }
 
-.panel > header .note { color: var(--dim); font: 400 11px var(--mono); }
+.panel > header .note { color: var(--steel); font: 400 11px var(--mono); }
 .panel > .body { padding: 14px; }
+
+/* Sage is what went well, crimson is what died: the two words a number can
+   say before it is read. */
+.good { color: var(--sage); }
+.bad { color: var(--crimson); }
 
 .muted { color: var(--muted); }
 .dim { color: var(--dim); }
@@ -212,7 +225,7 @@ main { flex: 1 1 auto; overflow: auto; padding: var(--gap); }
   padding: 10px 12px;
 }
 
-.stat .name { color: var(--muted); font-size: 11px; }
+.stat .name { color: var(--steel); font-size: 11px; }
 .stat .value { font: 600 18px/1.25 var(--mono); margin-top: 3px; }
 
 /* ---------------- buttons ---------------- */
@@ -235,7 +248,7 @@ main { flex: 1 1 auto; overflow: auto; padding: var(--gap); }
 .btn:hover { background: #232830; border-color: #414a50; }
 .btn:active { background: #15181b; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.btn .icon { display: inline-flex; color: var(--muted); }
+.btn .icon { display: inline-flex; color: var(--steel); }
 .btn:hover .icon { color: var(--text); }
 
 .btn.square { width: 32px; padding: 0; justify-content: center; }
@@ -280,7 +293,7 @@ input::placeholder { color: var(--dim); }
 input:focus, select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 140, 26, .16);
+  box-shadow: 0 0 0 3px rgba(224, 139, 62, .18);
 }
 
 input[type="range"] { height: auto; padding: 0; border: none; background: transparent; accent-color: var(--accent); box-shadow: none; }
@@ -356,7 +369,7 @@ input.switch:checked::after { transform: translateX(14px); background: #fff; }
   cursor: pointer;
 }
 
-.segmented button:hover { color: var(--text); background: var(--hover); }
+.segmented button:hover { color: var(--cyan); background: var(--hover); }
 .segmented button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); font-weight: 600; }
 
 /* chips: a filter value you click instead of type */
@@ -374,7 +387,7 @@ input.switch:checked::after { transform: translateX(14px); background: #fff; }
   cursor: pointer;
 }
 
-.chip:hover { color: var(--text); border-color: #465057; }
+.chip:hover { color: var(--cyan); border-color: #465057; }
 .chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); font-weight: 600; }
 
 .facet { padding: 12px 14px; border-bottom: 1px solid var(--border); }
@@ -397,6 +410,7 @@ td { padding: 11px 14px; border-bottom: 1px solid var(--border); white-space: no
 tbody tr:last-child td { border-bottom: none; }
 tbody tr.clickable { cursor: pointer; }
 tbody tr.clickable:hover { background: var(--hover); }
+tbody tr.clickable:hover td.name .ellipsis { color: var(--cyan); }
 td.num, th.num { text-align: right; font-family: var(--mono); }
 td.actions { text-align: right; width: 1%; }
 td.actions .row { justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
@@ -441,8 +455,8 @@ td.name .ellipsis { display: block; }
   text-align: left;
 }
 
-.menu-item .icon { color: var(--muted); display: inline-flex; }
-.menu-item:hover { background: var(--hover); }
+.menu-item .icon { color: var(--steel); display: inline-flex; }
+.menu-item:hover { background: var(--hover); color: var(--cyan); }
 .menu-item.danger { color: var(--rose); }
 .menu-item.danger .icon { color: var(--rose); }
 

@@ -168,8 +168,8 @@ export const fmt = {
 // crimson for death and penalties, yellow for a state to notice.
 
 export const COLORS = {
-  orange: "#ff8c1a",
-  amber: "#ffb454",
+  orange: "#e08b3e",
+  amber: "#f0aa63",
   cyan: "#7ed4e6",
   steel: "#557584",
   sage: "#8ec4a3",
@@ -179,8 +179,8 @@ export const COLORS = {
 };
 
 export const SERIES_COLORS = [
-  "#ff8c1a", "#7ed4e6", "#8ec4a3", "#e6c34d", "#c8453c",
-  "#ffb454", "#557584", "#b6a8e0", "#a5d6ff", "#ffd2a1",
+  "#e08b3e", "#7ed4e6", "#8ec4a3", "#e6c34d", "#c8453c",
+  "#f0aa63", "#7f9aa8", "#b6a8e0", "#a5d6ff", "#e8cba6",
 ];
 
 // Grid, axis lines and labels: cold and quiet, so the series are the only

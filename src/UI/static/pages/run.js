@@ -179,7 +179,7 @@ function runStats(details, family) {
       stat("steps", fmt.int(sessions.length ? sessions[sessions.length - 1].to_step : 0)),
       stat("agents now", fmt.int(alive)),
       stat("agents ever", fmt.int(family.nodes.length)),
-      stat("deaths", fmt.int(details.counts.deaths)),
+      stat("deaths", fmt.int(details.counts.deaths), "bad"),
       stat("updates", fmt.int(details.counts.updates)),
       stat("seed", sessions[0]?.seed ?? "—"),
     ]),
@@ -193,8 +193,11 @@ function runStats(details, family) {
   ];
 }
 
-function stat(name, value) {
-  return h("div", { class: "stat" }, [h("div", { class: "name" }, name), h("div", { class: "value" }, value)]);
+function stat(name, value, tone = "") {
+  return h("div", { class: "stat" }, [
+    h("div", { class: "name" }, name),
+    h("div", { class: `value ${tone}` }, value),
+  ]);
 }
 
 // ---------------- who the charts are about ----------------
@@ -254,8 +257,8 @@ function rewardSeries(rewards, view) {
     line("shaped", scale(rewards.shaped), COLORS.orange, {
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: "rgba(255,140,26,.22)" },
-          { offset: 1, color: "rgba(255,140,26,0)" },
+          { offset: 0, color: "rgba(224,139,62,.22)" },
+          { offset: 1, color: "rgba(224,139,62,0)" },
         ]),
       },
     }),
@@ -286,10 +289,10 @@ function drawRewards(charts, node, rewards, view) {
         bottom: 16,
         borderColor: "#23272b",
         backgroundColor: "#0d0f11",
-        fillerColor: "rgba(255,140,26,.14)",
+        fillerColor: "rgba(224,139,62,.14)",
         dataBackground: { lineStyle: { color: "#2f3a41" }, areaStyle: { color: "#171c20" } },
-        selectedDataBackground: { lineStyle: { color: COLORS.orange }, areaStyle: { color: "rgba(255,140,26,.2)" } },
-        handleStyle: { color: COLORS.orange, borderColor: "#c4620c" },
+        selectedDataBackground: { lineStyle: { color: COLORS.orange }, areaStyle: { color: "rgba(224,139,62,.2)" } },
+        handleStyle: { color: COLORS.orange, borderColor: "#a25f22" },
         moveHandleStyle: { color: "#31373d" },
         textStyle: { color: CHART_INK.label },
       },
@@ -347,7 +350,7 @@ function drawPopulation(charts, node, rewards) {
     xAxis: { ...base.xAxis, data: rewards.episodes, name: "episode" },
     yAxis: { ...base.yAxis, name: "agents alive · births · deaths" },
     series: [
-      line("agents", rewards.agents, COLORS.orange, { areaStyle: { color: "rgba(255,140,26,.1)" } }),
+      line("agents", rewards.agents, COLORS.orange, { areaStyle: { color: "rgba(224,139,62,.1)" } }),
       { name: "births", type: "bar", data: rewards.births, itemStyle: { color: COLORS.sage }, barMaxWidth: 6 },
       { name: "deaths", type: "bar", data: rewards.deaths, itemStyle: { color: COLORS.crimson }, barMaxWidth: 6 },
     ],
@@ -359,7 +362,7 @@ function drawPopulation(charts, node, rewards) {
 // would turn an amount into four different-looking things. The map is drawn
 // the way the world is watched live - y downwards, (0,0) top left.
 
-const HEAT_COLORS = ["#101416", "#2c2a1e", "#6b4318", "#bd671d", "#ff8c1a", "#ffd2a1"];
+const HEAT_COLORS = ["#101416", "#28271e", "#5e4222", "#a2652b", "#e08b3e", "#f3c795"];
 
 export function heatOption(grid, size, { title } = {}) {
   const base = chartBase();
