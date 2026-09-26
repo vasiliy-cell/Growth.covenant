@@ -265,6 +265,8 @@ class GridWorldEnv:
 
         for parent in parents:
             parent.offspring += 1
+            # A parent is an adult from now on, however young it is.
+            parent.grow_up()
 
         print(f"[birth @ step {self.current_step}] -> {baby.agent_id}  (pop {len(self.agents)})")
 
@@ -331,7 +333,9 @@ class GridWorldEnv:
             position = agent.get_position()
 
             rewards[agent.agent_id] = self.world.get_reward(position)
-            agent.energy += rewards[agent.agent_id]
+            # A stomach holds only so much: what the world paid is added,
+            # and whatever would go above the ceiling is not kept.
+            agent.energy = self.life.cap(agent.energy + rewards[agent.agent_id])
             agent.total_reward += rewards[agent.agent_id]
 
             # good/bad cells turn empty once an agent touches them
@@ -346,7 +350,7 @@ class GridWorldEnv:
         deaths = self._reap()
 
         # 4c. ONE TICK LIVED. Counted after the reaping and not before it,
-        #     so a newborn is immortal for exactly life.childhood_steps
+        #     so a newborn is immortal for exactly life.max_childhood_steps
         #     ticks and the leak it paid above is the leak of the age it
         #     actually had while living this tick.
         for agent in self.agents:

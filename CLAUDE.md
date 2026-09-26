@@ -50,7 +50,7 @@ The population turns over even though the world does not. The rules live in
 `life` / `energy` sections of `config.yml`); an agent carries only its own
 `age` and asks `Life` what that age costs it:
 
-- **childhood** — the first `life.childhood_steps` ticks after birth. The
+- **childhood** — the first `life.max_childhood_steps` ticks after birth. The
   agent ages and leaks energy, but nothing can kill it,
 - **adulthood** — mortal. At or below `life.death_energy` the agent starves
   and `GridWorldEnv._reap()` removes it from the run,
@@ -62,7 +62,7 @@ The population turns over even though the world does not. The rules live in
 
 Order inside a tick: eat → leak → **death** → age → birth. Death before
 birth, so a starving agent does not reproduce on its last tick; aging after
-death, so childhood really is `childhood_steps` whole ticks.
+death, so childhood really is `max_childhood_steps` whole ticks.
 
 `info` from `env.step()` carries `died` (ids that left this tick) and
 `alive`. An agent in `died` has no next observation, so `src/run.py` logs

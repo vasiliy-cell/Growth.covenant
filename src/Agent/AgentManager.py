@@ -107,6 +107,7 @@ class AgentManager:
                     "parents": list(agent.parents),
                     "total_reward": agent.total_reward,
                     "offspring": agent.offspring,
+                    "adult_at": agent.adult_at,
                 }
                 for agent in self.all()
             ],
@@ -143,6 +144,8 @@ class AgentManager:
             agent.age = record["age"]
             agent.total_reward = record["total_reward"]
             agent.offspring = record["offspring"]
+            # Saved before breeding ended childhood: nobody had one.
+            agent.adult_at = record.get("adult_at")
 
             self.agents[agent.agent_id] = agent
 

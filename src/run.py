@@ -31,7 +31,7 @@ def load_config(path=CONFIG_PATH):
 
 def apply_overrides(config, overrides):
     """
-    --set life.childhood_steps=2000, for a run that differs from the file
+    --set life.max_childhood_steps=2000, for a run that differs from the file
     in one place and should not have the file edited for it.
 
     The value goes through yaml, so 2000 is an int, 0.2 is a float and
@@ -285,7 +285,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     series:     a name this run shares with its siblings; it nests the log
                 folder and is written into run.json.
     live_every: how often to rewrite live.json for whoever is watching.
-    overrides:  ["life.childhood_steps=2000", ...] for this run only.
+    overrides:  ["life.max_childhood_steps=2000", ...] for this run only.
     render:     steps per second to run at so the world can be WATCHED -
                 every step goes to live.json and the loop waits between
                 steps. 0 or None runs at full speed.

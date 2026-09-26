@@ -8,7 +8,7 @@ class Life:
 
     A life has two periods, and the first one is free:
 
-      - CHILDHOOD - the first `childhood_steps` ticks after birth. The agent
+      - CHILDHOOD - the first `max_childhood_steps` ticks after birth. The agent
         ages and leaks energy like everybody else, but nothing can kill it.
         Every newborn therefore gets exactly the same amount of time to
         learn where the food is before the world starts charging for
@@ -34,19 +34,21 @@ class Life:
 
     def __init__(
         self,
-        childhood_steps=1000,
+        max_childhood_steps=1000,
         base_leak=0.5,
         aging_every=200,
         aging_amount=0.05,
         death_energy=0.0,
         start_energy=100.0,
+        max_energy=None,
     ):
-        self.childhood_steps = childhood_steps
+        self.max_childhood_steps = max_childhood_steps
         self.base_leak = base_leak
         self.aging_every = aging_every
         self.aging_amount = aging_amount
         self.death_energy = death_energy
         self.start_energy = start_energy
+        self.max_energy = max_energy
 
     @classmethod
     def from_config(cls, source=None):
@@ -59,49 +61,102 @@ class Life:
         energy_cfg = source.get("energy", {})
 
         return cls(
-            childhood_steps=int(life_cfg.get("childhood_steps", 1000)),
+            max_childhood_steps=int(life_cfg.get("max_childhood_steps", 1000)),
             base_leak=float(energy_cfg.get("energy_leak", 0.5)),
             aging_every=int(aging_cfg.get("every", 200)),
             aging_amount=float(aging_cfg.get("amount", 0.05)),
             death_energy=float(life_cfg.get("death_energy", 0.0)),
             start_energy=float(energy_cfg.get("start_energy", 100.0)),
+            max_energy=(
+                float(energy_cfg["max_energy"])
+                if energy_cfg.get("max_energy") is not None else None
+            ),
         )
 
     # -----------------------------
     # PERIOD
     # -----------------------------
-    def is_child(self, age):
-        return age < self.childhood_steps
+    def is_child(self, age, adult_at=None):
+        return age < self.adulthood(adult_at)
+
+    def adulthood(self, adult_at=None):
+        """
+        The age at which this body's childhood ended.
+
+        `max_childhood_steps` for most, but breeding ends childhood on the
+        spot: an agent that has fed itself up to the reproduction
+        threshold has shown it can forage, and from then on it pays for
+        itself like everybody else. `adult_at` is the age it first bred at,
+        None if it never has.
+        """
+        if adult_at is None:
+            return self.max_childhood_steps
+
+        return min(adult_at, self.max_childhood_steps)
+
+    # -----------------------------
+    # EATING
+    # -----------------------------
+    def cap(self, energy):
+        """
+        How much of what it just ate a body can actually keep.
+
+        A stomach, not a bank account: without a ceiling an agent that
+        forages well through a long childhood walks into adulthood with
+        thousands of energy and can pay the reproduction cost on every
+        single tick until it runs out - in one run three of them made 494
+        children in 480 ticks. With a ceiling, how often an agent breeds
+        is set by how fast it can FIND food, not by what it once saved.
+
+        None means no ceiling.
+        """
+        if self.max_energy is None:
+            return energy
+
+        return min(energy, self.max_energy)
 
     # -----------------------------
     # AGING
     # -----------------------------
-    def leak(self, age):
+    def leak(self, age, adult_at=None):
         """
         What being alive costs this body right now.
 
-        A step function, not a smooth curve: the leak is the base cost plus
-        one `aging_amount` for every full `aging_every` ticks already lived,
-        so a whole generation born together ages in the same visible jumps.
+        A child pays nothing. Childhood is meant to be the period where the
+        world does not charge for mistakes, and a leak it could not yet
+        forage against only moved the bill: a child that ate less than it
+        leaked went into debt for the whole of its childhood and starved on
+        the tick it grew up, however well it had learned to feed itself by
+        then.
+
+        An adult pays the base cost, and a step - not a smooth curve - for
+        age on top of it: one `aging_amount` for every full `aging_every`
+        ticks of ADULT life, counted from the end of childhood, so the bill
+        starts rising the tick the charging starts.
         """
+        if self.is_child(age, adult_at):
+            return 0.0
+
         if self.aging_every <= 0:
             return self.base_leak
 
-        return self.base_leak + (age // self.aging_every) * self.aging_amount
+        adult_age = age - self.adulthood(adult_at)
+
+        return self.base_leak + (adult_age // self.aging_every) * self.aging_amount
 
     # -----------------------------
     # DEATH
     # -----------------------------
-    def is_dead(self, age, energy):
+    def is_dead(self, age, energy, adult_at=None):
         """Starvation, and only for an adult - childhood ignores energy."""
-        if self.is_child(age):
+        if self.is_child(age, adult_at):
             return False
 
         return energy <= self.death_energy
 
     def __repr__(self):
         return (
-            f"Life(childhood={self.childhood_steps}, leak={self.base_leak}, "
+            f"Life(childhood={self.max_childhood_steps}, leak={self.base_leak}, "
             f"aging=+{self.aging_amount}/{self.aging_every}, "
             f"death_at={self.death_energy})"
         )

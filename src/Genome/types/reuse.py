@@ -16,13 +16,13 @@ class reuse:
             genotype["gamma"] = 0.999
 
         if genotype["learning_rate"] < 0:
-            genotype["learning_rate"] = abs(genotype["learning_rate"])
+            genotype["learning_rate"] = 0.0001
 
         if genotype["sigma"] <0:
             genotype["sigma"] = 0.01
 
         if genotype["max_norm"] < 0:
-            genotype["max_norm"] = abs(genotype["max_norm"])
+            genotype["max_norm"] = 0.0001
 
         if genotype["epsilon_decay"] >= 1:
             genotype["epsilon_decay"] = 0.999
@@ -32,13 +32,23 @@ class reuse:
         return genotype
 
     def mutate(genotype, rng):
+        """
+        The child's genome: the parent's, with a gene here and there
+        multiplied by a number around 1.
+
+        A gene changes with probability `sigma` and not otherwise, and it
+        changes by a FACTOR, so the same sigma means the same thing to a
+        learning rate of 0.001 and to a buffer of 10000. Adding a width in
+        absolute units, which this used to do on every gene of every child,
+        meant 90% of a learning rate and nothing at all of a buffer size.
+        """
         sigma = genotype["sigma"]
-        mutated_genotype = {}
+        mutated_genotype = dict(genotype)
+
         for gene_name, value in genotype.items():
-            mutated_genotype[gene_name] = rng.normal(value, sigma)
 
             if rng.random() < sigma:
-                mutated_genotype[gene_name] *= rng.uniform(0.2, 5.0)
+                mutated_genotype[gene_name] = value * rng.uniform(0.5, 2.0)
 
         if mutated_genotype["gamma"] <= 0: 
             mutated_genotype["gamma"] = 0.001
@@ -46,13 +56,13 @@ class reuse:
             mutated_genotype["gamma"] = 0.999
 
         if mutated_genotype["learning_rate"] < 0:
-            mutated_genotype["learning_rate"] = abs(mutated_genotype["learning_rate"])
+            mutated_genotype["learning_rate"] = 0.0001
 
         if mutated_genotype["sigma"] <0:
             mutated_genotype["sigma"] = 0.01
 
         if mutated_genotype["max_norm"] < 0:
-            mutated_genotype["max_norm"] = abs(mutated_genotype["max_norm"])
+            mutated_genotype["max_norm"] = 0.0001
 
         if mutated_genotype["epsilon_decay"] >= 1:
             mutated_genotype["epsilon_decay"] = 0.999
