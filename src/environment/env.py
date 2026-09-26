@@ -350,7 +350,7 @@ class GridWorldEnv:
         deaths = self._reap()
 
         # 4c. ONE TICK LIVED. Counted after the reaping and not before it,
-        #     so a newborn is immortal for exactly life.childhood_steps
+        #     so a newborn is immortal for exactly life.max_childhood_steps
         #     ticks and the leak it paid above is the leak of the age it
         #     actually had while living this tick.
         for agent in self.agents:

@@ -60,7 +60,7 @@ energy:
 
 # --- LIFE ---
 life:
-  childhood_steps: 12000  # ticks after birth in which nothing can kill the agent
+  max_childhood_steps: 12000  # longest childhood; breeding ends it sooner
   death_energy: 0         # an adult at or below this energy dies
   aging:
     every: 200            # every N ticks of a life...

@@ -27,7 +27,7 @@ def make_run(seed=1, size=10, agents=2, species="clons"):
         rng=rng,
         agent_count=agents,
         species_name=species,
-        life=Life(childhood_steps=10 ** 9, start_energy=100.0),
+        life=Life(max_childhood_steps=10 ** 9, start_energy=100.0),
     )
     observations = env.start()
 
@@ -137,7 +137,7 @@ def resume(record, seed=999, species="clons"):
         rng=rng,
         agent_count=1,
         species_name=species,
-        life=Life(childhood_steps=10 ** 9, start_energy=100.0),
+        life=Life(max_childhood_steps=10 ** 9, start_energy=100.0),
     )
 
     _, observations, brains = Checkpoint.restore(

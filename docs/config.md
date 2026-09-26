@@ -13,7 +13,7 @@ written.
 One value can be overridden for a single run without editing the file:
 
 ```bash
-python src/run.py --set life.childhood_steps=2000 --set world.size=32
+python src/run.py --set life.max_childhood_steps=2000 --set world.size=32
 ```
 
 ---
@@ -201,15 +201,16 @@ what can kill an agent, not about what it may do.
 
 A life has two periods, and the first one is free.
 
-**Childhood** - the first `childhood_steps` ticks after birth. The agent
-ages and eats like everybody else, but it pays no leak and nothing can kill
-it: every newborn gets the same amount of time to learn where the food is
+**Childhood** - at most the first `max_childhood_steps` ticks after birth:
+a ceiling and not a length, because breeding ends it sooner. A child ages
+and eats like everybody else, but it pays no leak and nothing can kill it,
+so every newborn gets the same amount of time to learn where the food is
 before the world starts charging at all.
 
 **Breeding ends childhood on the spot**, however young the parent is. An
 agent that fed itself up to the reproduction threshold has shown it can
 forage, and a population of immortal parents only fills the map. Aging is
-counted from that moment for such a body, not from `childhood_steps`.
+counted from that moment for such a body, not from `max_childhood_steps`.
 
 A leak during childhood only moved the bill: a child that ate less than it
 leaked went into debt for the whole of its childhood and starved on the
@@ -224,12 +225,15 @@ There is no hard age limit on purpose. The personal leak grows by
 growing, so old age is not a number to compare against - it is a bill that
 keeps rising until no amount of foraging can pay it.
 
-- **`childhood_steps`** - ticks of guaranteed immortality after birth.
+- **`max_childhood_steps`** - the longest childhood a body can have: ticks
+  of guaranteed immortality after birth, unless it breeds first.
 - **`death_energy`** - an adult at or below this energy dies.
 - **`aging.every`** / **`aging.amount`** - every N ticks of adult life,
-  the personal leak grows by this much. The leak at age A is 0 for a child
-  and `energy_leak + ((A - childhood_steps) // every) * amount` for an
-  adult, so the bill starts rising the tick the charging starts.
+  the personal leak grows by this much. The leak is 0 for a child, and for
+  an adult it is `energy_leak + (adult ticks lived // every) * amount`,
+  counted from whenever its childhood ended - `max_childhood_steps` or its
+  first child, whichever came first. So the bill starts rising the tick the
+  charging starts.
 
 ## `genome`
 

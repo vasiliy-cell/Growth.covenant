@@ -6,7 +6,7 @@ from src.utils.rng import RunRandom
 def make_life(**overrides):
     """Short, harsh rules - a whole life fits into a handful of ticks."""
     settings = dict(
-        childhood_steps=3,
+        max_childhood_steps=3,
         base_leak=1.0,
         aging_every=2,
         aging_amount=0.5,
@@ -33,8 +33,8 @@ def stand_still(env):
 # -----------------------------
 # PERIODS
 # -----------------------------
-def test_childhood_lasts_exactly_childhood_steps():
-    life = make_life(childhood_steps=3)
+def test_childhood_lasts_exactly_max_childhood_steps():
+    life = make_life(max_childhood_steps=3)
 
     assert life.is_child(0)
     assert life.is_child(2)
@@ -42,13 +42,13 @@ def test_childhood_lasts_exactly_childhood_steps():
 
 
 def test_breeding_ends_childhood_however_young_the_parent_is():
-    life = make_life(childhood_steps=1000)
+    life = make_life(max_childhood_steps=1000)
 
     assert life.is_child(age=5)
     assert not life.is_child(age=5, adult_at=3)
     assert life.is_dead(age=5, energy=0.0, adult_at=3)
 
-    # ...and it ages from the tick it bred, not from childhood_steps:
+    # ...and it ages from the tick it bred, not from max_childhood_steps:
     # base cost at first, one step up after aging_every adult ticks.
     assert life.leak(age=3, adult_at=3) == 1.0
     assert life.leak(age=5, adult_at=3) == 1.5
@@ -59,7 +59,7 @@ def test_a_parent_grows_up_in_the_world_the_tick_it_breeds():
     A population of immortal children fills the map: whoever can afford a
     child has shown it can forage, so from then on it pays for itself.
     """
-    env = make_env(make_life(childhood_steps=10 ** 9))
+    env = make_env(make_life(max_childhood_steps=10 ** 9))
 
     parent = env.agents.all()[0]
     parent.energy = 200.0
@@ -76,13 +76,13 @@ def test_a_parent_grows_up_in_the_world_the_tick_it_breeds():
 
 
 def test_a_child_survives_any_amount_of_hunger():
-    life = make_life(childhood_steps=3)
+    life = make_life(max_childhood_steps=3)
 
     assert not life.is_dead(age=2, energy=-1000.0)
 
 
 def test_an_adult_dies_at_the_threshold_and_not_above_it():
-    life = make_life(childhood_steps=3, death_energy=0.0)
+    life = make_life(max_childhood_steps=3, death_energy=0.0)
 
     assert life.is_dead(age=3, energy=0.0)
     assert life.is_dead(age=3, energy=-0.1)
@@ -93,7 +93,7 @@ def test_an_adult_dies_at_the_threshold_and_not_above_it():
 # AGING
 # -----------------------------
 def test_a_child_pays_nothing_for_being_alive():
-    life = make_life(childhood_steps=3, base_leak=1.0)
+    life = make_life(max_childhood_steps=3, base_leak=1.0)
 
     assert life.leak(0) == 0.0
     assert life.leak(2) == 0.0
@@ -105,7 +105,7 @@ def test_the_leak_starts_at_adulthood_and_grows_from_there():
     agent was born: counted from birth, a grown up would step straight
     into the leak of an age it spent as a child.
     """
-    life = make_life(childhood_steps=3, base_leak=1.0, aging_every=2, aging_amount=0.5)
+    life = make_life(max_childhood_steps=3, base_leak=1.0, aging_every=2, aging_amount=0.5)
 
     assert life.leak(3) == 1.0      # first adult tick: the base cost alone
     assert life.leak(4) == 1.0
@@ -140,7 +140,7 @@ def test_eating_stops_at_the_ceiling():
     """
     # A ceiling under the reproduction threshold of config.yml: what is
     # measured here is the stomach, not what a full one then spends.
-    env = make_env(make_life(childhood_steps=1000, max_energy=80.0))
+    env = make_env(make_life(max_childhood_steps=1000, max_energy=80.0))
 
     agent = env.agents.all()[0]
     agent.energy = 79.0
@@ -163,7 +163,7 @@ def test_a_body_is_born_with_its_start_energy():
 # IN THE WORLD
 # -----------------------------
 def test_an_agent_ages_one_tick_per_step():
-    env = make_env(make_life(childhood_steps=1000))
+    env = make_env(make_life(max_childhood_steps=1000))
 
     stand_still(env)
     stand_still(env)
@@ -172,7 +172,7 @@ def test_an_agent_ages_one_tick_per_step():
 
 
 def test_nobody_dies_during_childhood():
-    env = make_env(make_life(childhood_steps=1000, base_leak=1000.0))
+    env = make_env(make_life(max_childhood_steps=1000, base_leak=1000.0))
 
     for _ in range(5):
         _, _, info = stand_still(env)
@@ -186,7 +186,7 @@ def test_a_death_carries_the_whole_life_out_with_it():
     Nothing else in the logs can answer "what happened to this one"
     without a join across a million rows.
     """
-    env = make_env(make_life(childhood_steps=1, base_leak=1000.0))
+    env = make_env(make_life(max_childhood_steps=1, base_leak=1000.0))
 
     stand_still(env)
     _, _, info = stand_still(env)
@@ -204,7 +204,7 @@ def test_a_death_carries_the_whole_life_out_with_it():
 
 def test_a_birth_names_its_parents_and_counts_them(tmp_path):
     """A lineage cannot be reconstructed from anything else afterwards."""
-    env = make_env(make_life(childhood_steps=10 ** 9))
+    env = make_env(make_life(max_childhood_steps=10 ** 9))
 
     for agent in env.agents:
         agent.energy = 10000.0
@@ -223,7 +223,7 @@ def test_a_birth_names_its_parents_and_counts_them(tmp_path):
 def test_a_starving_adult_leaves_the_run():
     # a leak nothing on the map can pay for, so the outcome does not depend
     # on what the bodies happen to be standing on
-    env = make_env(make_life(childhood_steps=1, base_leak=1000.0))
+    env = make_env(make_life(max_childhood_steps=1, base_leak=1000.0))
 
     # tick 1 makes them adults, tick 2 kills whoever did not find food
     stand_still(env)
@@ -235,7 +235,7 @@ def test_a_starving_adult_leaves_the_run():
 
 
 def test_the_dead_are_gone_from_observations_and_rewards():
-    env = make_env(make_life(childhood_steps=0, base_leak=1000.0))
+    env = make_env(make_life(max_childhood_steps=0, base_leak=1000.0))
 
     observations, rewards, info = stand_still(env)
 
@@ -249,7 +249,7 @@ def test_the_dead_are_gone_from_observations_and_rewards():
 
 
 def test_a_well_fed_adult_keeps_living():
-    env = make_env(make_life(childhood_steps=0))
+    env = make_env(make_life(max_childhood_steps=0))
 
     # fed, but well under energy.reproduction_threshold: this test is about
     # staying alive, not about filling the world with children

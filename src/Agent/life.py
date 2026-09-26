@@ -8,7 +8,7 @@ class Life:
 
     A life has two periods, and the first one is free:
 
-      - CHILDHOOD - the first `childhood_steps` ticks after birth. The agent
+      - CHILDHOOD - the first `max_childhood_steps` ticks after birth. The agent
         ages and leaks energy like everybody else, but nothing can kill it.
         Every newborn therefore gets exactly the same amount of time to
         learn where the food is before the world starts charging for
@@ -34,7 +34,7 @@ class Life:
 
     def __init__(
         self,
-        childhood_steps=1000,
+        max_childhood_steps=1000,
         base_leak=0.5,
         aging_every=200,
         aging_amount=0.05,
@@ -42,7 +42,7 @@ class Life:
         start_energy=100.0,
         max_energy=None,
     ):
-        self.childhood_steps = childhood_steps
+        self.max_childhood_steps = max_childhood_steps
         self.base_leak = base_leak
         self.aging_every = aging_every
         self.aging_amount = aging_amount
@@ -61,7 +61,7 @@ class Life:
         energy_cfg = source.get("energy", {})
 
         return cls(
-            childhood_steps=int(life_cfg.get("childhood_steps", 1000)),
+            max_childhood_steps=int(life_cfg.get("max_childhood_steps", 1000)),
             base_leak=float(energy_cfg.get("energy_leak", 0.5)),
             aging_every=int(aging_cfg.get("every", 200)),
             aging_amount=float(aging_cfg.get("amount", 0.05)),
@@ -83,16 +83,16 @@ class Life:
         """
         The age at which this body's childhood ended.
 
-        `childhood_steps` for most, but breeding ends childhood on the
+        `max_childhood_steps` for most, but breeding ends childhood on the
         spot: an agent that has fed itself up to the reproduction
         threshold has shown it can forage, and from then on it pays for
         itself like everybody else. `adult_at` is the age it first bred at,
         None if it never has.
         """
         if adult_at is None:
-            return self.childhood_steps
+            return self.max_childhood_steps
 
-        return min(adult_at, self.childhood_steps)
+        return min(adult_at, self.max_childhood_steps)
 
     # -----------------------------
     # EATING
@@ -156,7 +156,7 @@ class Life:
 
     def __repr__(self):
         return (
-            f"Life(childhood={self.childhood_steps}, leak={self.base_leak}, "
+            f"Life(childhood={self.max_childhood_steps}, leak={self.base_leak}, "
             f"aging=+{self.aging_amount}/{self.aging_every}, "
             f"death_at={self.death_energy})"
         )

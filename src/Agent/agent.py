@@ -53,7 +53,7 @@ class Agent:
 
         # The age this body first bred at, and None while it never has.
         # Breeding ends childhood however young the parent is, so this is
-        # what the life rules read instead of the world's childhood_steps.
+        # what the life rules read instead of the world's max_childhood_steps.
         self.adult_at = None
 
         # Ticks lived. Starts at 0 for everybody - a newborn is a newborn
