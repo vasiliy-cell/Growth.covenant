@@ -24,7 +24,7 @@
      the cards on it are almost neutral grey a shade darker, and the deepest
      thing on the page - an input, a console - is still grey. The only
      tinted things are the light behind the page and the accents. */
-  --bg: #202629;
+  --bg: #15201f;
   --panel: #1a1e21;
   --panel-2: #1e2327;
   --inset: #171b1e;
@@ -77,31 +77,29 @@ html, body {
 }
 
 /*
- * The surface colour lives on html and NOWHERE else. The light below is
- * `body::before` at z-index -1: give the body a background of its own and
- * that light is painted underneath it, which is how the blur ended up
- * invisible - a perfectly even wall of grey.
+ * The light IS the background, painted straight onto the root element.
+ *
+ * Nothing on the page can cover it and no stacking order can bury it - the
+ * two ways this glow was invisible before. The blooms are enormous and soft,
+ * which is what reads as blurred; a `filter: blur()` cannot touch a
+ * background image anyway, and a blurred layer at a negative z-index sits
+ * under the first background anybody gives the body.
+ *
+ * Cold teal in the top corners, a deeper green-black pulling the bottom
+ * right down, and one small amber ember low on the left: the page is lit
+ * from behind and not evenly.
  */
-html { background: var(--bg); }
+html {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(62vmax 46vmax at 10% -8%, rgba(46, 172, 152, .42), transparent 62%),
+    radial-gradient(54vmax 42vmax at 94% 2%, rgba(84, 176, 208, .32), transparent 64%),
+    radial-gradient(50vmax 40vmax at 74% 98%, rgba(10, 46, 52, .55), transparent 66%),
+    radial-gradient(30vmax 24vmax at 4% 92%, rgba(224, 139, 62, .14), transparent 66%);
+  background-attachment: fixed;
+}
 
 body { display: flex; flex-direction: column; overflow: hidden; background: transparent; }
-
-/* The light behind the fog: three blooms, blurred into each other and into
-   the black. It sits under everything (z-index) and is spread past the edges
-   of the window (inset) so the blur has nowhere to fade out on screen. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: -25vmax;
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(120px);
-  background:
-    radial-gradient(46vmax 32vmax at 50% -10%, rgba(126, 212, 230, .30), transparent 68%),
-    radial-gradient(36vmax 38vmax at -8% 26%, rgba(96, 178, 206, .26), transparent 70%),
-    radial-gradient(36vmax 38vmax at 108% 40%, rgba(84, 150, 190, .24), transparent 70%),
-    radial-gradient(32vmax 26vmax at 50% 110%, rgba(120, 165, 190, .16), transparent 68%);
-}
 
 ::selection { background: rgba(224, 139, 62, .32); }
 
