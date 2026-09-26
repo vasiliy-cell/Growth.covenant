@@ -201,7 +201,7 @@ class GridWorldEnv:
                 born.append(self._birth(child, cost, [parent]))
                 parent.energy -= cost
         else:
-            # sexual: choose_partners returns energy+proximity matched pairs
+            # sexual: choose_partners pairs up everybody who can afford it
             for mother, father in choose_partners(self.agents):
 
                 g_mother = self.genomes.get_genotype(mother.agent_id)

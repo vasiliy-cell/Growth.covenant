@@ -185,7 +185,12 @@ cell is +5 reward AND +5 energy.
   Three such agents made 494 children in 480 ticks. With a ceiling, how
   often an agent breeds is set by how fast it can FIND food.
 - **`reproduction_threshold`** - an agent at or above this energy makes a
-  child (asexually; the sexual species also matches partners by distance).
+  child. For the sexual species it is the whole of the matching too:
+  everybody who can afford one is paired two by two, and how far apart the
+  two bodies stand does not matter. Pairing by proximity selected for the
+  crowds this world already collects in its corners - a crowd is where
+  partners are always within reach - and left a good forager working an
+  empty stretch of map without one.
 - **`reproduction_cost`** - what the parents pay for it, and what the child
   is born with. One parent pays it all; two parents pay half each.
 
