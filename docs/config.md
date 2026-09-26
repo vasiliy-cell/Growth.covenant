@@ -204,7 +204,12 @@ A life has two periods, and the first one is free.
 **Childhood** - the first `childhood_steps` ticks after birth. The agent
 ages and eats like everybody else, but it pays no leak and nothing can kill
 it: every newborn gets the same amount of time to learn where the food is
-before the world starts charging at all. It cannot reproduce either.
+before the world starts charging at all.
+
+**Breeding ends childhood on the spot**, however young the parent is. An
+agent that fed itself up to the reproduction threshold has shown it can
+forage, and a population of immortal parents only fills the map. Aging is
+counted from that moment for such a body, not from `childhood_steps`.
 
 A leak during childhood only moved the bill: a child that ate less than it
 leaked went into debt for the whole of its childhood and starved on the

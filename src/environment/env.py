@@ -265,6 +265,8 @@ class GridWorldEnv:
 
         for parent in parents:
             parent.offspring += 1
+            # A parent is an adult from now on, however young it is.
+            parent.grow_up()
 
         print(f"[birth @ step {self.current_step}] -> {baby.agent_id}  (pop {len(self.agents)})")
 

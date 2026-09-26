@@ -76,8 +76,23 @@ class Life:
     # -----------------------------
     # PERIOD
     # -----------------------------
-    def is_child(self, age):
-        return age < self.childhood_steps
+    def is_child(self, age, adult_at=None):
+        return age < self.adulthood(adult_at)
+
+    def adulthood(self, adult_at=None):
+        """
+        The age at which this body's childhood ended.
+
+        `childhood_steps` for most, but breeding ends childhood on the
+        spot: an agent that has fed itself up to the reproduction
+        threshold has shown it can forage, and from then on it pays for
+        itself like everybody else. `adult_at` is the age it first bred at,
+        None if it never has.
+        """
+        if adult_at is None:
+            return self.childhood_steps
+
+        return min(adult_at, self.childhood_steps)
 
     # -----------------------------
     # EATING
@@ -103,7 +118,7 @@ class Life:
     # -----------------------------
     # AGING
     # -----------------------------
-    def leak(self, age):
+    def leak(self, age, adult_at=None):
         """
         What being alive costs this body right now.
 
@@ -119,22 +134,22 @@ class Life:
         ticks of ADULT life, counted from the end of childhood, so the bill
         starts rising the tick the charging starts.
         """
-        if self.is_child(age):
+        if self.is_child(age, adult_at):
             return 0.0
 
         if self.aging_every <= 0:
             return self.base_leak
 
-        adult_age = age - self.childhood_steps
+        adult_age = age - self.adulthood(adult_at)
 
         return self.base_leak + (adult_age // self.aging_every) * self.aging_amount
 
     # -----------------------------
     # DEATH
     # -----------------------------
-    def is_dead(self, age, energy):
+    def is_dead(self, age, energy, adult_at=None):
         """Starvation, and only for an adult - childhood ignores energy."""
-        if self.is_child(age):
+        if self.is_child(age, adult_at):
             return False
 
         return energy <= self.death_energy

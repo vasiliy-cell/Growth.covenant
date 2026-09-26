@@ -51,6 +51,11 @@ class Agent:
         self.total_reward = 0.0
         self.offspring = 0
 
+        # The age this body first bred at, and None while it never has.
+        # Breeding ends childhood however young the parent is, so this is
+        # what the life rules read instead of the world's childhood_steps.
+        self.adult_at = None
+
         # Ticks lived. Starts at 0 for everybody - a newborn is a newborn
         # whether it was spawned at the start of the run or born into it.
         self.age = 0
@@ -103,17 +108,22 @@ class Agent:
         """One tick lived. Called once per tick by the env, for everybody."""
         self.age += 1
 
+    def grow_up(self):
+        """Childhood ends here, whatever the age: this body has bred."""
+        if self.adult_at is None:
+            self.adult_at = self.age
+
     def is_child(self):
         """Still inside the immortal period - nothing can kill this agent."""
-        return self.life.is_child(self.age)
+        return self.life.is_child(self.age, self.adult_at)
 
     def energy_leak(self):
         """What this body pays for being alive this tick: base cost + age."""
-        return self.life.leak(self.age)
+        return self.life.leak(self.age, self.adult_at)
 
     def is_dead(self):
         """An adult that has run out of energy. A child never is."""
-        return self.life.is_dead(self.age, self.energy)
+        return self.life.is_dead(self.age, self.energy, self.adult_at)
 
     def life_summary(self, step, cause="starvation"):
         """

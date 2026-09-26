@@ -41,6 +41,40 @@ def test_childhood_lasts_exactly_childhood_steps():
     assert not life.is_child(3)
 
 
+def test_breeding_ends_childhood_however_young_the_parent_is():
+    life = make_life(childhood_steps=1000)
+
+    assert life.is_child(age=5)
+    assert not life.is_child(age=5, adult_at=3)
+    assert life.is_dead(age=5, energy=0.0, adult_at=3)
+
+    # ...and it ages from the tick it bred, not from childhood_steps:
+    # base cost at first, one step up after aging_every adult ticks.
+    assert life.leak(age=3, adult_at=3) == 1.0
+    assert life.leak(age=5, adult_at=3) == 1.5
+
+
+def test_a_parent_grows_up_in_the_world_the_tick_it_breeds():
+    """
+    A population of immortal children fills the map: whoever can afford a
+    child has shown it can forage, so from then on it pays for itself.
+    """
+    env = make_env(make_life(childhood_steps=10 ** 9))
+
+    parent = env.agents.all()[0]
+    parent.energy = 200.0
+    assert parent.is_child()
+
+    stand_still(env)
+
+    assert parent.offspring == 1
+    assert not parent.is_child()
+    assert parent.energy_leak() == parent.life.base_leak
+
+    newborn = env.agents.all()[-1]
+    assert newborn.is_child(), "a newborn is still a child until it breeds"
+
+
 def test_a_child_survives_any_amount_of_hunger():
     life = make_life(childhood_steps=3)
 
