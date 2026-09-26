@@ -20,6 +20,10 @@ uncommitted.
   (e.g. `refill map instead of regenerating it`, `fix epsilon read from config`).
 - Cosmetic-only edits (formatting, typos) do not need their own commit —
   fold them into the related change.
+- **Moderately often, not constantly.** A commit is a finished logical
+  block, so a large piece of work is a handful of commits and not twenty:
+  do not commit after every edit, and do not wait until three unrelated
+  things are done either.
 
 ### Clean code
 - No commented-out dead code left in files — git history is the archive.

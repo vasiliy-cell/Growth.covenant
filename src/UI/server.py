@@ -148,19 +148,41 @@ def world_details(world: str):
     return reports.details(reader_for(world), LIVE_DIR)
 
 
+# A chart can be asked about a part of the population: children only,
+# adults only, and only the agents that lived between so many and so many
+# steps. Nothing new is logged for it - see reports.cohorts.
 @app.get("/api/worlds/{world:path}/rewards")
-def world_rewards(world: str):
-    return reports.rewards(reader_for(world))
+def world_rewards(
+    world: str,
+    cohort: str = "all",
+    min_steps: Optional[int] = None,
+    max_steps: Optional[int] = None,
+):
+    return reports.rewards(reader_for(world), cohort, min_steps, max_steps)
 
 
 @app.get("/api/worlds/{world:path}/learning")
-def world_learning(world: str):
-    return reports.learning(reader_for(world))
+def world_learning(
+    world: str,
+    cohort: str = "all",
+    min_steps: Optional[int] = None,
+    max_steps: Optional[int] = None,
+):
+    return reports.learning(reader_for(world), cohort, min_steps, max_steps)
 
 
 @app.get("/api/worlds/{world:path}/family")
 def world_family(world: str):
     return reports.family(reader_for(world))
+
+
+@app.get("/api/worlds/{world:path}/agent/{agent_id}")
+def world_agent(world: str, agent_id: str):
+    """One agent's whole life, including its own heat map."""
+    try:
+        return reports.agent(reader_for(world), agent_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"No agent {agent_id} in this world")
 
 
 @app.get("/api/worlds/{world:path}/heatmap")

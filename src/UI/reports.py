@@ -17,8 +17,10 @@ import os
 import time
 
 import numpy as np
+import pyarrow.compute as pc
 import pyarrow.dataset as ds
 
+from src.persistence import log_schema
 from src.persistence.log_reader import RunLogReader
 
 # A live.json older than this belongs to a run that is no longer with us.
@@ -209,48 +211,333 @@ def details(reader, live_dir=None):
 
 
 # -----------------------------
+# COHORTS: who a chart is about
+# -----------------------------
+# Every chart can be asked about children only, adults only, or about the
+# agents that lived a certain number of steps. Both questions are answered
+# out of the log alone - the core is not asked to write anything new.
+
+
+def childhood_length(reader):
+    """`life.max_childhood_steps` as the newest session of this world had it."""
+    for session in reversed(reader.sessions):
+        life = (session.get("config") or {}).get("life", {})
+
+        if life.get("max_childhood_steps") is not None:
+            return int(life["max_childhood_steps"])
+
+    return 0
+
+
+def cohorts(reader):
+    """
+    Per agent: the age its childhood ended at, and how long it lived.
+
+    Childhood is the core's own notion (`Life.is_child`): it lasts
+    `max_childhood_steps`, but BREEDING ends it on the spot, because an
+    agent that has fed itself up to the reproduction threshold has shown it
+    can forage. The logs do not carry that moment as a column - and they do
+    not need to: they carry every birth, and the age an agent was when its
+    FIRST child was born is exactly the age its childhood ended at.
+
+    Lifespan is the death row for whoever has one, and the last age logged
+    for whoever is still walking around.
+    """
+    births = reader.births()
+    childhood = childhood_length(reader)
+
+    born = {}
+    adult_at = {}
+    children = {}
+
+    if births.num_rows:
+        ids = births["agent_id"].to_pylist()
+        steps = births["step"].to_pylist()
+        parents = births["parents"].to_pylist()
+        born = dict(zip(ids, steps))
+
+        for agent_id, step, mothers in zip(ids, steps, parents):
+            for parent in mothers or []:
+                children.setdefault(parent, []).append(agent_id)
+
+                if parent not in born:
+                    continue
+
+                age = step - born[parent]
+
+                if age < adult_at.get(parent, float("inf")):
+                    adult_at[parent] = age
+
+    # min(first birth, max_childhood_steps), the way Life.adulthood reads it
+    adulthood = {
+        agent_id: min(adult_at.get(agent_id, childhood), childhood)
+        for agent_id in born
+    }
+
+    lifespan = {}
+    deaths = reader.deaths()
+
+    if deaths.num_rows:
+        lifespan = dict(zip(deaths["agent_id"].to_pylist(), deaths["lifespan"].to_pylist()))
+
+    # Whoever has no death row is still walking around, and how long it has
+    # lived so far is the oldest age any window ever logged for it.
+    buried = set(lifespan)
+    windows = reader.episode_agents()
+
+    if windows.num_rows:
+        encoded = pc.dictionary_encode(windows["agent_id"]).combine_chunks()
+        codes = encoded.indices.to_numpy(zero_copy_only=False)
+        names = encoded.dictionary.to_pylist()
+        oldest = np.zeros(len(names), dtype=np.int64)
+        np.maximum.at(oldest, codes, windows["age"].to_numpy(zero_copy_only=False).astype(np.int64))
+
+        for name, age in zip(names, oldest):
+            if name not in buried:
+                lifespan[name] = int(age)
+
+    return {
+        "childhood": childhood,
+        "born": born,
+        "adulthood": adulthood,
+        "lifespan": lifespan,
+        "children": children,
+    }
+
+
+def keep_agents(who, min_steps, max_steps):
+    """Which agents a filter leaves in, by how long they ended up living."""
+    lifespan = who["lifespan"]
+
+    def long_enough(agent_id):
+        lived = lifespan.get(agent_id)
+
+        if lived is None:
+            return min_steps in (None, 0)
+
+        if min_steps is not None and lived < min_steps:
+            return False
+
+        if max_steps is not None and lived > max_steps:
+            return False
+
+        return True
+
+    return {agent_id for agent_id in who["born"] if long_enough(agent_id)}
+
+
+def by_agent(table, who, allowed, cohort):
+    """
+    Which rows of a per-agent table a filter leaves in, as one boolean array.
+
+    The agent column is dictionary-encoded first, so every lookup happens
+    once per agent instead of once per row: a long run has hundreds of
+    thousands of update rows and a chart that has to be redrawn while the
+    run is going cannot afford a dictionary lookup on each of them.
+
+    A row is a child's row while the agent's age is below the age its
+    childhood ended at - the same comparison `Life.is_child` makes.
+    """
+    encoded = pc.dictionary_encode(table["agent_id"]).combine_chunks()
+    codes = encoded.indices.to_numpy(zero_copy_only=False)
+    names = encoded.dictionary.to_pylist()
+
+    keep = np.ones(len(codes), dtype=bool)
+
+    if allowed is not None:
+        keep &= np.array([name in allowed for name in names], dtype=bool)[codes]
+
+    if cohort in ("child", "adult"):
+        childhood = who["childhood"]
+        adulthood = np.array(
+            [who["adulthood"].get(name, childhood) for name in names], dtype=np.int64
+        )
+        child = ages_of(table, who, names, codes) < adulthood[codes]
+        keep &= child if cohort == "child" else ~child
+
+    return keep
+
+
+def ages_of(table, who, names, codes):
+    """
+    How old each row's agent was when the row was written.
+
+    A per-window row carries its own age. An update row does not - but it
+    carries the step it happened on, and an age is that step minus the
+    agent's birth.
+    """
+    if "age" in table.schema.names:
+        return table["age"].to_numpy(zero_copy_only=False).astype(np.int64)
+
+    born = np.array([who["born"].get(name, 0) for name in names], dtype=np.int64)
+
+    return table["step"].to_numpy(zero_copy_only=False).astype(np.int64) - born[codes]
+
+
+def slots_for(episodes, order):
+    """
+    Which place on the chart's episode axis each row belongs to.
+
+    Two sessions of one world can honestly claim the same episode number -
+    a world resumed from an older checkpoint replays it - and the axis holds
+    one column per row of the population table, so the later session wins
+    the slot, exactly as it does in the unfiltered chart.
+    """
+    order = np.asarray(order, dtype=np.int64)
+    lookup = np.full(int(order.max()) + 2, -1, dtype=np.int64)
+    lookup[order] = np.arange(len(order))
+
+    episodes = np.asarray(episodes, dtype=np.int64)
+    episodes = np.clip(episodes, 0, len(lookup) - 1)
+
+    return lookup[episodes]
+
+
+def sums_per_slot(slots, values, keep, size):
+    return np.bincount(slots[keep], weights=values[keep], minlength=size)[:size]
+
+
+def means_per_slot(slots, values, keep, size):
+    """A mean per slot, and None where the filter left the slot empty."""
+    real = keep & ~np.isnan(values)
+    totals = np.bincount(slots[real], weights=values[real], minlength=size)[:size]
+    counts = np.bincount(slots[real], minlength=size)[:size]
+
+    return [
+        float(total / count) if count else None
+        for total, count in zip(totals, counts)
+    ]
+
+
+# -----------------------------
 # CHARTS
 # -----------------------------
 def column(table, name):
     return table[name].to_pylist() if name in table.schema.names else []
 
 
-def rewards(reader):
+def rewards(reader, cohort="all", min_steps=None, max_steps=None):
     """
     Every kind of reward on one chart, per logging window.
 
     env is what the world paid, intrinsic is what curiosity added, shaped
     is what the networks actually learned from - the gap between the first
     and the last is the whole story of how much of this run is curiosity.
+
+    Unfiltered, the numbers come straight off the population table - one
+    row per window, the cheapest read in the log. A filter turns the same
+    chart into a question about a part of the population, and then the
+    per-agent windows are added up instead. Births and deaths always count
+    the whole world: an event belongs to the world, not to a cohort.
     """
-    table = reader.episode_population()
+    population = reader.episode_population()
+    filtered = cohort != "all" or min_steps is not None or max_steps is not None
 
-    return {
-        "episodes": column(table, "episode"),
-        "steps": column(table, "step_end"),
-        "env": column(table, "env_reward"),
-        "intrinsic": column(table, "intrinsic_reward"),
-        "shaped": column(table, "shaped_reward"),
-        "agents": column(table, "agents"),
-        "births": column(table, "births"),
-        "deaths": column(table, "deaths"),
-        "sessions": column(table, "session"),
+    out = {
+        "episodes": column(population, "episode"),
+        "steps": column(population, "step_end"),
+        "env": column(population, "env_reward"),
+        "intrinsic": column(population, "intrinsic_reward"),
+        "shaped": column(population, "shaped_reward"),
+        "agents": column(population, "agents"),
+        "births": column(population, "births"),
+        "deaths": column(population, "deaths"),
+        "sessions": column(population, "session"),
+        "cohort": cohort,
+        "filtered": False,
     }
 
+    if not filtered or not out["episodes"]:
+        return out
 
-def learning(reader):
-    """What the gradient did, per window."""
-    table = reader.episode_population()
+    windows = reader.episode_agents()
 
-    return {
-        "episodes": column(table, "episode"),
-        "loss": column(table, "mean_loss"),
-        "td_error": column(table, "mean_td_error"),
-        "updates": column(table, "updates"),
-        "epsilon": column(table, "mean_epsilon"),
-        "curiosity_beta": column(table, "mean_curiosity_beta"),
-        "sessions": column(table, "session"),
+    if windows.num_rows == 0:
+        return out
+
+    who = cohorts(reader)
+    allowed = keep_agents(who, min_steps, max_steps)
+    keep = by_agent(windows, who, allowed, cohort)
+
+    order = out["episodes"]
+    size = len(order)
+    slots = slots_for(windows["episode"].to_numpy(zero_copy_only=False), order)
+    inside = slots >= 0
+    keep &= inside
+
+    def summed(name):
+        values = windows[name].to_numpy(zero_copy_only=False).astype(np.float64)
+        return sums_per_slot(slots, values, keep, size).tolist()
+
+    out.update({
+        "env": summed("env_reward"),
+        "intrinsic": summed("intrinsic_reward"),
+        "shaped": summed("shaped_reward"),
+        "agents": np.bincount(slots[keep], minlength=size)[:size].tolist(),
+        "filtered": True,
+    })
+
+    return out
+
+
+def learning(reader, cohort="all", min_steps=None, max_steps=None):
+    """
+    What the gradient did, per window.
+
+    Unfiltered this is the population row again. Filtered, it is the update
+    table: an update carries the agent and the step it happened on, and an
+    agent's age on that step is the step minus its birth - which is all a
+    cohort needs to be told apart.
+    """
+    population = reader.episode_population()
+    filtered = cohort != "all" or min_steps is not None or max_steps is not None
+
+    out = {
+        "episodes": column(population, "episode"),
+        "loss": column(population, "mean_loss"),
+        "td_error": column(population, "mean_td_error"),
+        "updates": column(population, "updates"),
+        "epsilon": column(population, "mean_epsilon"),
+        "curiosity_beta": column(population, "mean_curiosity_beta"),
+        "sessions": column(population, "session"),
+        "cohort": cohort,
+        "filtered": False,
     }
+
+    if not filtered or not out["episodes"]:
+        return out
+
+    table = reader.updates()
+
+    if table.num_rows == 0:
+        return out
+
+    who = cohorts(reader)
+    allowed = keep_agents(who, min_steps, max_steps)
+    keep = by_agent(table, who, allowed, cohort)
+
+    order = out["episodes"]
+    size = len(order)
+
+    # An update lands in the window that was open on its step.
+    ends = np.asarray(column(population, "step_end"), dtype=np.int64)
+    steps = table["step"].to_numpy(zero_copy_only=False).astype(np.int64)
+    slots = np.clip(np.searchsorted(ends, steps, side="left"), 0, size - 1)
+
+    def averaged(name):
+        values = table[name].to_numpy(zero_copy_only=False).astype(np.float64)
+        return means_per_slot(slots, values, keep, size)
+
+    out.update({
+        "loss": averaged("loss"),
+        "td_error": averaged("td_error"),
+        "epsilon": averaged("epsilon"),
+        "curiosity_beta": averaged("curiosity_beta"),
+        "updates": np.bincount(slots[keep], minlength=size)[:size].tolist(),
+        "filtered": True,
+    })
+
+    return out
 
 
 def heatmap(reader, recent_share=0.2):
@@ -359,6 +646,120 @@ def family(reader):
         # otherwise leave an edge pointing at nothing.
         "edges": [edge for edge in edges if edge["source"] in known],
     }
+
+
+def agent(reader, agent_id):
+    """
+    One agent, whole: where it came from, what it was made of, what it
+    earned, and every cell it ever stood on.
+
+    The reward is given TWICE and labelled both times, because the two
+    numbers answer different questions: `env` is what the world paid this
+    body, `shaped` is what its network actually learned from - the world
+    plus its own curiosity. A single "reward" would quietly be one of them.
+
+    The heat map is this agent's own, read from the step table with a filter
+    instead of from the world snapshots: one body's path through a few
+    thousand ticks is too thin a thing to sample. That read costs a couple
+    of seconds on a long run, and it is the only place in the panel that
+    touches the step table at all.
+    """
+    births = reader.births()
+    row = None
+
+    if births.num_rows:
+        for candidate in births.to_pylist():
+            if candidate["agent_id"] == agent_id:
+                row = candidate
+                break
+
+    if row is None:
+        raise KeyError(agent_id)
+
+    death = None
+
+    for candidate in reader.deaths().to_pylist():
+        if candidate["agent_id"] == agent_id:
+            death = candidate
+            break
+
+    who = cohorts(reader)
+    children = who["children"].get(agent_id, [])
+
+    windows = reader.episode_agents()
+    earned = {"env": 0.0, "intrinsic": 0.0, "shaped": 0.0}
+    steps_logged = 0
+    last_age = None
+    last_energy = None
+
+    if windows.num_rows:
+        table = windows.to_pydict()
+
+        for index, owner in enumerate(table["agent_id"]):
+            if owner != agent_id:
+                continue
+
+            earned["env"] += table["env_reward"][index]
+            earned["intrinsic"] += table["intrinsic_reward"][index]
+            earned["shaped"] += table["shaped_reward"][index]
+            steps_logged += table["steps"][index]
+            last_age = table["age"][index]
+            last_energy = table["energy"][index]
+
+    return {
+        "id": agent_id,
+        "index": row["index"],
+        "parents": row["parents"],
+        "birth_step": row["step"],
+        "energy_at_birth": row["energy"],
+        "genotype": json.loads(row["genotype_json"] or "null"),
+        "phenotype": {
+            name[len("phen_"):]: value
+            for name, value in row.items()
+            if name.startswith("phen_")
+        },
+        "alive": death is None,
+        "death_step": death["death_step"] if death else None,
+        "lifespan": death["lifespan"] if death else last_age,
+        "cause_of_death": death["cause_of_death"] if death else None,
+        "cumulative_reward": death["cumulative_reward"] if death else None,
+        "children": children,
+        "offspring": len(children),
+        "childhood_ended_at": who["adulthood"].get(agent_id, who["childhood"]),
+        "childhood_length": who["childhood"],
+        "bred_at": None if agent_id not in who["adulthood"] else (
+            who["adulthood"][agent_id] if who["adulthood"][agent_id] < who["childhood"] else None
+        ),
+        "reward": earned,
+        "steps_logged": steps_logged,
+        "last_age": last_age,
+        "last_energy": last_energy,
+        "heat": agent_heatmap(reader, agent_id),
+    }
+
+
+def agent_heatmap(reader, agent_id):
+    """Where one body walked: a count per cell, out of its own step rows."""
+    size = world_size(reader)
+    path = os.path.join(reader.path, "steps")
+
+    if size <= 0 or not os.path.isdir(path) or not os.listdir(path):
+        return {"size": 0, "grid": [], "samples": 0}
+
+    table = ds.dataset(path, format="parquet", schema=log_schema.STEPS).to_table(
+        columns=["x", "y"],
+        filter=ds.field("agent_id") == agent_id,
+    )
+
+    counts = np.zeros((size, size), dtype=np.int64)
+
+    if table.num_rows:
+        x = table["x"].to_numpy().astype(int)
+        y = table["y"].to_numpy().astype(int)
+        inside = (x >= 0) & (x < size) & (y >= 0) & (y < size)
+        np.add.at(counts, (y[inside], x[inside]), 1)
+
+    return {"size": size, "grid": counts.tolist(), "samples": int(counts.sum())}
 
 
 # -----------------------------
