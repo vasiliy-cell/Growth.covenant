@@ -263,21 +263,22 @@ anything:
 
 ### Mutation
 
-A child's genome is its parent's, redrawn: every gene gets `N(0, sigma)`
-added to it, and with probability `sigma` it is also multiplied by
-`U(0.5, 2.0)`. Because that noise is ABSOLUTE, `sigma` has to stay small:
-at 0.5 a learning rate of 0.001 became 0.3.
+A child's genome is its parent's, and each gene changes with probability
+`sigma` and not otherwise: the ones that do are multiplied by `U(0.5, 2.0)`.
+Most children are an exact copy - at `sigma: 0.005` about 93% of them.
 
-Both halves are meant to be symmetric, and neither quite is:
+The change is a FACTOR, so one `sigma` means the same thing to a learning
+rate of 0.001 and to a buffer of 10000. It used to be a width in absolute
+units added to every gene of every child, and that is not one rule but two
+different ones: the same 0.005 was 90% of a learning rate and nothing at
+all of a buffer size. Worse, a gene cannot go below zero, so a symmetric
+walk with steps larger than the gene itself could only climb: learning
+rates left 0.001 for 0.1 over some thirty generations, and at 0.1 every
+ReLU of a network dies and its Q becomes a constant.
 
-- the added noise is symmetric and does not move the average, but its
-  spread grows with every generation, so the tail runs away even while the
-  middle stands still - and a network dies of the tail, not of the middle,
-- the multiplier is symmetric in what it does (x2 undone by x0.5) but not
-  in its average: with `U(0.5, 2.0)` a jump multiplies by about 1.17 in the
-  long run. `U(0.2, 5.0)`, which this was, multiplied by 2.1 - over
-  generations that alone carried learning rates from 0.001 into 0.1, where
-  every ReLU of a network dies and its Q becomes a constant.
+The multiplier is still not quite symmetric - `U(0.5, 2.0)` multiplies by
+about 1.17 in the long run - but it fires rarely enough that 40 generations
+leave the median learning rate exactly where it started.
 
 A few genes are checked after every draw and every mutation, because the
 values outside those ranges do not merely make a worse agent, they break

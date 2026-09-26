@@ -32,12 +32,23 @@ class reuse:
         return genotype
 
     def mutate(genotype, rng):
+        """
+        The child's genome: the parent's, with a gene here and there
+        multiplied by a number around 1.
+
+        A gene changes with probability `sigma` and not otherwise, and it
+        changes by a FACTOR, so the same sigma means the same thing to a
+        learning rate of 0.001 and to a buffer of 10000. Adding a width in
+        absolute units, which this used to do on every gene of every child,
+        meant 90% of a learning rate and nothing at all of a buffer size.
+        """
         sigma = genotype["sigma"]
-        mutated_genotype = {}
+        mutated_genotype = dict(genotype)
+
         for gene_name, value in genotype.items():
 
             if rng.random() < sigma:
-                mutated_genotype[gene_name] *= rng.uniform(0.5, 2.0)
+                mutated_genotype[gene_name] = value * rng.uniform(0.5, 2.0)
 
         if mutated_genotype["gamma"] <= 0: 
             mutated_genotype["gamma"] = 0.001
