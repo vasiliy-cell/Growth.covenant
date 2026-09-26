@@ -265,17 +265,31 @@ anything:
 
 A child's genome is its parent's, redrawn: every gene gets `N(0, sigma)`
 added to it, and with probability `sigma` it is also multiplied by
-`U(0.2, 5.0)`. Because that noise is ABSOLUTE, `sigma` has to stay small:
+`U(0.5, 2.0)`. Because that noise is ABSOLUTE, `sigma` has to stay small:
 at 0.5 a learning rate of 0.001 became 0.3.
+
+Both halves are meant to be symmetric, and neither quite is:
+
+- the added noise is symmetric and does not move the average, but its
+  spread grows with every generation, so the tail runs away even while the
+  middle stands still - and a network dies of the tail, not of the middle,
+- the multiplier is symmetric in what it does (x2 undone by x0.5) but not
+  in its average: with `U(0.5, 2.0)` a jump multiplies by about 1.17 in the
+  long run. `U(0.2, 5.0)`, which this was, multiplied by 2.1 - over
+  generations that alone carried learning rates from 0.001 into 0.1, where
+  every ReLU of a network dies and its Q becomes a constant.
 
 A few genes are checked after every draw and every mutation, because the
 values outside those ranges do not merely make a worse agent, they break
 learning outright:
 
 - `gamma` is kept inside (0, 1), 0.001 or 0.999 at the edges,
-- `learning_rate` and `max_norm` are made positive - a negative `max_norm`
-  makes `clip_grad_norm_` flip every gradient, and the network learns
-  backwards,
+- `learning_rate` and `max_norm` below zero become 0.0001, a value near
+  zero rather than its own size mirrored back - a negative `max_norm` makes
+  `clip_grad_norm_` flip every gradient and the network learns backwards,
+  and mirroring is what made the two of them drift upwards over
+  generations: every draw that should have pulled the gene down was folded
+  back on top of the half that pulled it up,
 - `epsilon_decay` and `curiosity_decay` above 1 become 0.999 - a decay
   above 1 makes epsilon or curiosity GROW instead of fading,
 - `sigma` below 0 becomes 0.01.

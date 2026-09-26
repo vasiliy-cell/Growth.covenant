@@ -31,7 +31,7 @@ class MendelGeneticsSpecies:
         for gene_name in genotype:
             if rng.random() < sigma: 
                 i = rng.choice([0, 1])
-                mutated_genotype[gene_name][i][0] *= rng.uniform(0.2, 5.0)  
+                mutated_genotype[gene_name][i][0] *= rng.uniform(0.5, 2.0)  
             if rng.random() < sigma: 
                 i = rng.choice([0, 1])
                 apel = mutated_genotype[gene_name][i][1]
@@ -47,11 +47,11 @@ class MendelGeneticsSpecies:
                 if mutated_genotype["gamma"][i][0] >= 1: 
                     mutated_genotype["gamma"][i][0] = 0.999
                 if mutated_genotype["learning_rate"][i][0] < 0:
-                    mutated_genotype["learning_rate"][i][0] = abs(mutated_genotype["learning_rate"][i][0])
+                    mutated_genotype["learning_rate"][i][0] = 0.0001
                 if mutated_genotype["sigma"][i][0] <0:
                     mutated_genotype["sigma"][i][0] = 0.01
                 if mutated_genotype["max_norm"][i][0] < 0:
-                    mutated_genotype["max_norm"][i][0] = abs(mutated_genotype["max_norm"][i][0])
+                    mutated_genotype["max_norm"][i][0] = 0.0001
                 if mutated_genotype["epsilon_decay"][i][0] >= 1:
                     mutated_genotype["epsilon_decay"][i][0] = 0.999
                 if mutated_genotype["curiosity_decay"][i][0] >= 1:

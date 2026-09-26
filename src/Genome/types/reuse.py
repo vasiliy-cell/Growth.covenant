@@ -16,13 +16,13 @@ class reuse:
             genotype["gamma"] = 0.999
 
         if genotype["learning_rate"] < 0:
-            genotype["learning_rate"] = abs(genotype["learning_rate"])
+            genotype["learning_rate"] = 0.0001
 
         if genotype["sigma"] <0:
             genotype["sigma"] = 0.01
 
         if genotype["max_norm"] < 0:
-            genotype["max_norm"] = abs(genotype["max_norm"])
+            genotype["max_norm"] = 0.0001
 
         if genotype["epsilon_decay"] >= 1:
             genotype["epsilon_decay"] = 0.999
@@ -38,7 +38,7 @@ class reuse:
             mutated_genotype[gene_name] = rng.normal(value, sigma)
 
             if rng.random() < sigma:
-                mutated_genotype[gene_name] *= rng.uniform(0.2, 5.0)
+                mutated_genotype[gene_name] *= rng.uniform(0.5, 2.0)
 
         if mutated_genotype["gamma"] <= 0: 
             mutated_genotype["gamma"] = 0.001
@@ -46,13 +46,13 @@ class reuse:
             mutated_genotype["gamma"] = 0.999
 
         if mutated_genotype["learning_rate"] < 0:
-            mutated_genotype["learning_rate"] = abs(mutated_genotype["learning_rate"])
+            mutated_genotype["learning_rate"] = 0.0001
 
         if mutated_genotype["sigma"] <0:
             mutated_genotype["sigma"] = 0.01
 
         if mutated_genotype["max_norm"] < 0:
-            mutated_genotype["max_norm"] = abs(mutated_genotype["max_norm"])
+            mutated_genotype["max_norm"] = 0.0001
 
         if mutated_genotype["epsilon_decay"] >= 1:
             mutated_genotype["epsilon_decay"] = 0.999
