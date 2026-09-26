@@ -181,7 +181,7 @@ function runStats(details, family) {
       stat("agents ever", fmt.int(family.nodes.length)),
       stat("deaths", fmt.int(details.counts.deaths), "bad"),
       stat("updates", fmt.int(details.counts.updates)),
-      stat("seed", sessions[0]?.seed ?? "—"),
+      stat("seed", sessions[0]?.seed ?? "—", "tight"),
     ]),
     h("div", { class: "mono dim", style: "font-size:11px;margin-top:10px;line-height:1.7" }, [
       `${details.species} · commit ${(details.commit || "—").slice(0, 10)} · episode = ${details.episode_length} steps`,
