@@ -78,7 +78,7 @@ genome:
       scale: 0.5
       type: float
     sigma:                        # width of mutation, and the chance of a huge one
-      mean: 0.01
+      mean: 0.005
       scale: 0.001
       type: float
 

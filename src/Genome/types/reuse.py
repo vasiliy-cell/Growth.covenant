@@ -35,7 +35,6 @@ class reuse:
         sigma = genotype["sigma"]
         mutated_genotype = {}
         for gene_name, value in genotype.items():
-            mutated_genotype[gene_name] = rng.normal(value, sigma)
 
             if rng.random() < sigma:
                 mutated_genotype[gene_name] *= rng.uniform(0.5, 2.0)
