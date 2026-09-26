@@ -27,6 +27,7 @@ export const api = {
   rewards: (id) => request(world(id, "rewards")),
   learning: (id) => request(world(id, "learning")),
   family: (id) => request(world(id, "family")),
+  heatmap: (id) => request(world(id, "heatmap")),
   stream: (id) => new EventSource(world(id, "stream")),
 
   resume: (id, body) => post(world(id, "continue"), body),
