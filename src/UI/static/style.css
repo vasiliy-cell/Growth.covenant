@@ -20,15 +20,18 @@
 :root {
   color-scheme: dark;
 
-  --bg: #16191c;
-  --panel: #0f1113;
-  --panel-2: #131619;
-  --inset: #0b0d0f;
-  --hover: #1a1e22;
-  --border: #23272b;
-  --border-strong: #333940;
+  /* The surface keeps a little of the fog's colour; the cards on it are
+     almost neutral grey - a hint of cold in them and no more, so the only
+     tinted things on the page are the light behind it and the accents. */
+  --bg: #191b1e;
+  --panel: #141517;
+  --panel-2: #17191b;
+  --inset: #101113;
+  --hover: #1e2022;
+  --border: #26282b;
+  --border-strong: #34373a;
   --ring: rgba(170, 205, 220, .05);
-  --hairline: rgba(180, 212, 226, .07);
+  --hairline: rgba(206, 218, 226, .06);
 
   --text: #e7ecef;
   --muted: #93a2ab;
@@ -105,7 +108,7 @@ a { color: inherit; text-decoration: none; }
   gap: 20px;
   height: 52px;
   padding: 0 18px;
-  background: rgba(18, 21, 24, .72);
+  background: rgba(21, 23, 26, .72);
   border-bottom: 1px solid var(--border-strong);
   box-shadow: inset 0 -1px 0 var(--ring);
   flex: 0 0 auto;
@@ -136,7 +139,7 @@ nav.tabs a {
 }
 
 nav.tabs a:hover { color: var(--cyan); background: var(--hover); }
-nav.tabs a.active { color: var(--accent-soft); background: #1c2024; border-color: var(--border-strong); }
+nav.tabs a.active { color: var(--accent-soft); background: #202225; border-color: var(--border-strong); }
 
 .titlebar .status { justify-self: end; display: flex; gap: 8px; align-items: center; }
 
@@ -238,7 +241,7 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
   padding: 0 12px;
   font: 500 12px/1 var(--sans);
   color: var(--text);
-  background: #1b1f22;
+  background: #1e2023;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
@@ -246,8 +249,8 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
   white-space: nowrap;
 }
 
-.btn:hover { background: #232830; border-color: #414a50; }
-.btn:active { background: #15181b; }
+.btn:hover { background: #26292c; border-color: #454a4e; }
+.btn:active { background: #17191b; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 .btn .icon { display: inline-flex; color: var(--steel); }
 .btn:hover .icon { color: var(--text); }
@@ -310,7 +313,7 @@ input.switch {
   width: 34px; height: 20px;
   padding: 0;
   border-radius: 999px;
-  background: #272c31;
+  background: #2a2c2f;
   border: 1px solid var(--border-strong);
   position: relative;
   cursor: pointer;
@@ -386,7 +389,7 @@ input.switch:checked::after { transform: translateX(14px); background: #fff; }
   cursor: pointer;
 }
 
-.chip:hover { color: var(--cyan); border-color: #465057; }
+.chip:hover { color: var(--cyan); border-color: #474b4f; }
 .chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); font-weight: 600; }
 
 .facet { padding: 12px 14px; border-bottom: 1px solid var(--border); }
@@ -432,7 +435,7 @@ td.name .ellipsis { display: block; }
   z-index: 45;
   min-width: 190px;
   padding: 4px;
-  background: #16191a;
+  background: #1b1d1f;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
   box-shadow: inset 0 0 0 1px var(--hairline), 0 12px 30px rgba(0, 0, 0, .6);
@@ -502,7 +505,7 @@ td.name .ellipsis { display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #07080a;
+  background: #121315;
 }
 
 .live-stage canvas {
@@ -531,14 +534,14 @@ td.name .ellipsis { display: block; }
 .tree svg { width: 100%; height: 100%; }
 .node circle { stroke: var(--bg); stroke-width: 2px; cursor: pointer; }
 .node.dead circle { opacity: .5; }
-.link { fill: none; stroke: #2c3a41; stroke-width: 1.3px; }
+.link { fill: none; stroke: #33383c; stroke-width: 1.3px; }
 
 .card {
   position: fixed;
   z-index: 40;
   min-width: 270px;
   max-width: 370px;
-  background: #141719;
+  background: #191a1c;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px var(--hairline), 0 18px 44px rgba(0, 0, 0, .75);
@@ -574,7 +577,7 @@ td.name .ellipsis { display: block; }
   font: 600 10px var(--mono);
   letter-spacing: .4px;
   text-transform: uppercase;
-  background: #1c2024;
+  background: #202225;
   border: 1px solid var(--border-strong);
 }
 
@@ -630,7 +633,7 @@ td.name .ellipsis { display: block; }
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 6, 7, .78);
+  background: rgba(10, 13, 15, .74);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -678,8 +681,8 @@ pre.console {
   max-height: 240px;
   overflow: auto;
   font: 11px/1.55 var(--mono);
-  color: #b6c3ca;
-  background: #07080a;
+  color: #b8bdc0;
+  background: #101113;
   border-top: 1px solid var(--border);
   white-space: pre-wrap;
 }
@@ -689,5 +692,5 @@ pre.console {
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #272d32; border-radius: 10px; border: 2px solid var(--bg); }
-::-webkit-scrollbar-thumb:hover { background: #38424a; }
+::-webkit-scrollbar-thumb { background: #2c2f32; border-radius: 10px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #3c4145; }

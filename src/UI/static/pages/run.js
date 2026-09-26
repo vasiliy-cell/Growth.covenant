@@ -287,13 +287,13 @@ function drawRewards(charts, node, rewards, view) {
         type: "slider",
         height: 20,
         bottom: 16,
-        borderColor: "#23272b",
-        backgroundColor: "#0d0f11",
+        borderColor: "#26282b",
+        backgroundColor: "#101113",
         fillerColor: "rgba(224,139,62,.14)",
-        dataBackground: { lineStyle: { color: "#2f3a41" }, areaStyle: { color: "#171c20" } },
+        dataBackground: { lineStyle: { color: "#3a3d40" }, areaStyle: { color: "#1b1d1f" } },
         selectedDataBackground: { lineStyle: { color: COLORS.orange }, areaStyle: { color: "rgba(224,139,62,.2)" } },
         handleStyle: { color: COLORS.orange, borderColor: "#a25f22" },
-        moveHandleStyle: { color: "#31373d" },
+        moveHandleStyle: { color: "#34373a" },
         textStyle: { color: CHART_INK.label },
       },
     ],
@@ -362,7 +362,7 @@ function drawPopulation(charts, node, rewards) {
 // would turn an amount into four different-looking things. The map is drawn
 // the way the world is watched live - y downwards, (0,0) top left.
 
-const HEAT_COLORS = ["#101416", "#28271e", "#5e4222", "#a2652b", "#e08b3e", "#f3c795"];
+const HEAT_COLORS = ["#1b1d1f", "#2c2a22", "#5e4222", "#a2652b", "#e08b3e", "#f3c795"];
 
 export function heatOption(grid, size, { title } = {}) {
   const base = chartBase();
@@ -533,7 +533,7 @@ function drawTree(node, note, family, worldId, view) {
 
   drawn.append("circle")
     .attr("r", (item) => 5 + Math.min(6, (item.data.agent.offspring || 0) * 1.5))
-    .attr("fill", (item) => (item.data.agent.alive ? COLORS.orange : "#3b464d"));
+    .attr("fill", (item) => (item.data.agent.alive ? COLORS.orange : "#41464a"));
 
   drawn.append("text")
     .attr("y", -11)

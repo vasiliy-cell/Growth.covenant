@@ -13,9 +13,11 @@
 import { api, h, fmt, route, cleanup, every, button } from "../lib.js";
 
 // empty, food, danger - the panel's own language on the map: smoked sage
-// is what pays, rusted crimson is what hurts, and the agents on top of
-// them are the one warm colour in the interface.
-const CELLS = [[13, 15, 17], [142, 196, 163], [200, 69, 60]];
+// is what pays, rusted crimson is what hurts, and the agents on top of them
+// are the one warm colour in the interface. An empty cell is graphite, not
+// black: a black hole in the middle of the page would cut straight through
+// the fog everything else sits in.
+const CELLS = [[30, 32, 35], [142, 196, 163], [200, 69, 60]];
 
 const SIZE = 520;
 const SPEEDS = [[5, "5/s"], [10, "10/s"], [30, "30/s"], [60, "60/s"], [0, "full speed"]];
@@ -90,7 +92,9 @@ export function liveStage(worldId, { onFrame } = {}) {
       ? (frame.rate ? `running · ${frame.rate} steps/s` : "running · full speed")
       : "finished";
 
-    side.replaceChildren(
+    // replaceChildren turns a null into the word "null" on the page, so the
+    // hint is only passed when there is one.
+    side.replaceChildren(...[
       stat("step", fmt.int(frame.step)),
       stat("episode", fmt.int(frame.episode)),
       stat("agents", fmt.int(frame.agents)),
@@ -100,7 +104,7 @@ export function liveStage(worldId, { onFrame } = {}) {
       frame.running && !frame.rate
         ? h("div", { class: "hint" }, "Full speed: these are samples, agents jump. Pick a speed above to see every step.")
         : null,
-    );
+    ].filter(Boolean));
 
     if (onFrame) onFrame(frame);
   };
@@ -216,7 +220,7 @@ class Player {
     const scale = canvas.width / this.size;
 
     context.imageSmoothingEnabled = false;
-    context.fillStyle = "#08090a";
+    context.fillStyle = "#121315";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     if (this.mapKey) context.drawImage(this.map, 0, 0, canvas.width, canvas.height);
