@@ -170,9 +170,10 @@ What the world charges for being alive and what it takes to make a child.
 Note that the reward the world pays goes straight into energy: one food
 cell is +5 reward AND +5 energy.
 
-- **`energy_leak`** - the BASE cost of being alive, paid by every agent on
-  every tick. Aging adds to it (see `life.aging`), so this is what a
-  newborn pays and nobody ever pays less.
+- **`energy_leak`** - the BASE cost of being alive, paid by every ADULT on
+  every tick. Children pay nothing at all, and aging adds to it (see
+  `life.aging`), so this is what a fresh adult pays and no adult ever pays
+  less.
 - **`start_energy`** - what a body is born with. A newborn gets
   `reproduction_cost` from its parents instead.
 - **`reproduction_threshold`** - an agent at or above this energy makes a
@@ -180,38 +181,41 @@ cell is +5 reward AND +5 energy.
 - **`reproduction_cost`** - what the parents pay for it, and what the child
   is born with. One parent pays it all; two parents pay half each.
 
-  Keep it BELOW `reproduction_threshold`. At or above it, every newborn is
-  born already able to reproduce, and the population explodes.
+  Keep it BELOW `reproduction_threshold`. At or above it, a fresh adult is
+  already able to reproduce again the moment it grows up.
 
-Reproduction is gated by energy alone - **not** by age. A newborn that has
-the energy can have a child on its first tick; childhood only protects it
-from death.
+Only ADULTS reproduce. A child may not breed however rich it is - energy
+alone once let a newborn have a child on its very first tick, and with a
+cost at or above the threshold that ran away into an explosion.
 
 ## `life`
 
 A life has two periods, and the first one is free.
 
 **Childhood** - the first `childhood_steps` ticks after birth. The agent
-ages and leaks energy like everybody else, but nothing can kill it: every
-newborn gets the same amount of time to learn where the food is before the
-world starts charging for mistakes. Its energy is not floored, so a child
-that eats less than it leaks goes on into debt and can die the moment it
-grows up.
+ages and eats like everybody else, but it pays no leak and nothing can kill
+it: every newborn gets the same amount of time to learn where the food is
+before the world starts charging at all. It cannot reproduce either.
+
+A leak during childhood only moved the bill: a child that ate less than it
+leaked went into debt for the whole of its childhood and starved on the
+tick it grew up, however well it had learned to feed itself by then.
 
 **Adulthood** - everything after that. The agent is mortal, and starvation
 is the only way out: once its energy falls to `death_energy` it is removed
 from the run.
 
 There is no hard age limit on purpose. The personal leak grows by
-`aging.amount` every `aging.every` ticks of a life and never stops growing,
-so old age is not a number to compare against - it is a bill that keeps
-rising until no amount of foraging can pay it.
+`aging.amount` every `aging.every` ticks of ADULT life and never stops
+growing, so old age is not a number to compare against - it is a bill that
+keeps rising until no amount of foraging can pay it.
 
 - **`childhood_steps`** - ticks of guaranteed immortality after birth.
 - **`death_energy`** - an adult at or below this energy dies.
-- **`aging.every`** / **`aging.amount`** - every N ticks of a life, the
-  personal leak grows by this much. The leak at age A is
-  `energy_leak + (A // every) * amount`.
+- **`aging.every`** / **`aging.amount`** - every N ticks of adult life,
+  the personal leak grows by this much. The leak at age A is 0 for a child
+  and `energy_leak + ((A - childhood_steps) // every) * amount` for an
+  adult, so the bill starts rising the tick the charging starts.
 
 ## `genome`
 

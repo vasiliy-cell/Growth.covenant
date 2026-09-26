@@ -57,13 +57,25 @@ def test_an_adult_dies_at_the_threshold_and_not_above_it():
 # -----------------------------
 # AGING
 # -----------------------------
-def test_the_leak_grows_by_one_step_per_aging_period():
-    life = make_life(base_leak=1.0, aging_every=2, aging_amount=0.5)
+def test_a_child_pays_nothing_for_being_alive():
+    life = make_life(childhood_steps=3, base_leak=1.0)
 
-    assert life.leak(0) == 1.0
-    assert life.leak(1) == 1.0
-    assert life.leak(2) == 1.5
-    assert life.leak(5) == 2.0
+    assert life.leak(0) == 0.0
+    assert life.leak(2) == 0.0
+
+
+def test_the_leak_starts_at_adulthood_and_grows_from_there():
+    """
+    The bill starts the tick the world starts charging, not the tick the
+    agent was born: counted from birth, a grown up would step straight
+    into the leak of an age it spent as a child.
+    """
+    life = make_life(childhood_steps=3, base_leak=1.0, aging_every=2, aging_amount=0.5)
+
+    assert life.leak(3) == 1.0      # first adult tick: the base cost alone
+    assert life.leak(4) == 1.0
+    assert life.leak(5) == 1.5      # two adult ticks lived
+    assert life.leak(8) == 2.0
 
 
 def test_aging_can_be_switched_off():
@@ -109,7 +121,9 @@ def test_a_death_carries_the_whole_life_out_with_it():
     Nothing else in the logs can answer "what happened to this one"
     without a join across a million rows.
     """
-    env = make_env(make_life(childhood_steps=1, base_leak=1000.0))
+    env = make_env(
+        make_life(childhood_steps=1, base_leak=1000.0, start_energy=10.0)
+    )
 
     stand_still(env)
     _, _, info = stand_still(env)
@@ -162,7 +176,9 @@ def test_a_birth_names_its_parents_and_counts_them(tmp_path):
 def test_a_starving_adult_leaves_the_run():
     # a leak nothing on the map can pay for, so the outcome does not depend
     # on what the bodies happen to be standing on
-    env = make_env(make_life(childhood_steps=1, base_leak=1000.0))
+    env = make_env(
+        make_life(childhood_steps=1, base_leak=1000.0, start_energy=10.0)
+    )
 
     # tick 1 makes them adults, tick 2 kills whoever did not find food
     stand_still(env)

@@ -80,14 +80,27 @@ class Life:
         """
         What being alive costs this body right now.
 
-        A step function, not a smooth curve: the leak is the base cost plus
-        one `aging_amount` for every full `aging_every` ticks already lived,
-        so a whole generation born together ages in the same visible jumps.
+        A child pays nothing. Childhood is meant to be the period where the
+        world does not charge for mistakes, and a leak it could not yet
+        forage against only moved the bill: a child that ate less than it
+        leaked went into debt for the whole of its childhood and starved on
+        the tick it grew up, however well it had learned to feed itself by
+        then.
+
+        An adult pays the base cost, and a step - not a smooth curve - for
+        age on top of it: one `aging_amount` for every full `aging_every`
+        ticks of ADULT life, counted from the end of childhood, so the bill
+        starts rising the tick the charging starts.
         """
+        if self.is_child(age):
+            return 0.0
+
         if self.aging_every <= 0:
             return self.base_leak
 
-        return self.base_leak + (age // self.aging_every) * self.aging_amount
+        adult_age = age - self.childhood_steps
+
+        return self.base_leak + (adult_age // self.aging_every) * self.aging_amount
 
     # -----------------------------
     # DEATH
