@@ -189,12 +189,13 @@ cell is +5 reward AND +5 energy.
 - **`reproduction_cost`** - what the parents pay for it, and what the child
   is born with. One parent pays it all; two parents pay half each.
 
-  Keep it BELOW `reproduction_threshold`. At or above it, a fresh adult is
-  already able to reproduce again the moment it grows up.
+  Keep it BELOW `reproduction_threshold`. At or above it, every newborn is
+  born already able to breed, and the population explodes.
 
-Only ADULTS reproduce. A child may not breed however rich it is - energy
-alone once let a newborn have a child on its very first tick, and with a
-cost at or above the threshold that ran away into an explosion.
+Reproduction is gated by energy and by nothing else - **not** by age. A
+child that has fed itself up to the threshold has earned it: getting there
+young is exactly what a fast learner looks like, and childhood is about
+what can kill an agent, not about what it may do.
 
 ## `life`
 
