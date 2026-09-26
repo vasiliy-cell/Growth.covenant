@@ -637,18 +637,21 @@ function agentBody(agent) {
 
     h("div", { class: "grid-2", style: "margin-top:6px" }, [
       h("div", { class: "panel" }, [
-        h("header", {}, ["Phenotype", h("span", { class: "note" }, "what its genes were read into")]),
-        h("div", { class: "body mono", style: "font-size:11px" },
-          h("div", { class: "kv" }, Object.entries(agent.phenotype || {})
+        h("header", {}, [
+          "Phenotype",
+          h("span", { class: "note" }, `${Object.keys(agent.phenotype || {}).length} genes, read`),
+        ]),
+        h("div", { class: "body" }, h("div", { class: "kv gene-list" },
+          Object.entries(agent.phenotype || {})
             .sort(([a], [b]) => a.localeCompare(b))
             .flatMap(([name, value]) => [
-              h("span", { class: "muted" }, name),
+              h("span", {}, name),
               h("span", {}, fmt.number(value, Math.abs(value) >= 100 ? 0 : 4)),
             ]))),
       ]),
       h("div", { class: "panel" }, [
         h("header", {}, ["Genotype", h("span", { class: "note" }, "what it was born with")]),
-        h("div", { class: "body mono", style: "font-size:11px" }, genotypeBody(agent.genotype)),
+        h("div", { class: "body" }, genotypeBody(agent.genotype)),
       ]),
     ]),
 
@@ -681,10 +684,10 @@ function genotypeBody(genotype) {
 
   // A mendel genotype is two alleles per gene; the other species keep one
   // number per gene, and both are worth seeing next to the phenotype.
-  return h("div", { class: "kv" }, (pairs.length ? pairs : Object.entries(genotype))
+  return h("div", { class: "kv gene-list" }, (pairs.length ? pairs : Object.entries(genotype))
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([name, value]) => [
-      h("span", { class: "muted" }, name),
+      h("span", {}, name),
       h("span", {}, Array.isArray(value)
         ? value.map((allele) => (Array.isArray(allele)
           ? `${fmt.number(allele[0], Math.abs(allele[0]) >= 100 ? 0 : 3)}${allele[1]}`
