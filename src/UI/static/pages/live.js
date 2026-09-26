@@ -12,9 +12,10 @@
 
 import { api, h, fmt, route, cleanup, every, button } from "../lib.js";
 
-// empty, food, danger: the map's own colours, which mean something and so
-// stay out of the orange of the panel.
-const CELLS = [[14, 14, 16], [46, 160, 67], [218, 54, 51]];
+// empty, food, danger - the panel's own language on the map: smoked sage
+// is what pays, rusted crimson is what hurts, and the agents on top of
+// them are the one warm colour in the interface.
+const CELLS = [[13, 15, 17], [142, 196, 163], [200, 69, 60]];
 
 const SIZE = 520;
 const SPEEDS = [[5, "5/s"], [10, "10/s"], [30, "30/s"], [60, "60/s"], [0, "full speed"]];
@@ -23,12 +24,17 @@ const SPEEDS = [[5, "5/s"], [10, "10/s"], [30, "30/s"], [60, "60/s"], [0, "full 
 // time too.
 let chosenSpeed = 30;
 
-export function livePage(root, id) {
+// The live world as a panel: whoever wants it puts it on their page.
+//
+// `onFrame` is called with every frame that arrives, which is how the
+// charts under this panel know how many steps have passed since they were
+// last drawn.
+export function liveStage(worldId, { onFrame } = {}) {
+  const id = worldId;
   const dpr = window.devicePixelRatio || 1;
   const canvas = h("canvas", { width: SIZE * dpr, height: SIZE * dpr });
   const side = h("div", { class: "side" });
-  const title = h("span", {}, "connecting…");
-  const status = h("span", { class: "badge" }, "waiting");
+  const status = h("span", { class: "badge" }, "connecting…");
   const speeds = h("div", { class: "row", style: "gap:0" });
 
   let running = true;
@@ -45,15 +51,13 @@ export function livePage(root, id) {
 
   drawSpeeds();
 
-  root.replaceChildren(h("div", { class: "page" }, h("div", { class: "panel" }, [
+  const panel = h("div", { class: "panel" }, [
     h("header", {}, [
-      h("a", { class: "btn small ghost", href: route.worlds(), title: "Back to worlds" }, "←"),
-      title,
+      "Live",
       status,
       h("span", { class: "spacer" }),
       h("span", { class: "note" }, "watch at"),
       speeds,
-      h("a", { class: "btn small", href: route.world(id) }, "Charts"),
       button({
         label: "Stop", icon: "stop", kind: "danger", small: true,
         title: "Stop the run now; it writes a checkpoint on the way out",
@@ -61,9 +65,10 @@ export function livePage(root, id) {
       }),
     ]),
     h("div", { class: "live-stage" }, [h("div", { class: "screen" }, canvas), side]),
-  ])));
+  ]);
 
-  // Keep the run slowed down while this page is open; let go on leaving.
+  // Keep the run slowed down while this panel is on screen; let go when the
+  // page it lives on is left.
   ask();
   every(2000, ask);
   cleanup(() => { api.watch(id, 0).catch(() => {}); });
@@ -80,9 +85,10 @@ export function livePage(root, id) {
 
     player.push(frame);
 
-    title.textContent = frame.label || frame.world_id;
     status.className = frame.running ? "badge live" : "badge";
-    status.textContent = frame.running ? (frame.rate ? `running · ${frame.rate} steps/s` : "running · full speed") : "finished";
+    status.textContent = frame.running
+      ? (frame.rate ? `running · ${frame.rate} steps/s` : "running · full speed")
+      : "finished";
 
     side.replaceChildren(
       stat("step", fmt.int(frame.step)),
@@ -95,7 +101,18 @@ export function livePage(root, id) {
         ? h("div", { class: "hint" }, "Full speed: these are samples, agents jump. Pick a speed above to see every step.")
         : null,
     );
+
+    if (onFrame) onFrame(frame);
   };
+
+  return panel;
+}
+
+// The old address of a live world. A run is not a separate window any more -
+// the map and every chart of it are on the world's own page - so this only
+// sends the reader there.
+export function livePage(root, id) {
+  location.replace(`${location.pathname}${location.search}${route.world(id)}`);
 }
 
 function stat(name, value) {
@@ -199,12 +216,12 @@ class Player {
     const scale = canvas.width / this.size;
 
     context.imageSmoothingEnabled = false;
-    context.fillStyle = "#070708";
+    context.fillStyle = "#08090a";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     if (this.mapKey) context.drawImage(this.map, 0, 0, canvas.width, canvas.height);
 
-    context.fillStyle = "#ffa657";
+    context.fillStyle = "#ffb454";
 
     for (const [x, y] of this.positions(now).values()) {
       context.beginPath();
@@ -234,7 +251,7 @@ export async function liveRunPage(root, runId) {
       const { world, state } = await api.runWorld(runId);
 
       if (world) {
-        location.replace(`${location.pathname}${location.search}${route.live(world)}`);
+        location.replace(`${location.pathname}${location.search}${route.world(world)}`);
         return;
       }
 

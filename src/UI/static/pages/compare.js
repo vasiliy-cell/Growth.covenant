@@ -240,8 +240,10 @@ function drawChart(chart, result, smoothing, color) {
     legend: { show: false },
     grid: { ...base.grid, top: 20 },
     dataZoom: [{ type: "inside" }],
-    xAxis: { ...base.xAxis, type: "value", name: "episode", nameTextStyle: { color: "#62626c" } },
-    yAxis: { ...base.yAxis },
+    xAxis: { ...base.xAxis, type: "value", name: "episode" },
+    // Every axis says what it holds: this one is whichever metric the
+    // comparison is about.
+    yAxis: { ...base.yAxis, name: result.name },
     series: result.series.map((series) => {
       const values = smooth(series.values, smoothing);
 

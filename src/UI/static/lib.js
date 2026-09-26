@@ -17,6 +17,16 @@ async function request(path, options = {}) {
 const post = (path, body) => request(path, { method: "POST", body: JSON.stringify(body) });
 const world = (id, tail) => `/api/worlds/${encodeURI(id)}/${tail}`;
 
+// Only the parts of a filter that are set: an empty filter must leave the
+// address alone, so an unfiltered chart takes the cheap path on the server.
+function query(filter) {
+  const parts = Object.entries(filter || {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== "" && value !== "all")
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`);
+
+  return parts.length ? `?${parts.join("&")}` : "";
+}
+
 export const api = {
   worlds: () => request("/api/worlds"),
   facets: () => request("/api/facets"),
@@ -24,9 +34,11 @@ export const api = {
   config: () => request("/api/config"),
 
   details: (id) => request(world(id, "details")),
-  rewards: (id) => request(world(id, "rewards")),
-  learning: (id) => request(world(id, "learning")),
+  // A chart can be about a part of the population: see reports.cohorts.
+  rewards: (id, filter) => request(world(id, `rewards${query(filter)}`)),
+  learning: (id, filter) => request(world(id, `learning${query(filter)}`)),
   family: (id) => request(world(id, "family")),
+  agent: (id, agentId) => request(world(id, `agent/${encodeURIComponent(agentId)}`)),
   heatmap: (id) => request(world(id, "heatmap")),
   stream: (id) => new EventSource(world(id, "stream")),
 
@@ -151,38 +163,53 @@ export const fmt = {
 };
 
 // ---------------- charts ----------------
-// Orange leads; the other colours are GitHub's dark palette, chosen to
-// stay apart from each other on black.
+// The panel's language, in chart form: hazard orange for the line you came
+// to read, ice cyan and steel for the frame around it, sage for reward,
+// crimson for death and penalties, yellow for a state to notice.
 
 export const COLORS = {
-  orange: "#f0883e",
-  gold: "#e3b341",
-  rose: "#ff7b72",
-  blue: "#79c0ff",
-  green: "#3fb950",
-  red: "#f85149",
-  purple: "#d2a8ff",
-  gray: "#3a3a42",
+  orange: "#ff8c1a",
+  amber: "#ffb454",
+  cyan: "#7ed4e6",
+  steel: "#557584",
+  sage: "#8ec4a3",
+  crimson: "#c8453c",
+  yellow: "#e6c34d",
+  gray: "#2f3a41",
 };
 
 export const SERIES_COLORS = [
-  "#f0883e", "#79c0ff", "#e3b341", "#ff7b72", "#3fb950",
-  "#d2a8ff", "#ffa657", "#56d4dd", "#a5d6ff", "#ffc680",
+  "#ff8c1a", "#7ed4e6", "#8ec4a3", "#e6c34d", "#c8453c",
+  "#ffb454", "#557584", "#b6a8e0", "#a5d6ff", "#ffd2a1",
 ];
 
+// Grid, axis lines and labels: cold and quiet, so the series are the only
+// thing with colour in the box.
+export const CHART_INK = {
+  label: "#93a2ab",
+  axis: "#23272b",
+  split: "#171c20",
+  name: "#7ed4e6",
+};
+
+// Every axis in the panel is named: a chart that does not say what its
+// numbers are is a picture, not a measurement. `name` on an axis of this
+// base lands under the x axis and along the y axis by itself.
 export function chartBase() {
+  const name = { color: CHART_INK.name, fontSize: 10, fontFamily: "ui-monospace, SF Mono, Menlo, monospace" };
+
   return {
     backgroundColor: "transparent",
     animation: false,
-    textStyle: { color: "#9d9da8", fontFamily: "ui-monospace, SF Mono, Menlo, monospace", fontSize: 11 },
-    grid: { left: 56, right: 22, top: 36, bottom: 36 },
+    textStyle: { color: CHART_INK.label, fontFamily: "ui-monospace, SF Mono, Menlo, monospace", fontSize: 11 },
+    grid: { left: 64, right: 26, top: 34, bottom: 52 },
     tooltip: {
       trigger: "axis",
-      backgroundColor: "#131316",
-      borderColor: "#34343b",
+      backgroundColor: "#141719",
+      borderColor: "#31373d",
       borderWidth: 1,
-      textStyle: { color: "#ededf0", fontSize: 11 },
-      axisPointer: { lineStyle: { color: "#4a4a53" } },
+      textStyle: { color: "#e7ecef", fontSize: 11 },
+      axisPointer: { lineStyle: { color: "#3f4a50" } },
     },
     legend: {
       top: 6,
@@ -190,19 +217,25 @@ export function chartBase() {
       icon: "roundRect",
       itemWidth: 12,
       itemHeight: 3,
-      textStyle: { color: "#9d9da8", fontSize: 11 },
+      textStyle: { color: CHART_INK.label, fontSize: 11 },
     },
     xAxis: {
       type: "category",
       boundaryGap: false,
-      axisLine: { lineStyle: { color: "#26262b" } },
+      nameLocation: "middle",
+      nameGap: 30,
+      nameTextStyle: name,
+      axisLine: { lineStyle: { color: CHART_INK.axis } },
       axisTick: { show: false },
       splitLine: { show: false },
     },
     yAxis: {
       type: "value",
+      nameLocation: "middle",
+      nameGap: 48,
+      nameTextStyle: name,
       axisLine: { show: false },
-      splitLine: { lineStyle: { color: "#1b1b1f" } },
+      splitLine: { lineStyle: { color: CHART_INK.split } },
     },
   };
 }
@@ -326,11 +359,53 @@ export function menu(items) {
   return trigger;
 }
 
+// A popup the size of a page: what a family tree opens when a node is
+// clicked. It is the same overlay the questions use, so Escape, the
+// backdrop and the close button all end it the same way.
+export function popup({ title, body, note }) {
+  const backdrop = document.getElementById("modal-backdrop");
+  const box = document.getElementById("modal");
+
+  const close = () => {
+    backdrop.hidden = true;
+    // A popup can hold charts, and a chart holds a canvas until it is told
+    // to let go of it.
+    for (const canvas of box.querySelectorAll(".chart")) {
+      echarts.getInstanceByDom(canvas)?.dispose();
+    }
+
+    box.className = "modal";
+    box.replaceChildren();
+    document.removeEventListener("keydown", onKey);
+  };
+
+  const onKey = (event) => { if (event.key === "Escape") close(); };
+
+  box.className = "modal big";
+  box.replaceChildren(
+    h("header", {}, [
+      h("span", {}, title),
+      note ? h("span", { class: "note" }, note) : null,
+      h("span", { class: "spacer" }),
+      button({ label: "Close", kind: "ghost", small: true, onclick: close }),
+    ]),
+    h("div", { class: "body scroller" }, body),
+  );
+
+  backdrop.hidden = false;
+  backdrop.onclick = (event) => { if (event.target === backdrop) close(); };
+  document.addEventListener("keydown", onKey);
+
+  return { close, fill: (content) => box.querySelector(".body").replaceChildren(content) };
+}
+
 export function modal({ title, body, confirm, danger, onConfirm }) {
   const backdrop = document.getElementById("modal-backdrop");
   const box = document.getElementById("modal");
 
   const close = () => { backdrop.hidden = true; box.replaceChildren(); };
+
+  box.className = "modal";
   const error = h("div", { class: "error" });
 
   const confirmButton = button({
@@ -370,6 +445,25 @@ export function segmented(options, value, onchange) {
 
   draw(value);
   return root;
+}
+
+// A row of chips of which exactly one is on: the same choice a segmented
+// control makes, in the shape that fits inside a panel header.
+export function chips(options, value, onchange) {
+  const box = h("div", { class: "row", style: "gap:4px;flex-wrap:nowrap" });
+
+  const draw = (current) => {
+    box.replaceChildren(...options.map(([key, text, title]) =>
+      h("button", {
+        class: `chip ${key === current ? "on" : ""}`,
+        style: "margin:0",
+        title: title || null,
+        onclick: () => { draw(key); onchange(key); },
+      }, text)));
+  };
+
+  draw(value);
+  return box;
 }
 
 export function toggle(checked, onchange) {

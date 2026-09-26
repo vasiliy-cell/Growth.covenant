@@ -70,14 +70,17 @@ function runningRows(worlds, reload) {
 
   return [h("div", { class: "panel" }, [
     h("header", {}, ["Running now", h("span", { class: "note" }, `${running.length}`)]),
-    h("table", {}, h("tbody", {}, running.map((world) => h("tr", {}, [
-      h("td", {}, world.label || world.world_id),
+    h("table", {}, h("tbody", {}, running.map((world) => h("tr", {
+      class: "clickable",
+      onclick: (event) => { if (!event.target.closest("button")) go(route.world(world.id)); },
+    }, [
+      h("td", { class: "name" }, h("div", { class: "ellipsis" }, world.label || world.world_id)),
       h("td", { class: "num" }, `step ${fmt.int(world.live && world.live.step)}`),
       h("td", { class: "num" }, `${fmt.int(world.live && world.live.agents)} agents`),
       h("td", { class: "num" }, `${fmt.number(world.live && world.live.steps_per_second, 0)} steps/s`),
       h("td", { class: "actions" }, h("div", { class: "row" }, [
-        button({ label: "Watch", icon: "watch", kind: "primary", small: true, onclick: () => go(route.live(world.id)) }),
-        button({ label: "Stop", icon: "stop", kind: "danger", small: true, onclick: () => stop(world, reload) }),
+        button({ icon: "watch", kind: "primary", small: true, title: "Open the world: live map and charts", onclick: () => go(route.world(world.id)) }),
+        button({ icon: "stop", kind: "danger", small: true, title: "Stop this run", onclick: () => stop(world, reload) }),
       ])),
     ])))),
   ])];
@@ -91,25 +94,27 @@ function row(world, reload) {
   const canKeep = world.checkpoint && !world.checkpoint.pinned && !world.extinct;
 
   return h("tr", { class: "clickable", onclick: (event) => { if (!event.target.closest("button")) go(route.world(world.id)); } }, [
-    h("td", {}, [
+    h("td", { class: "name" }, [
       h("div", { class: "row", style: "gap:8px;flex-wrap:nowrap" }, [
-        world.label || h("span", { class: "dim" }, "unnamed"),
+        h("div", { class: "ellipsis" }, world.label || h("span", { class: "dim" }, "unnamed")),
         world.running ? h("span", { class: "badge live" }, "running") : null,
         world.extinct ? h("span", { class: "badge", title: "Every agent starved" }, "extinct") : null,
       ]),
-      h("div", { class: "dim mono", style: "font-size:11px;margin-top:2px" }, world.world_id),
+      h("div", { class: "dim mono ellipsis", style: "font-size:11px;margin-top:2px" }, world.world_id),
     ]),
     h("td", { class: "num" }, fmt.int(world.episodes)),
     h("td", { class: "muted" }, fmt.ago(world.created_at)),
+    // Icons, not words: a running world showed four labelled buttons here
+    // and pushed its own row past the edge of the table.
     h("td", { class: "actions" }, h("div", { class: "row" }, [
       world.running
-        ? button({ label: "Watch", icon: "watch", kind: "primary", small: true, onclick: () => go(route.live(world.id)) })
+        ? button({ icon: "watch", kind: "primary", small: true, title: "Open: live map and charts", onclick: () => go(route.world(world.id)) })
         : null,
       world.running
-        ? button({ label: "Stop", icon: "stop", kind: "danger", small: true, onclick: () => stop(world, reload) })
+        ? button({ icon: "stop", kind: "danger", small: true, title: "Stop this run", onclick: () => stop(world, reload) })
         : null,
       canContinue
-        ? button({ label: "Continue", icon: "resume", small: true, onclick: () => resume(world, reload) })
+        ? button({ icon: "resume", small: true, title: "Continue from the newest checkpoint", onclick: () => resume(world, reload) })
         : null,
       menu([
         canKeep ? { label: "Keep checkpoint", icon: "keep", onclick: () => keep(world, reload) } : null,

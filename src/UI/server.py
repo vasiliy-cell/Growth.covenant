@@ -447,7 +447,20 @@ def metrics():
 # -----------------------------
 @app.get("/api/runs")
 def runs():
-    return launcher.summary()
+    """
+    The queue, with the world each run is writing.
+
+    A run names its world a second after it starts, in its first heartbeat,
+    and the Launch page needs that name to show the run below the form - so
+    it is attached here instead of being asked for row by row.
+    """
+    state = launcher.summary()
+    by_pid = reports.worlds_by_pid(LOGS_DIR, LIVE_DIR)
+
+    for run in state["runs"]:
+        run["world"] = by_pid.get(run["pid"])
+
+    return state
 
 
 @app.post("/api/runs")

@@ -830,6 +830,45 @@ def live_all(logs_dir, live_dir):
     )
 
 
+def worlds_by_pid(logs_dir, live_dir):
+    """
+    Which world each launched process is writing, by pid.
+
+    The queue asks this on every refresh, so it reads the handful of
+    heartbeat files and matches them to folder names instead of opening
+    every run.json in logs/.
+    """
+    if not os.path.isdir(live_dir) or not os.path.isdir(logs_dir):
+        return {}
+
+    folders = os.listdir(logs_dir)
+    found = {}
+
+    for name in os.listdir(live_dir):
+        if not name.endswith(".json"):
+            continue
+
+        world_id = name[: -len(".json")]
+        live = read_live(live_dir, world_id)
+
+        if not live or live.get("pid") is None:
+            continue
+
+        # A log folder is the world id, plus the run's label if it had one.
+        folder = next(
+            (
+                folder for folder in folders
+                if folder == world_id or folder.startswith(f"{world_id}_")
+            ),
+            None,
+        )
+
+        if folder:
+            found[live["pid"]] = folder
+
+    return found
+
+
 # -----------------------------
 # FACETS
 # -----------------------------

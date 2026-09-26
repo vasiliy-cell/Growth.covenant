@@ -1,6 +1,15 @@
-// Starting runs: one, or several one after another with a new seed each.
+// Starting runs, and watching the one that is going.
+//
+// One page, scrolled: the form and the queue at the top, and under them the
+// run itself - its live map, its stats and every chart of it. Starting a run
+// does not send you anywhere; the page simply grows.
 
-import { api, h, fmt, button, segmented, toggle, go, route, every, redraw, setText } from "../lib.js";
+import { api, h, fmt, button, segmented, toggle, every, redraw, setText, leavePage } from "../lib.js";
+import { runView } from "./run.js";
+
+// Which world the lower half of the page is about. It outlives one render of
+// the page, because picking another run rebuilds the page around it.
+let watching = null;
 
 export async function launchPage(root) {
   const { config, cpus } = await api.config();
@@ -9,38 +18,85 @@ export async function launchPage(root) {
   sessionStorage.removeItem("prefill");
 
   const queue = h("div", {});
+  const stage = h("div", { class: "stack" });
+
+  const rebuild = () => {
+    // A different run means different everything below: the live stream, the
+    // charts, the tree. Building the page again is how they all let go at
+    // once instead of half of them staying behind.
+    leavePage();
+    launchPage(root).catch(() => {});
+  };
 
   root.replaceChildren(h("div", { class: "page" }, [
     h("div", { class: "page-head" }, [
-      h("h1", {}, prefill ? "Replay" : "New run"),
+      h("h1", {}, prefill ? "Replay" : "Launch"),
       h("span", { class: "sub" }, `episode = ${config.run?.episode_length ?? 20} steps · ${cpus} cores`),
     ]),
     h("div", { class: "grid-2" }, [
-      h("div", { class: "panel" }, h("div", { class: "body", style: "padding:18px" }, form(config, prefill || {}))),
+      h("div", { class: "panel" }, h("div", { class: "body" }, form(config, prefill || {}))),
       queue,
     ]),
+    stage,
   ]));
+
+  let shown = null;
 
   const refresh = async () => {
     try {
       const state = await api.runs();
 
       // The queue is only rebuilt when a run changes state. Rebuilding it
-      // every second and a half threw away the console somebody was
-      // reading - and their place in it.
+      // every second and a half threw away the console somebody was reading -
+      // and their place in it.
       const built = redraw(
         queue,
-        JSON.stringify(state.runs.map((run) => [run.id, run.state])),
-        () => queuePanel(state),
+        JSON.stringify(state.runs.map((run) => [run.id, run.state, run.world])),
+        () => queuePanel(state, rebuild),
       );
 
       if (!built) refreshConsoles();
+
+      // Nothing picked yet: follow the run that is going. The launcher runs
+      // one at a time, so there is never a question which one that is.
+      const going = state.runs.find((run) => run.state === "running" && run.world);
+      const target = watching || (going && going.world);
+
+      if (target && target !== shown) {
+        shown = target;
+        watching = target;
+        await runView(stage, target, { live: Boolean(going && going.world === target) });
+      } else if (!target && !shown) {
+        stage.replaceChildren(h("div", { class: "panel" }, h("div", { class: "empty" }, [
+          "Nothing is running. ", h("b", {}, "Start"), " a run and it appears here - map, charts and family tree.",
+        ])));
+      } else if (going && going.world !== shown && !newRunOffered(stage)) {
+        offerNewRun(stage, going.world, rebuild);
+      }
     } catch { /* next time */ }
   };
 
   await refresh();
   every(1500, refresh);
 }
+
+function newRunOffered(stage) {
+  return Boolean(stage.querySelector(".new-run"));
+}
+
+function offerNewRun(stage, world, rebuild) {
+  stage.prepend(h("div", { class: "panel new-run" }, h("div", { class: "body row" }, [
+    h("span", { class: "badge live" }, "a newer run is going"),
+    h("span", { class: "muted" }, "the charts below are the previous one"),
+    h("span", { class: "spacer" }),
+    button({
+      label: "Show the new run", kind: "primary", small: true,
+      onclick: () => { watching = world; rebuild(); },
+    }),
+  ])));
+}
+
+// ---------------- the form ----------------
 
 function field(label, control, hint) {
   return h("div", { class: "field" }, [
@@ -74,7 +130,7 @@ function form(config, prefill) {
     onclick: () => { seed.value = Math.floor(Math.random() * 1e9); },
   });
 
-  const message = h("span", { class: "mono", style: "font-size:12px;color:var(--accent-soft)" });
+  const message = h("span", { class: "mono accent", style: "font-size:12px" });
 
   const start = button({
     label: "Start",
@@ -96,9 +152,13 @@ function form(config, prefill) {
           pin: values.pin,
         });
 
+        // Whatever was being watched, the new run is what this page is about
+        // now: it appears below by itself.
+        watching = null;
+
         message.textContent = count > 1
           ? `a series of ${count} runs is queued - they go one after another`
-          : "started - press Watch in the queue to see it";
+          : "started - it appears below in a moment";
       } catch (error) {
         message.textContent = error.message;
       } finally {
@@ -123,7 +183,7 @@ function form(config, prefill) {
         h("div", { class: "hint" }, "it goes to checkpoints/pinned and is never rotated away"),
       ]),
     ]),
-    h("div", { class: "row", style: "margin-top:18px;gap:14px" }, [start, message]),
+    h("div", { class: "row", style: "margin-top:14px;gap:14px" }, [start, message]),
   ]);
 }
 
@@ -131,9 +191,8 @@ function form(config, prefill) {
 
 const BADGES = { running: "badge live", queued: "badge warn", crashed: "badge bad" };
 
-// Which consoles are open, and the element showing each one - so their
-// text can be refreshed in place instead of being rebuilt under the
-// reader.
+// Which consoles are open, and the element showing each one - so their text
+// can be refreshed in place instead of being rebuilt under the reader.
 const openConsoles = new Map();
 
 function refreshConsoles() {
@@ -147,10 +206,10 @@ function refreshConsoles() {
   }
 }
 
-function queuePanel(state) {
+function queuePanel(state, rebuild) {
   return h("div", { class: "panel" }, [
     h("header", {}, [
-      "Queue",
+      "Runs",
       h("span", { class: "note" }, `${state.running} running · ${state.queued} waiting`),
       h("span", { class: "spacer" }),
       state.runs.some((run) => !["running", "queued"].includes(run.state))
@@ -158,12 +217,12 @@ function queuePanel(state) {
         : null,
     ]),
     state.runs.length
-      ? h("div", {}, state.runs.map(runRow))
-      : h("div", { class: "empty" }, "Nothing queued. Runs you start appear here."),
+      ? h("div", { class: "scroller" }, state.runs.map((run) => runRow(run, rebuild)))
+      : h("div", { class: "empty" }, "Nothing queued yet. Runs you start appear here."),
   ]);
 }
 
-function runRow(run) {
+function runRow(run, rebuild) {
   const request = run.request || {};
   const console = h("pre", { class: "console", hidden: !openConsoles.has(run.id) });
 
@@ -177,12 +236,20 @@ function runRow(run) {
     : `${request.label || "unnamed"} · ${request.species} · ${fmt.int(request.episodes)} episodes · seed ${request.seed ?? "random"}`;
 
   return h("div", { style: "border-bottom:1px solid var(--border)" }, [
-    h("div", { class: "row", style: "padding:11px 14px;flex-wrap:nowrap" }, [
+    h("div", { class: "row", style: "padding:9px 12px;flex-wrap:nowrap" }, [
       h("span", { class: BADGES[run.state] || "badge" }, run.state),
       h("span", { class: "mono", style: "font-size:11px;overflow:hidden;text-overflow:ellipsis" }, what),
       h("span", { class: "spacer" }),
-      run.state === "running"
-        ? button({ label: "Watch", icon: "watch", kind: "primary", small: true, onclick: () => go(route.liveRun(run.id)) })
+      run.world
+        ? button({
+          icon: "watch", small: true, kind: run.world === watching ? "primary" : "",
+          title: "Show this run below",
+          onclick: () => {
+            if (run.world === watching) return;
+            watching = run.world;
+            rebuild();
+          },
+        })
         : null,
       button({
         icon: "console", small: true, title: "Console",
