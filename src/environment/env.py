@@ -192,9 +192,14 @@ class GridWorldEnv:
         born = []
 
         if self.species.partners_required == 0:
-            # asexual: everyone past the energy threshold clones itself
+            # asexual: every ADULT past the energy threshold clones itself.
+            # A child may not breed, however rich it is: energy alone let a
+            # newborn reproduce on its first tick.
             threshold = config["energy"]["reproduction_threshold"]
-            parents = [a for a in self.agents.all() if a.energy >= threshold]
+            parents = [
+                a for a in self.agents.all()
+                if not a.is_child() and a.energy >= threshold
+            ]
             for parent in parents:
                 genotype = self.genomes.get_genotype(parent.agent_id)
                 child = self.species.reproduce(genotype, None, self.genome_rng)

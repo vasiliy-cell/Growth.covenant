@@ -125,9 +125,25 @@ def test_a_death_carries_the_whole_life_out_with_it():
     assert "genotype" in death
 
 
+def test_a_child_never_reproduces_however_rich_it_is():
+    """
+    Energy alone let a newborn breed on its first tick, and with a
+    reproduction cost at or above the threshold that ran away: every child
+    was born already able to have children of its own.
+    """
+    env = make_env(make_life(childhood_steps=10 ** 9))
+
+    for agent in env.agents:
+        agent.energy = 10000.0
+
+    _, _, info = stand_still(env)
+
+    assert info["births"] == []
+
+
 def test_a_birth_names_its_parents_and_counts_them(tmp_path):
     """A lineage cannot be reconstructed from anything else afterwards."""
-    env = make_env(make_life(childhood_steps=10 ** 9))
+    env = make_env(make_life(childhood_steps=0))
 
     for agent in env.agents:
         agent.energy = 10000.0

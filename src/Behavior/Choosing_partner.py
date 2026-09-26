@@ -7,7 +7,10 @@ with open("config.yml", "r", encoding="utf-8") as f:
 def choose_partners(agents):   
     threshold = config["energy"]["reproduction_threshold"]
     zone = 3
-    ready = [agent for agent in agents if agent.energy >= threshold]   
+    ready = [
+        agent for agent in agents
+        if not agent.is_child() and agent.energy >= threshold
+    ]
     couples = []
     used = set()
     for agent, b in combinations(ready, 2):
