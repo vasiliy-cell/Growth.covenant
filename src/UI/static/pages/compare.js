@@ -40,13 +40,23 @@ export async function comparePage(root, step) {
 // ---------------- the three steps ----------------
 
 function stepper(current) {
-  const steps = [["runs", "Runs"], ["metrics", "Metrics"], ["charts", "Charts"]];
+  // "1 2 3" on its own reads as a count of what is selected. Each step
+  // says it is a step, and says what is actually picked so far.
+  const steps = [
+    ["runs", "Runs", state.runs.length && `${state.runs.length} picked`],
+    ["metrics", "Metrics", state.metrics.length && `${state.metrics.length} picked`],
+    ["charts", "Charts", null],
+  ];
   const at = steps.findIndex(([key]) => key === current);
 
-  return h("div", { class: "stepper" }, steps.map(([key, text], index) => h("a", {
+  return h("div", { class: "stepper" }, steps.map(([key, text, picked], index) => h("a", {
     class: `step ${index === at ? "on" : ""} ${index < at ? "done" : ""}`,
     href: index < at ? route.compare(key === "runs" ? "" : key) : null,
-  }, [h("span", { class: "number" }, index + 1), text])));
+  }, [
+    h("span", { class: "number" }, `step ${index + 1}`),
+    text,
+    picked ? h("span", { class: "count" }, picked) : null,
+  ])));
 }
 
 function pickRuns(worlds) {

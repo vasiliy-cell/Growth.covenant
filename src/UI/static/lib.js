@@ -246,6 +246,40 @@ export function leavePage() {
   disposers = [];
 }
 
+// Redraws that do not throw away where the reader was.
+//
+// A list that rebuilds itself every couple of seconds takes the scroll
+// position with it: the page jumps back the moment you scroll down, and a
+// wide table can never be scrolled sideways at all. So a refresh only
+// redraws when something actually changed, and puts the scroll back where
+// it was afterwards.
+export function redraw(node, signature, build) {
+  if (node.dataset.signature === signature) return false;
+
+  const page = document.getElementById("view").parentElement;
+  const top = page.scrollTop;
+  const sideways = [...node.querySelectorAll(".table-scroll")].map((box) => box.scrollLeft);
+
+  node.replaceChildren(...[].concat(build()));
+  node.dataset.signature = signature;
+
+  page.scrollTop = top;
+  [...node.querySelectorAll(".table-scroll")].forEach((box, index) => {
+    box.scrollLeft = sideways[index] ?? 0;
+  });
+
+  return true;
+}
+
+// Text that follows the tail unless the reader has scrolled up to read.
+export function setText(node, text) {
+  const atBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 8;
+  const top = node.scrollTop;
+
+  node.textContent = text;
+  node.scrollTop = atBottom ? node.scrollHeight : top;
+}
+
 export function every(ms, fn) {
   const timer = setInterval(fn, ms);
   cleanup(() => clearInterval(timer));

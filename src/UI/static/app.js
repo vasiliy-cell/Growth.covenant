@@ -10,19 +10,30 @@ import { livePage, liveRunPage } from "./pages/live.js";
 
 const root = document.getElementById("view");
 
+// Every render draws into its OWN container, attached straight away so
+// charts can measure themselves. A newer render replaces that container,
+// so a page that finishes loading late writes into a node that is no
+// longer on screen instead of painting over its successor - which is how
+// Launch used to end up showing Compare.
+let generation = 0;
+
 const PAGES = [
-  [/^#\/world\/(.+)$/, "worlds", (id) => worldPage(root, id)],
-  [/^#\/compare(?:\/(metrics|charts))?$/, "compare", (step) => comparePage(root, step || "runs")],
-  [/^#\/launch$/, "launch", () => launchPage(root)],
-  [/^#\/live\/(.+)$/, null, (id) => livePage(root, id)],
-  [/^#\/live-run\/(.+)$/, null, (id) => liveRunPage(root, id)],
-  [/^(#\/?)?$/, "worlds", () => worldsPage(root)],
+  [/^#\/world\/(.+)$/, "worlds", (into, id) => worldPage(into, id)],
+  [/^#\/compare(?:\/(metrics|charts))?$/, "compare", (into, step) => comparePage(into, step || "runs")],
+  [/^#\/launch$/, "launch", (into) => launchPage(into)],
+  [/^#\/live\/(.+)$/, null, (into, id) => livePage(into, id)],
+  [/^#\/live-run\/(.+)$/, null, (into, id) => liveRunPage(into, id)],
+  [/^(#\/?)?$/, "worlds", (into) => worldsPage(into)],
 ];
 
 async function render() {
+  const token = ++generation;
+
   leavePage();
 
   const hash = location.hash || "#/";
+  const container = h("div");
+  root.replaceChildren(container);
 
   for (const [pattern, tab, page] of PAGES) {
     const match = hash.match(pattern);
@@ -36,10 +47,12 @@ async function render() {
       // An optional part of a route that is absent comes back undefined,
       // and decodeURIComponent(undefined) is the STRING "undefined" - which
       // is how Compare once received a step called "undefined".
-      await page(...match.slice(1).map((part) => (part === undefined ? undefined : decodeURIComponent(part))));
+      await page(container, ...match.slice(1).map((part) => (part === undefined ? undefined : decodeURIComponent(part))));
     } catch (error) {
-      root.replaceChildren(h("div", { class: "page" }, h("div", { class: "panel" },
-        h("div", { class: "empty" }, error.message))));
+      if (token === generation) {
+        container.replaceChildren(h("div", { class: "page" }, h("div", { class: "panel" },
+          h("div", { class: "empty" }, error.message))));
+      }
     }
     return;
   }

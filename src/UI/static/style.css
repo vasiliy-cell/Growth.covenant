@@ -484,7 +484,7 @@ td.actions .row { justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
   align-items: center;
   gap: 9px;
   height: 34px;
-  padding: 0 14px 0 6px;
+  padding: 0 14px 0 7px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--inset);
@@ -493,13 +493,16 @@ td.actions .row { justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
 }
 
 .step .number {
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  font: 600 11px var(--mono);
+  padding: 3px 8px;
+  border-radius: 999px;
+  font: 600 10px var(--mono);
+  letter-spacing: .4px;
+  text-transform: uppercase;
   background: #1d1d21;
   border: 1px solid var(--border-strong);
 }
+
+.step .count { color: var(--accent-soft); font: 11px var(--mono); }
 
 .step.done { color: var(--muted); cursor: pointer; }
 .step.done:hover { color: var(--text); border-color: var(--border-strong); }

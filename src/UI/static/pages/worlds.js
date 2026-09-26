@@ -1,101 +1,107 @@
 // The first page: every world in logs/, and everything you can do to one.
 
-import { api, h, fmt, button, menu, modal, toggle, go, route, every } from "../lib.js";
+import { api, h, fmt, button, menu, modal, toggle, go, route, every, redraw } from "../lib.js";
 
 export async function worldsPage(root) {
-  const holder = h("div", { class: "page" });
-  root.replaceChildren(holder);
+  const head = h("div", { class: "page-head" });
+  const running = h("div", {});
+  const table = h("div", {});
+
+  root.replaceChildren(h("div", { class: "page" }, [head, running, table]));
 
   const draw = async () => {
     const { worlds } = await api.worlds();
-    holder.replaceChildren(...content(worlds, draw));
+
+    head.replaceChildren(...heading(worlds));
+    running.replaceChildren(...runningRows(worlds, draw));
+
+    // The table is only rebuilt when a world appears, disappears or
+    // changes state - not every three seconds while somebody is reading
+    // it or scrolling it sideways.
+    redraw(table, signature(worlds), () => tablePanel(worlds, draw));
   };
 
   await draw();
-
-  // Running worlds change under your eyes; the list follows them.
   every(3000, () => draw().catch(() => {}));
 }
 
-function content(worlds, reload) {
-  const running = worlds.filter((world) => world.running);
+function signature(worlds) {
+  return JSON.stringify(worlds.map((world) => [
+    world.id, world.label, world.episodes, world.last_step, world.deaths,
+    world.running, world.extinct, world.checkpoint && world.checkpoint.step,
+  ]));
+}
+
+function heading(worlds) {
   const size = worlds.reduce((sum, world) => sum + world.size, 0);
 
-  const head = h("div", { class: "page-head" }, [
+  return [
     h("h1", {}, "Worlds"),
     h("span", { class: "sub" }, `${worlds.length} worlds · ${fmt.bytes(size)}`),
     h("span", { class: "spacer" }),
     button({ label: "New run", icon: "plus", kind: "primary", onclick: () => go(route.launch()) }),
-  ]);
-
-  if (!worlds.length) {
-    return [head, h("div", { class: "panel" }, h("div", { class: "empty" }, [
-      "No worlds yet. Press ", h("b", {}, "New run"), " to make the first one.",
-    ]))];
-  }
-
-  return [
-    head,
-    running.length ? runningPanel(running, reload) : null,
-    h("div", { class: "panel table-scroll" }, [
-      h("table", {}, [
-        h("thead", {}, h("tr", {}, [
-          h("th", {}, "World"),
-          h("th", {}, "Species"),
-          h("th", { class: "num" }, "Episodes"),
-          h("th", { class: "num" }, "Steps"),
-          h("th", { class: "num" }, "Deaths"),
-          h("th", { class: "num" }, "Seed"),
-          h("th", {}, "Checkpoint"),
-          h("th", {}, "Created"),
-          h("th", {}, ""),
-        ])),
-        h("tbody", {}, worlds.map((world) => row(world, reload))),
-      ]),
-    ]),
-  ].filter(Boolean);
+  ];
 }
 
-function runningPanel(running, reload) {
-  return h("div", { class: "panel" }, [
+function tablePanel(worlds, reload) {
+  if (!worlds.length) {
+    return h("div", { class: "panel" }, h("div", { class: "empty" }, [
+      "No worlds yet. Press ", h("b", {}, "New run"), " to make the first one.",
+    ]));
+  }
+
+  return h("div", { class: "panel table-scroll" }, [
+    h("table", {}, [
+      h("thead", {}, h("tr", {}, [
+        h("th", {}, "World"),
+        h("th", { class: "num" }, "Episodes"),
+        h("th", {}, "Started"),
+        h("th", {}, ""),
+      ])),
+      h("tbody", {}, worlds.map((world) => row(world, reload))),
+    ]),
+  ]);
+}
+
+function runningRows(worlds, reload) {
+  const running = worlds.filter((world) => world.running);
+
+  if (!running.length) return [];
+
+  return [h("div", { class: "panel" }, [
     h("header", {}, ["Running now", h("span", { class: "note" }, `${running.length}`)]),
     h("table", {}, h("tbody", {}, running.map((world) => h("tr", {}, [
       h("td", {}, world.label || world.world_id),
-      h("td", { class: "num" }, `step ${fmt.int(world.live?.step)}`),
-      h("td", { class: "num" }, `${fmt.int(world.live?.agents)} agents`),
-      h("td", { class: "num" }, `${fmt.number(world.live?.steps_per_second, 0)} steps/s`),
+      h("td", { class: "num" }, `step ${fmt.int(world.live && world.live.step)}`),
+      h("td", { class: "num" }, `${fmt.int(world.live && world.live.agents)} agents`),
+      h("td", { class: "num" }, `${fmt.number(world.live && world.live.steps_per_second, 0)} steps/s`),
       h("td", { class: "actions" }, h("div", { class: "row" }, [
         button({ label: "Watch", icon: "watch", kind: "primary", small: true, onclick: () => go(route.live(world.id)) }),
         button({ label: "Stop", icon: "stop", kind: "danger", small: true, onclick: () => stop(world, reload) }),
       ])),
     ])))),
-  ]);
+  ])];
 }
 
 function row(world, reload) {
-  // An extinct world has nobody to continue and nothing worth keeping.
+  // Only what tells one world from another at a glance: what it is called,
+  // how far it went, when it started. Everything else is one click away on
+  // the world's own page, and every action is behind the menu.
   const canContinue = world.checkpoint && !world.running && !world.extinct;
   const canKeep = world.checkpoint && !world.checkpoint.pinned && !world.extinct;
 
   return h("tr", { class: "clickable", onclick: (event) => { if (!event.target.closest("button")) go(route.world(world.id)); } }, [
     h("td", {}, [
-      h("div", {}, [
+      h("div", { class: "row", style: "gap:8px;flex-wrap:nowrap" }, [
         world.label || h("span", { class: "dim" }, "unnamed"),
-        world.running ? h("span", { class: "badge live", style: "margin-left:8px" }, "running") : null,
-        world.extinct ? h("span", { class: "badge", style: "margin-left:8px", title: "Every agent starved: nothing to continue" }, "extinct") : null,
+        world.running ? h("span", { class: "badge live" }, "running") : null,
+        world.extinct ? h("span", { class: "badge", title: "Every agent starved" }, "extinct") : null,
       ]),
       h("div", { class: "dim mono", style: "font-size:11px;margin-top:2px" }, world.world_id),
     ]),
-    h("td", {}, h("span", { class: "badge" }, world.species || "—")),
     h("td", { class: "num" }, fmt.int(world.episodes)),
-    h("td", { class: "num" }, fmt.int(world.last_step)),
-    h("td", { class: "num" }, fmt.int(world.deaths)),
-    h("td", { class: "num dim" }, world.seeds[0] ?? "—"),
-    h("td", {}, checkpointCell(world)),
     h("td", { class: "muted" }, fmt.ago(world.created_at)),
     h("td", { class: "actions" }, h("div", { class: "row" }, [
-      // One button for what this world is doing right now; everything
-      // else lives in the menu, so a row never runs off the edge.
       world.running
         ? button({ label: "Watch", icon: "watch", kind: "primary", small: true, onclick: () => go(route.live(world.id)) })
         : null,
@@ -113,20 +119,6 @@ function row(world, reload) {
         { label: "Delete", icon: "delete", danger: true, onclick: () => remove(world, reload) },
       ]),
     ])),
-  ]);
-}
-
-function checkpointCell(world) {
-  if (!world.checkpoint) {
-    return h("span", {
-      class: "dim",
-      title: "No checkpoint left: only the newest checkpoint of the last 5 runs is kept. Keep a world to protect its checkpoint.",
-    }, "none");
-  }
-
-  return h("span", { class: "mono muted", style: "font-size:11px" }, [
-    `step ${fmt.int(world.checkpoint.step)}`,
-    world.checkpoint.pinned ? h("span", { class: "badge", style: "margin-left:6px" }, "kept") : null,
   ]);
 }
 

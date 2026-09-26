@@ -1,6 +1,6 @@
 // Starting runs: one, or several one after another with a new seed each.
 
-import { api, h, fmt, button, segmented, toggle, go, route, every } from "../lib.js";
+import { api, h, fmt, button, segmented, toggle, go, route, every, redraw, setText } from "../lib.js";
 
 export async function launchPage(root) {
   const { config, cpus } = await api.config();
@@ -22,7 +22,20 @@ export async function launchPage(root) {
   ]));
 
   const refresh = async () => {
-    try { queue.replaceChildren(await queuePanel()); } catch { /* next time */ }
+    try {
+      const state = await api.runs();
+
+      // The queue is only rebuilt when a run changes state. Rebuilding it
+      // every second and a half threw away the console somebody was
+      // reading - and their place in it.
+      const built = redraw(
+        queue,
+        JSON.stringify(state.runs.map((run) => [run.id, run.state])),
+        () => queuePanel(state),
+      );
+
+      if (!built) refreshConsoles();
+    } catch { /* next time */ }
   };
 
   await refresh();
@@ -118,13 +131,23 @@ function form(config, prefill) {
 
 const BADGES = { running: "badge live", queued: "badge warn", crashed: "badge bad" };
 
-// The queue is redrawn every second and a half; a console somebody opened
-// must stay open through that instead of snapping shut under them.
-const openConsoles = new Set();
+// Which consoles are open, and the element showing each one - so their
+// text can be refreshed in place instead of being rebuilt under the
+// reader.
+const openConsoles = new Map();
 
-async function queuePanel() {
-  const state = await api.runs();
+function refreshConsoles() {
+  for (const [id, node] of openConsoles) {
+    if (!node.isConnected) {
+      openConsoles.delete(id);
+      continue;
+    }
 
+    api.console(id).then(({ console: text }) => setText(node, text || "(nothing yet)"));
+  }
+}
+
+function queuePanel(state) {
   return h("div", { class: "panel" }, [
     h("header", {}, [
       "Queue",
@@ -145,7 +168,8 @@ function runRow(run) {
   const console = h("pre", { class: "console", hidden: !openConsoles.has(run.id) });
 
   if (openConsoles.has(run.id)) {
-    api.console(run.id).then(({ console: text }) => { console.textContent = text || "(nothing yet)"; });
+    openConsoles.set(run.id, console);
+    api.console(run.id).then(({ console: text }) => setText(console, text || "(nothing yet)"));
   }
 
   const what = request.resume
@@ -168,8 +192,8 @@ function runRow(run) {
           if (console.hidden) {
             openConsoles.delete(run.id);
           } else {
-            openConsoles.add(run.id);
-            console.textContent = (await api.console(run.id)).console || "(nothing yet)";
+            openConsoles.set(run.id, console);
+            setText(console, (await api.console(run.id)).console || "(nothing yet)");
           }
         },
       }),
