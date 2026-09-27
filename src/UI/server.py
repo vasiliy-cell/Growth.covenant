@@ -177,6 +177,11 @@ def world_family(world: str):
     return reports.family(reader_for(world))
 
 
+@app.get("/api/worlds/{world:path}/leaderboard")
+def world_leaderboard(world: str, by: str = "children", limit: int = 20):
+    return reports.leaderboard(reader_for(world), by, limit)
+
+
 @app.get("/api/worlds/{world:path}/agent/{agent_id}")
 def world_agent(world: str, agent_id: str):
     """One agent's whole life, including its own heat map."""

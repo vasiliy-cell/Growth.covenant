@@ -39,6 +39,7 @@ export const api = {
   learning: (id, filter) => request(world(id, `learning${query(filter)}`)),
   family: (id) => request(world(id, "family")),
   agent: (id, agentId) => request(world(id, `agent/${encodeURIComponent(agentId)}`)),
+  leaderboard: (id, by, limit) => request(world(id, `leaderboard${query({ by, limit })}`)),
   heatmap: (id) => request(world(id, "heatmap")),
   stream: (id) => new EventSource(world(id, "stream")),
 

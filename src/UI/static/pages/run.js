@@ -26,6 +26,15 @@ const COHORTS = [
 
 const REFRESH = [[0, "off"], [200, "200"], [1000, "1000"], [5000, "5000"]];
 
+// What the agents of a run can be ranked on. Four columns, because a
+// leaderboard of one number is a claim about what this world is for.
+const RANKS = [
+  ["shaped", "reward learned from"],
+  ["env", "reward from the world"],
+  ["children", "children"],
+  ["lived", "ticks lived"],
+];
+
 // How hard every chart on the page is smoothed. One control for all of
 // them, because comparing a smoothed chart with a raw one next to it is how
 // you talk yourself into a trend that is not there.
@@ -50,6 +59,8 @@ export async function runView(node, worldId, { live = false } = {}) {
   const filter = { cohort: "all", min_steps: null, max_steps: null };
   const view = {
     mode: "agent",
+    by: "shaped",
+    leaders: new Set(),
     ema: 0,
     shown: new Set(["shaped", "env", "intrinsic", "leak"]),
     heat: "recent",
@@ -65,6 +76,7 @@ export async function runView(node, worldId, { live = false } = {}) {
   const populationNode = h("div", { class: "chart" });
   const heatNode = h("div", { class: "chart tall" });
   const treeNode = h("div", { class: "tree" });
+  const boardNode = h("div", {});
   const treeNote = h("span", { class: "note" });
   const statsNode = h("div", { class: "body" });
   const filterNote = h("span", { class: "note" });
@@ -93,6 +105,25 @@ export async function runView(node, worldId, { live = false } = {}) {
       : "the whole population";
   };
 
+  const reloadBoard = async () => {
+    state.board = await api.leaderboard(worldId, view.by, 20);
+
+    // The tree shows the same bodies, so it lights up the same ones.
+    const leaders = new Set(state.board.rows.map((row) => row.id));
+    const changed = leaders.size !== view.leaders?.size
+      || [...leaders].some((id) => !view.leaders.has(id));
+
+    view.leaders = leaders;
+
+    boardNode.replaceChildren(boardTable(state.board, worldId, view));
+
+    if (state.details && state.family) {
+      statsNode.replaceChildren(...runStats(state.details, state.family, state.board));
+    }
+
+    if (changed && state.family) drawTree(treeNode, treeNote, state.family, worldId, view);
+  };
+
   const reloadWorld = async () => {
     const [details, family, heat] = await Promise.all([
       api.details(worldId), api.family(worldId), api.heatmap(worldId),
@@ -101,7 +132,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     state.details = details;
     state.heat = heat;
 
-    statsNode.replaceChildren(...runStats(details, family));
+    statsNode.replaceChildren(...runStats(details, family, state.board));
     drawHeatmap(charts, heatNode, heat, view.heat);
 
     if (!state.family || state.family.nodes.length !== family.nodes.length) {
@@ -127,6 +158,7 @@ export async function runView(node, worldId, { live = false } = {}) {
         drawnAt = frame.step;
         reload().catch(() => {});
         reloadWorld().catch(() => {});
+        reloadBoard().catch(() => {});
       },
     }));
   }
@@ -187,6 +219,16 @@ export async function runView(node, worldId, { live = false } = {}) {
 
   parts.push(h("div", { class: "panel" }, [
     h("header", {}, [
+      "Leaderboard",
+      h("span", { class: "note" }, "click one to open it"),
+      h("span", { class: "spacer" }),
+      chips(RANKS, view.by, (by) => { view.by = by; reloadBoard().catch(() => {}); }),
+    ]),
+    boardNode,
+  ]));
+
+  parts.push(h("div", { class: "panel" }, [
+    h("header", {}, [
       "Family tree",
       treeNote,
       h("span", { class: "spacer" }),
@@ -204,15 +246,21 @@ export async function runView(node, worldId, { live = false } = {}) {
 
   node.replaceChildren(...parts);
 
-  await Promise.all([reload(), reloadWorld()]);
+  await Promise.all([reload(), reloadWorld(), reloadBoard()]);
   echarts.connect(GROUP);
 }
 
 // ---------------- what this run is ----------------
 
-function runStats(details, family) {
+function runStats(details, family, board) {
   const sessions = details.sessions || [];
   const alive = family.nodes.filter((agent) => agent.alive).length;
+
+  // How much of this population was a dead end. A world where one body in
+  // twenty breeds is not the same experiment as one where half of them do.
+  const bred = board && board.agents
+    ? `${Math.round((board.bred / board.agents) * 100)}%`
+    : "—";
 
   return [
     h("div", { class: "stats" }, [
@@ -220,10 +268,15 @@ function runStats(details, family) {
       stat("steps", fmt.int(sessions.length ? sessions[sessions.length - 1].to_step : 0)),
       stat("agents now", fmt.int(alive)),
       stat("agents ever", fmt.int(family.nodes.length)),
+      stat("bred", bred, "good"),
       stat("deaths", fmt.int(details.counts.deaths), "bad"),
       stat("updates", fmt.int(details.counts.updates)),
       stat("seed", sessions[0]?.seed ?? "—", "scrollx"),
     ]),
+    board && board.agents
+      ? h("div", { class: "dim mono", style: "font-size:11px;margin-top:8px" },
+        `${fmt.int(board.bred)} of ${fmt.int(board.agents)} agents left at least one child`)
+      : null,
     h("div", { class: "mono dim", style: "font-size:11px;margin-top:10px;line-height:1.7" }, [
       `${details.species} · commit ${(details.commit || "—").slice(0, 10)} · episode = ${details.episode_length} steps`,
       ...sessions.map((session) => h("div", {},
@@ -499,6 +552,42 @@ function drawHeatmap(charts, node, heat, mode) {
   chart.setOption(heatOption(mode === "recent" ? heat.recent : heat.all, heat.size));
 }
 
+// ---------------- leaderboard ----------------
+
+function boardTable(board, worldId, view) {
+  if (!board || !board.rows.length) {
+    return h("div", { class: "empty" }, "nobody has been born in this world yet");
+  }
+
+  const columns = [
+    ["shaped", "reward learned from", (row) => fmt.number(row.shaped, 1)],
+    ["env", "from the world", (row) => fmt.number(row.env, 1)],
+    ["children", "children", (row) => fmt.int(row.children)],
+    ["lived", "ticks lived", (row) => fmt.int(row.lived)],
+  ];
+
+  return h("div", { class: "table-scroll" }, h("table", {}, [
+    h("thead", {}, h("tr", {}, [
+      h("th", { style: "width:36px" }, "#"),
+      h("th", {}, "Agent"),
+      ...columns.map(([key, title]) =>
+        h("th", { class: `num ${key === board.by ? "accent" : ""}` }, title)),
+    ])),
+    h("tbody", {}, board.rows.map((row, place) => h("tr", {
+      class: "clickable",
+      onclick: () => openAgent(worldId, row),
+    }, [
+      h("td", { class: "mono", style: place === 0 ? "color:var(--accent);font-weight:700" : "color:var(--dim)" }, place + 1),
+      h("td", {}, h("div", { class: "row", style: "gap:8px;flex-wrap:nowrap" }, [
+        h("span", { class: "mono", style: `color:${view.leaders?.has(row.id) ? COLORS.yellow : "inherit"}` }, `#${row.index}`),
+        row.alive ? h("span", { class: "badge live" }, "alive") : null,
+      ])),
+      ...columns.map(([key, , read]) =>
+        h("td", { class: `num ${key === board.by ? "accent" : ""}` }, read(row))),
+    ]))),
+  ]));
+}
+
 // ---------------- family tree ----------------
 
 function drawTree(node, note, family, worldId, view) {
@@ -544,7 +633,8 @@ function drawTree(node, note, family, worldId, view) {
   }
 
   note.textContent = `${total} of ${family.nodes.length} agents · ` +
-    `${family.nodes.filter((agent) => agent.alive).length} alive · click one`;
+    `${family.nodes.filter((agent) => agent.alive).length} alive · ` +
+    `yellow = on the leaderboard · click one`;
 
   // nodeSize, not size: the spacing between two agents is fixed and the
   // DRAWING grows, so nodes never slide into each other however many there
@@ -589,9 +679,15 @@ function drawTree(node, note, family, worldId, view) {
     .attr("class", (item) => `node ${item.data.agent.alive ? "alive" : "dead"}`)
     .attr("transform", (item) => `translate(${item.x},${item.y})`);
 
+  const leaders = view.leaders || new Set();
+
   drawn.append("circle")
-    .attr("r", (item) => 5 + Math.min(6, (item.data.agent.offspring || 0) * 1.5))
-    .attr("fill", (item) => (item.data.agent.alive ? COLORS.orange : "#4e5254"));
+    .attr("r", (item) => (leaders.has(item.data.agent.id) ? 7 : 5)
+      + Math.min(6, (item.data.agent.offspring || 0) * 1.5))
+    .attr("fill", (item) => {
+      if (leaders.has(item.data.agent.id)) return COLORS.yellow;
+      return item.data.agent.alive ? COLORS.orange : "#4e5254";
+    });
 
   drawn.append("text")
     .attr("y", -11)
@@ -657,7 +753,7 @@ function showCard(card, event, agent) {
 async function openAgent(worldId, node) {
   const box = popup({
     title: `Agent #${node.index}`,
-    note: node.alive ? "alive" : `died at step ${fmt.int(node.death_step)}`,
+    note: node.alive ? "alive" : "died",
     body: h("div", { class: "empty" }, "Reading every step this agent ever took…"),
   });
 

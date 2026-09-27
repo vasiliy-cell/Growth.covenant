@@ -865,6 +865,87 @@ def agent(reader, agent_id):
     }
 
 
+# What an agent can be ranked on. A leaderboard of one number is a claim
+# about what this world is for, so the panel offers all four and says which
+# one it is sorted by.
+LEADERBOARD = {
+    "children": "children",
+    "lived": "ticks lived",
+    "shaped": "reward it learned from",
+    "env": "reward from the world",
+}
+
+
+def leaderboard(reader, by="children", limit=20):
+    """
+    The agents of one world, ranked - and how many of them bred at all.
+
+    Everything here works for the living as well as the dead: a death row
+    carries a whole life, but half the population of a running world has not
+    written one yet, so the rewards are added up from the per-window table
+    and the lifespans come from `cohorts`.
+    """
+    if by not in LEADERBOARD:
+        by = "children"
+
+    births = reader.births()
+
+    if births.num_rows == 0:
+        return {"by": by, "agents": 0, "bred": 0, "rows": []}
+
+    who = cohorts(reader)
+    ids = births["agent_id"].to_pylist()
+    indexes = births["index"].to_pylist()
+    dead = set(reader.deaths()["agent_id"].to_pylist()) if reader.deaths().num_rows else set()
+
+    earned = {}
+    windows = reader.episode_agents()
+
+    if windows.num_rows:
+        encoded = pc.dictionary_encode(windows["agent_id"]).combine_chunks()
+        codes = encoded.indices.to_numpy(zero_copy_only=False)
+        names = encoded.dictionary.to_pylist()
+
+        sums = {
+            name: np.bincount(
+                codes,
+                weights=windows[column].to_numpy(zero_copy_only=False).astype(np.float64),
+                minlength=len(names),
+            )
+            for name, column in (("env", "env_reward"), ("shaped", "shaped_reward"))
+        }
+
+        earned = {
+            agent_id: {"env": float(sums["env"][slot]), "shaped": float(sums["shaped"][slot])}
+            for slot, agent_id in enumerate(names)
+        }
+
+    rows = [
+        {
+            "id": agent_id,
+            "index": index,
+            "alive": agent_id not in dead,
+            "children": len(who["children"].get(agent_id, [])),
+            "lived": who["lifespan"].get(agent_id, 0),
+            "env": earned.get(agent_id, {}).get("env", 0.0),
+            "shaped": earned.get(agent_id, {}).get("shaped", 0.0),
+        }
+        for agent_id, index in zip(ids, indexes)
+    ]
+
+    rows.sort(key=lambda row: (row[by], row["children"], row["lived"]), reverse=True)
+
+    return {
+        "by": by,
+        "agents": len(rows),
+        # The number worth knowing about a population: how much of it was a
+        # dead end. A world where one body in twenty breeds is not the same
+        # experiment as one where half of them do.
+        "bred": sum(1 for row in rows if row["children"]),
+        "rows": rows[: max(1, limit)],
+    }
+
+
 def agent_heatmap(reader, agent_id):
     """Where one body walked: a count per cell, out of its own step rows."""
     size = world_size(reader)
