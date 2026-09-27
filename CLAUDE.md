@@ -2,6 +2,30 @@
 
 DQN agent living in a continuous grid world.
 
+## This is a research project
+
+The code IS the experiment. Every rule of the world, every learning
+detail and every number in `config.yml` is part of the methodology, and
+the results are only worth something if the author can explain every
+behavior of the agents from code they agreed to.
+
+- **Never "improve" code without explicit consent.** No optimizations,
+  refactors, cleanups, "safer" defaults or "more correct" formulas inside
+  anything that is part of the research - even a tiny one. A change that
+  looks harmless (an order of operations, a rounding, an rng draw, a
+  default value) can silently change the experiment and invalidate every
+  run compared against it.
+- **Do exactly what was asked, and nothing next to it.** If something else
+  looks wrong along the way, write it down and tell the user; do not fix
+  it on the side.
+- **When something looks illogical, ask - do not fix.** It may be a bug,
+  or it may be the point of the experiment. Only the user can tell which.
+- **Ask before choosing any value that affects the experiment** (rewards,
+  shares, costs, gene distributions, defaults) and before introducing any
+  new mechanism. Propose it in words first; implement after a yes.
+- When a requested change can be done in more than one way that behaves
+  differently, describe the options and let the user choose.
+
 ## Working rules
 
 ### Comments and docs — English only
