@@ -13,7 +13,12 @@ SPECIES = {
 }
 
 
-def make_species(name):
-    """Pick this run's reproduction strategy once, by config name."""
-    return SPECIES[name]()
+def make_species(name, evolve):
+    """
+    Pick this run's reproduction strategy once, by config name.
+
+    evolve: the genes that vary (genome.evolve); every other gene is frozen
+    at its mean for the whole population.
+    """
+    return SPECIES[name](evolve)
 

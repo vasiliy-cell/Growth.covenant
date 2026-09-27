@@ -32,7 +32,7 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, balance=None, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7):
+    def __init__(self, size=8, rng=None, balance=None, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7, evolve=None):
         self.size = size
 
         # Every stream of chance in this run (src/utils/rng.py). The world
@@ -69,7 +69,18 @@ class GridWorldEnv:
         # Everything below calls self.species.reproduce(...) without ever
         # asking which species it is - that is the whole point.
         self.species_name = species_name or config["genome"]["type"]
-        self.species = make_species(self.species_name)
+
+        # The genes that vary (genome.evolve); every other gene is the same
+        # mean in every agent, from the first one on. None is every gene:
+        # a world from before the list existed evolved all of them.
+        genes = list(config["genome"]["genes"])
+        self.evolve = genes if evolve is None else list(evolve)
+
+        unknown = [name for name in self.evolve if name not in genes]
+        if unknown:
+            raise ValueError(f"genome.evolve names genes that do not exist: {unknown}")
+
+        self.species = make_species(self.species_name, self.evolve)
 
     # --- build the world (call once at the beginning of the run) ---
     def start(self):
@@ -139,6 +150,9 @@ class GridWorldEnv:
             },
             "current_step": self.current_step,
             "species": self.species_name,
+            # Which genes are frozen is the condition of the experiment, so
+            # it belongs to the world and not to whatever config resumes it.
+            "evolve": self.evolve,
             # The window every network of this world was sized to. A resume
             # must see through the same one, or the saved weights no longer
             # fit the input.

@@ -252,8 +252,8 @@ keeps rising until no amount of foraging can pay it.
 
 Every value in the project that changes HOW an agent learns, written as a
 gene: a distribution to draw a newborn from instead of a single number
-shared by everybody. `mean` is the hand-tuned value, so a population born
-with `scale: 0` everywhere is a run where every agent is identical.
+shared by everybody. `mean` is the hand-tuned value, so a population with
+`evolve: []` is a run where every agent is identical.
 
 This section is the SOURCE OF TRUTH for the brain: every newborn's brain is
 built from a genome sampled here
@@ -263,6 +263,20 @@ built from a genome sampled here
 - **`type`** - which reproduction species this run uses: `clons` (asexual),
   `non_linear` (BLX-a blend of two parents) or `mendel` (dominant and
   recessive alleles). Asked in the terminal too; this is the default.
+- **`evolve`** - the genes that vary and mutate. Every gene left out is
+  FROZEN: each agent carries exactly its `mean` from the first generation
+  on, and it passes to every child unchanged, in every species (both
+  alleles in mendel, dominance included). `[]` is the baseline with no
+  evolution at all; testing one group is listing only that group.
+
+  A frozen gene still takes its random draws and throws them away, so the
+  genome stream is spent the same way whatever is frozen: under one seed
+  two conditions hand every OTHER gene the same numbers, and the
+  difference between them is only the genes that were switched on.
+
+  The list belongs to the world: a run continued from a checkpoint keeps
+  the list that world started with, whatever `config.yml` says now. A
+  checkpoint from before the list existed evolved every gene.
 
 ### The shape of a gene
 
@@ -270,7 +284,8 @@ The same for all of them, so the sampler never has to special-case
 anything:
 
 - **`mean`** - center of the draw.
-- **`scale`** - stddev of the draw; 0 freezes the gene at `mean`.
+- **`scale`** - stddev of the first generation's draw. Ignored for a
+  frozen gene; `scale: 0` alone does NOT freeze it - mutation still moves it.
 - **`type`** - `float` or `int`, how the drawn number is rounded.
 - **`step`** - round to a multiple of this.
 

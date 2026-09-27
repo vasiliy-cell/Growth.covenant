@@ -10,9 +10,15 @@ genome_config = config["genome"]
 class MendelGeneticsSpecies:
     partners_required = 1
     rng = np.random.default_rng()
+
+    def __init__(self, evolve):
+        # The genes that vary; every other gene is frozen at its mean, in
+        # both alleles and with its dominance as it was born.
+        self.evolve = evolve
+
     def make_first_genome(self, genome_config, rng):
-        draft_1 = reuse.make_first_genome(genome_config, rng)
-        draft_2 = reuse.make_first_genome(genome_config, rng)
+        draft_1 = reuse.make_first_genome(genome_config, rng, self.evolve)
+        draft_2 = reuse.make_first_genome(genome_config, rng, self.evolve)
         genotype = {}
         
         for gene_name in draft_1:
@@ -29,9 +35,14 @@ class MendelGeneticsSpecies:
         i = rng.choice([0, 1])  
         sigma = genotype["sigma"][i][0]
         for gene_name in genotype:
+            # A frozen gene takes the same draws and ignores them.
+            frozen = gene_name not in self.evolve
+
             if rng.random() < sigma: 
                 i = rng.choice([0, 1])
-                mutated_genotype[gene_name][i][0] *= rng.uniform(0.5, 2.0)  
+                factor = rng.uniform(0.5, 2.0)
+                if not frozen:
+                    mutated_genotype[gene_name][i][0] *= factor
             if rng.random() < sigma: 
                 i = rng.choice([0, 1])
                 apel = mutated_genotype[gene_name][i][1]
@@ -39,7 +50,8 @@ class MendelGeneticsSpecies:
                     apel = "A"
                 elif apel == "A":
                     apel = "a"
-                mutated_genotype[gene_name][i][1] = apel
+                if not frozen:
+                    mutated_genotype[gene_name][i][1] = apel
 
             for i in range(2):
                 if mutated_genotype["gamma"][i][0] <= 0: 

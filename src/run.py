@@ -423,6 +423,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         run_id=world_id,
         species_name=species,
         view_size=int(config.get("agents", {}).get("view_size", 7)),
+        evolve=(
+            record["env"].get("evolve") if record is not None
+            else config["genome"]["evolve"]
+        ),
     )
 
     # --- minds ---

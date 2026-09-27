@@ -4,11 +4,18 @@ with open("config.yml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 class reuse: 
-    def make_first_genome(genome_config, rng):
+    def make_first_genome(genome_config, rng, evolve):
+        """
+        evolve: the genes that vary. Every other gene is frozen: each first
+        agent gets exactly its mean. A frozen gene still takes its draw, so
+        the genome stream is spent the same way whatever is frozen - one
+        seed hands every other gene the same numbers in every condition.
+        """
         genotype = {}
 
         for gene_name, spec in genome_config["genes"].items():
-            genotype[gene_name] = rng.normal(spec["mean"], spec["scale"])
+            value = rng.normal(spec["mean"], spec["scale"])
+            genotype[gene_name] = value if gene_name in evolve else spec["mean"]
 
         if genotype["gamma"] <= 0: 
             genotype["gamma"] = 0.001
@@ -31,7 +38,7 @@ class reuse:
             
         return genotype
 
-    def mutate(genotype, rng):
+    def mutate(genotype, rng, evolve):
         """
         The child's genome: the parent's, with a gene here and there
         multiplied by a number around 1.
@@ -41,6 +48,9 @@ class reuse:
         learning rate of 0.001 and to a buffer of 10000. Adding a width in
         absolute units, which this used to do on every gene of every child,
         meant 90% of a learning rate and nothing at all of a buffer size.
+
+        A gene outside `evolve` is frozen and passes on unchanged. It still
+        takes its draws, the same as in make_first_genome.
         """
         sigma = genotype["sigma"]
         mutated_genotype = dict(genotype)
@@ -48,7 +58,10 @@ class reuse:
         for gene_name, value in genotype.items():
 
             if rng.random() < sigma:
-                mutated_genotype[gene_name] = value * rng.uniform(0.5, 2.0)
+                factor = rng.uniform(0.5, 2.0)
+
+                if gene_name in evolve:
+                    mutated_genotype[gene_name] = value * factor
 
         if mutated_genotype["gamma"] <= 0: 
             mutated_genotype["gamma"] = 0.001

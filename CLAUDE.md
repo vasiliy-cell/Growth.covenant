@@ -174,8 +174,8 @@ named rng stream, plus `schema_version`, the config and the git commit.
   with it (an index names an agent's rng streams — reusing one would hand a
   newborn somebody else's mind). The process gets a **new** run id for its
   log and its checkpoints.
-- A resumed run takes its seed, species, world and population from the
-  checkpoint, and reads the live `config.yml` for everything tunable
+- A resumed run takes its seed, species, frozen genes (`genome.evolve`),
+  world and population from the checkpoint, and reads the live `config.yml` for everything tunable
   (life, energy, refill). When the two configs differ the runner says which
   sections changed — an experiment whose rules moved silently is lost.
 
