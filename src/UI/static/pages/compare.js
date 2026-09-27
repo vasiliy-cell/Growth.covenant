@@ -2,7 +2,7 @@
 // on, look at the charts. Each step has its own address, so the browser's
 // back button walks back through them.
 
-import { api, h, fmt, button, go, route, chartBase, chartIn, SERIES_COLORS } from "../lib.js";
+import { api, h, fmt, button, go, route, chartBase, chartIn, ema, SERIES_COLORS } from "../lib.js";
 
 // What has been picked so far, kept across the three steps and across a
 // reload of the page.
@@ -11,7 +11,7 @@ const saved = JSON.parse(sessionStorage.getItem("compare") || "{}");
 const state = {
   runs: saved.runs || [],
   metrics: saved.metrics || ["shaped_reward"],
-  smoothing: saved.smoothing || 5,
+  smoothing: saved.smoothing || 10,
 };
 
 function remember() {
@@ -169,13 +169,13 @@ async function charts(worlds, metrics) {
 
   const results = await Promise.all(state.metrics.map((metric) => api.compare(state.runs, metric)));
 
-  const smoothing = h("div", { class: "row", style: "gap:0" }, [1, 5, 20, 50].map((size) =>
+  const smoothing = h("div", { class: "row", style: "gap:0" }, [1, 10, 50, 200].map((size) =>
     h("span", {
       class: `chip ${size === state.smoothing ? "on" : ""}`,
       style: "margin:0 4px 0 0",
       // Same address, new smoothing: ask the router to draw this step again.
       onclick: () => { state.smoothing = size; remember(); window.dispatchEvent(new HashChangeEvent("hashchange")); },
-    }, size === 1 ? "raw" : `smooth ${size}`)));
+    }, size === 1 ? "raw" : `EMA ${size}`)));
 
   const legend = h("div", { class: "panel" }, h("div", { class: "body legend" },
     state.runs.map((id) => h("span", { class: "legend-item" }, [
@@ -212,26 +212,6 @@ async function charts(worlds, metrics) {
 
 // ---------------- chart ----------------
 
-function smooth(values, size) {
-  if (size <= 1) return values;
-
-  const window = [];
-  let sum = 0;
-  let count = 0;
-
-  return values.map((value) => {
-    window.push(value);
-    if (value !== null && value !== undefined) { sum += value; count += 1; }
-
-    if (window.length > size) {
-      const dropped = window.shift();
-      if (dropped !== null && dropped !== undefined) { sum -= dropped; count -= 1; }
-    }
-
-    return count ? sum / count : null;
-  });
-}
-
 function drawChart(chart, result, smoothing, color) {
   const base = chartBase();
 
@@ -243,9 +223,9 @@ function drawChart(chart, result, smoothing, color) {
     xAxis: { ...base.xAxis, type: "value", name: "episode" },
     // Every axis says what it holds: this one is whichever metric the
     // comparison is about.
-    yAxis: { ...base.yAxis, name: result.name },
+    yAxis: { ...base.yAxis, name: smoothing > 1 ? `${result.name} · EMA ${smoothing}` : result.name },
     series: result.series.map((series) => {
-      const values = smooth(series.values, smoothing);
+      const values = ema(series.values, smoothing);
 
       return {
         name: `${series.label} · seed ${series.seed ?? "—"}`,

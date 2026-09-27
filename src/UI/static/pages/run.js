@@ -9,7 +9,7 @@
 // of that run, not every so many seconds: one knob, in the run's own time.
 
 import {
-  api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, line,
+  api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, line, ema,
   COLORS, CHART_INK, cleanup,
 } from "../lib.js";
 import { liveStage } from "./live.js";
@@ -26,6 +26,16 @@ const COHORTS = [
 
 const REFRESH = [[0, "off"], [200, "200"], [1000, "1000"], [5000, "5000"]];
 
+// How hard every chart on the page is smoothed. One control for all of
+// them, because comparing a smoothed chart with a raw one next to it is how
+// you talk yourself into a trend that is not there.
+const SMOOTHING = [
+  [0, "raw", "every episode as it was logged"],
+  [10, "EMA 10", "exponential moving average over about ten episodes"],
+  [50, "EMA 50"],
+  [200, "EMA 200"],
+];
+
 // The three rewards, and which of them the chart draws. They are three
 // different questions - what the world paid, what curiosity added, what the
 // networks actually learned from - so any of them can be on alone.
@@ -39,6 +49,7 @@ export async function runView(node, worldId, { live = false } = {}) {
   const filter = { cohort: "all", min_steps: null, max_steps: null };
   const view = {
     mode: "agent",
+    ema: 0,
     shown: new Set(["shaped", "env", "intrinsic"]),
     heat: "recent",
     onlyParents: true,
@@ -67,8 +78,8 @@ export async function runView(node, worldId, { live = false } = {}) {
     state.learning = learning;
 
     drawRewards(charts, rewardNode, rewards, view);
-    drawLearning(charts, learningNode, learning);
-    drawPopulation(charts, populationNode, rewards);
+    drawLearning(charts, learningNode, learning, view);
+    drawPopulation(charts, populationNode, rewards, view);
 
     filterNote.textContent = rewards.filtered
       ? `${rewards.agents.reduce((sum, value) => sum + value, 0)} agent-windows kept`
@@ -120,6 +131,10 @@ export async function runView(node, worldId, { live = false } = {}) {
 
   parts.push(filterPanel(filter, view, live, filterNote, async () => {
     await reload();
+  }, () => {
+    drawRewards(charts, rewardNode, state.rewards, view);
+    drawLearning(charts, learningNode, state.learning, view);
+    drawPopulation(charts, populationNode, state.rewards, view);
   }));
 
   parts.push(h("div", { class: "panel" }, [
@@ -218,7 +233,7 @@ function stat(name, value, tone = "") {
 
 // ---------------- who the charts are about ----------------
 
-function filterPanel(filter, view, live, note, apply) {
+function filterPanel(filter, view, live, note, apply, redrawCharts) {
   const min = h("input", { type: "number", min: "0", placeholder: "from", value: "" });
   const max = h("input", { type: "number", min: "0", placeholder: "to", value: "" });
 
@@ -246,6 +261,10 @@ function filterPanel(filter, view, live, note, apply) {
         h("div", { style: "width:96px" }, min),
         h("div", { style: "width:96px" }, max),
       ]),
+      h("div", { class: "row", style: "gap:8px" }, [
+        h("span", { class: "dim mono", style: "font-size:11px" }, "smoothing"),
+        chips(SMOOTHING, view.ema, (span) => { view.ema = span; redrawCharts(); }),
+      ]),
       live
         ? h("div", { class: "row", style: "gap:8px" }, [
           h("span", { class: "dim mono", style: "font-size:11px" }, "redraw every"),
@@ -255,6 +274,12 @@ function filterPanel(filter, view, live, note, apply) {
         : null,
     ]),
   ]);
+}
+
+// An axis that shows a smoothed line says so: a reader who cannot see that
+// the curve was smoothed is reading a different chart from the one drawn.
+function axisName(name, view) {
+  return view.ema ? `${name} · EMA ${view.ema}` : name;
 }
 
 // ---------------- reward ----------------
@@ -267,7 +292,8 @@ function perAgent(values, agents) {
 }
 
 function rewardSeries(rewards, view) {
-  const scale = (values) => (view.mode === "agent" ? perAgent(values, rewards.agents) : values);
+  const scale = (values) =>
+    ema(view.mode === "agent" ? perAgent(values, rewards.agents) : values, view.ema);
 
   const drawn = {
     shaped: () => line("shaped", scale(rewards.shaped), COLORS.orange, {
@@ -318,13 +344,16 @@ function drawRewards(charts, node, rewards, view) {
     xAxis: { ...base.xAxis, data: rewards.episodes, name: "episode" },
     yAxis: {
       ...base.yAxis,
-      name: view.mode === "agent" ? "reward per agent per episode" : "reward per episode, whole population",
+      name: axisName(
+        view.mode === "agent" ? "reward per agent per episode" : "reward per episode, whole population",
+        view,
+      ),
     },
     series: rewardSeries(rewards, view),
   }, { replaceMerge: ["series"] });
 }
 
-function drawLearning(charts, node, learning) {
+function drawLearning(charts, node, learning, view) {
   if (!learning) return;
 
   const base = chartBase();
@@ -341,17 +370,17 @@ function drawLearning(charts, node, learning) {
     grid: { ...base.grid, right: 64 },
     xAxis: { ...base.xAxis, data: learning.episodes, name: "episode" },
     yAxis: [
-      { ...base.yAxis, name: "loss" },
-      { ...base.yAxis, name: "|td error|", position: "right", nameGap: 44, splitLine: { show: false } },
+      { ...base.yAxis, name: axisName("loss", view) },
+      { ...base.yAxis, name: axisName("|td error|", view), position: "right", nameGap: 44, splitLine: { show: false } },
     ],
     series: [
-      line("loss", learning.loss, COLORS.orange),
-      line("|td error|", learning.td_error, COLORS.yellow, { yAxisIndex: 1 }),
+      line("loss", ema(learning.loss, view.ema), COLORS.orange),
+      line("|td error|", ema(learning.td_error, view.ema), COLORS.yellow, { yAxisIndex: 1 }),
     ],
   });
 }
 
-function drawPopulation(charts, node, rewards) {
+function drawPopulation(charts, node, rewards, view) {
   if (!rewards) return;
 
   const base = chartBase();
@@ -366,9 +395,9 @@ function drawPopulation(charts, node, rewards) {
     ...base,
     dataZoom: [{ type: "inside" }],
     xAxis: { ...base.xAxis, data: rewards.episodes, name: "episode" },
-    yAxis: { ...base.yAxis, name: "agents alive · births · deaths" },
+    yAxis: { ...base.yAxis, name: axisName("agents alive", view) + " · births · deaths" },
     series: [
-      line("agents", rewards.agents, COLORS.orange, { areaStyle: { color: "rgba(224,139,62,.1)" } }),
+      line("agents", ema(rewards.agents, view.ema), COLORS.orange, { areaStyle: { color: "rgba(224,139,62,.1)" } }),
       { name: "births", type: "bar", data: rewards.births, itemStyle: { color: COLORS.sage }, barMaxWidth: 6 },
       { name: "deaths", type: "bar", data: rewards.deaths, itemStyle: { color: COLORS.crimson }, barMaxWidth: 6 },
     ],

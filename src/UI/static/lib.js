@@ -161,6 +161,30 @@ export const fmt = {
   },
 };
 
+// ---------------- smoothing ----------------
+
+// An exponential moving average: every point is mostly the points before it,
+// and the newest one weighs 2/(span+1).
+//
+// A per-episode chart of a population is a cloud - twenty steps of a handful
+// of agents is a small sample and it jumps - and the question being asked of
+// it is almost always "which way is this going". A gap (a window where the
+// filter left nobody, or no update happened) stays a gap: it is carried over
+// rather than counted as a zero, which would drag the whole curve down.
+export function ema(values, span) {
+  if (!span || span <= 1) return values;
+
+  const alpha = 2 / (span + 1);
+  let carried = null;
+
+  return values.map((value) => {
+    if (value === null || value === undefined || Number.isNaN(value)) return null;
+
+    carried = carried === null ? value : carried + alpha * (value - carried);
+    return carried;
+  });
+}
+
 // ---------------- charts ----------------
 // The panel's language, in chart form: hazard orange for the line you came
 // to read, ice cyan and steel for the frame around it, sage for reward,
