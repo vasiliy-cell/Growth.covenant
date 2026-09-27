@@ -27,6 +27,99 @@ from src.persistence.log_reader import RunLogReader
 LIVE_TIMEOUT = 20.0
 
 
+# -----------------------------
+# READING A TABLE ONCE
+# -----------------------------
+# An open panel reads the same world again every few seconds, and a chart of
+# a long run is most of a parquet folder. A table that has not changed on
+# disk is not read again: the key is what the folder looks like - how many
+# parts, how big, and when the newest one was written - which is a handful
+# of stat() calls against hundreds of megabytes of reading.
+#
+# Parts are written, fsynced and renamed into place and never edited, so a
+# folder that looks the same holds the same rows. The cache keeps a few
+# worlds' tables and drops the oldest; a pyarrow Table is immutable, so
+# handing the same one to two requests is safe.
+
+_TABLES = {}
+_DERIVED = {}
+_CATALOG = {}
+_KEEP = 16
+
+
+def folder_stamp(path):
+    """What a table folder looks like right now, cheaply."""
+    if not os.path.isdir(path):
+        return None
+
+    parts = 0
+    newest = 0.0
+    total = 0
+
+    with os.scandir(path) as entries:
+        for entry in entries:
+            if not entry.is_file():
+                continue
+
+            info = entry.stat()
+            parts += 1
+            total += info.st_size
+            newest = max(newest, info.st_mtime)
+
+    return parts, newest, total
+
+
+def table_path(reader, name):
+    folder = (
+        "events/births" if name == "births"
+        else reader.TABLES[name][0]
+    )
+
+    return os.path.join(reader.path, *folder.split("/"))
+
+
+def read(reader, name):
+    """One of a world's tables, read from disk only when it has changed."""
+    key = (reader.path, name)
+    stamp = folder_stamp(table_path(reader, name))
+    known = _TABLES.get(key)
+
+    if known is not None and known[0] == stamp:
+        return known[1]
+
+    value = getattr(reader, name)()
+    _TABLES[key] = (stamp, value)
+
+    while len(_TABLES) > _KEEP:
+        _TABLES.pop(next(iter(_TABLES)))
+
+    return value
+
+
+def derived(reader, name, build, tables):
+    """
+    The same, for something COMPUTED from tables rather than read.
+
+    `cohorts` walks every birth in a world to find when each childhood
+    ended, and three different charts ask it for the same answer inside one
+    refresh.
+    """
+    key = (reader.path, name)
+    stamp = tuple(folder_stamp(table_path(reader, part)) for part in tables)
+    known = _DERIVED.get(key)
+
+    if known is not None and known[0] == stamp:
+        return known[1]
+
+    value = build()
+    _DERIVED[key] = (stamp, value)
+
+    while len(_DERIVED) > _KEEP:
+        _DERIVED.pop(next(iter(_DERIVED)))
+
+    return value
+
+
 def folder_size(path):
     total = 0
 
@@ -107,17 +200,65 @@ def latest_checkpoint(reader, grouped):
 # -----------------------------
 # CATALOG
 # -----------------------------
+def world_stamp(reader):
+    """
+    What a world's folder looks like: one stat per table, no walking.
+
+    A parquet part is written, fsynced and renamed into place and never
+    touched again, so a world whose folders have the same shape has the same
+    rows, the same size and the same row counts - which is everything the
+    catalog says about it except its heartbeat.
+    """
+    folders = [reader.path] + [
+        os.path.join(reader.path, *folder.split("/"))
+        for folder, _ in reader.TABLES.values()
+    ] + [os.path.join(reader.path, "events", "births")]
+
+    return tuple(folder_stamp(folder) for folder in folders)
+
+
+def store_stamp(store):
+    """What the two checkpoint folders look like right now."""
+    if store is None:
+        return None
+
+    return (
+        folder_stamp(store.rolling_directory),
+        folder_stamp(store.pinned_directory),
+    )
+
+
 def catalog(logs_dir, store=None, live_dir=None):
-    """Every world on disk, newest first, without opening a table."""
+    """
+    Every world on disk, newest first, without opening a table.
+
+    The heartbeat is read every time - it is one small file and it is the
+    only thing here that changes by the second - and everything else about a
+    world that has not been written to since the last look is remembered:
+    counting the rows of fifty worlds and measuring what they weigh took two
+    and a half seconds, on a page that asks every three.
+    """
     worlds = []
     grouped = checkpoints_by_run(store) if store is not None else {}
+
+    # A world's own folder says nothing about its checkpoints - those live
+    # somewhere else entirely - so pinning one, or a rotation taking one
+    # away, has to show up in the key as well.
+    saves = store_stamp(store)
 
     for reader in RunLogReader.find(logs_dir):
         sessions = reader.sessions
         live = read_live(live_dir, reader.world_id) if live_dir else None
+        stamp = (world_stamp(reader), saves)
+        known = _CATALOG.get(reader.path)
+
+        if known is not None and known[0] == stamp:
+            worlds.append(with_live(known[1], live))
+            continue
+
         population = last_population(reader)
 
-        worlds.append({
+        entry = {
             "id": os.path.relpath(reader.path, logs_dir),
             "path": reader.path,
             "world_id": reader.world_id,
@@ -135,20 +276,37 @@ def catalog(logs_dir, store=None, live_dir=None):
             "size": folder_size(reader.path),
             "genes": len(reader.genes),
             "commit": reader.header.get("commit"),
-            "running": bool(live and live["running"]),
             "population": population,
-            # Nobody alive and nothing running: there is nothing to watch,
-            # stop or continue, and the panel must not pretend otherwise.
-            "extinct": population == 0 and not (live and live["running"]),
             "checkpoint": latest_checkpoint(reader, grouped),
-            "live": {
-                "step": live["step"],
-                "agents": live["agents"],
-                "steps_per_second": live.get("steps_per_second"),
-            } if live else None,
-        })
+        }
+
+        _CATALOG[reader.path] = (stamp, entry)
+        worlds.append(with_live(entry, live))
+
+    while len(_CATALOG) > 200:
+        _CATALOG.pop(next(iter(_CATALOG)))
 
     return worlds
+
+
+def with_live(entry, live):
+    """
+    A remembered world, with its heartbeat as it is right now.
+
+    Whether a world is RUNNING, and whether it is extinct, are the two
+    things that can change without anything being written to its folder, so
+    they are answered here and never cached.
+    """
+    entry = dict(entry)
+    entry["running"] = bool(live and live["running"])
+    entry["extinct"] = entry["population"] == 0 and not entry["running"]
+    entry["live"] = {
+        "step": live["step"],
+        "agents": live["agents"],
+        "steps_per_second": live.get("steps_per_second"),
+    } if live else None
+
+    return entry
 
 
 def last_population(reader):
@@ -230,6 +388,14 @@ def childhood_length(reader):
 
 
 def cohorts(reader):
+    """Cached; see `_cohorts` for what it is."""
+    return derived(
+        reader, "cohorts", lambda: _cohorts(reader),
+        ("births", "deaths", "episode_agents"),
+    )
+
+
+def _cohorts(reader):
     """
     Per agent: the age its childhood ended at, and how long it lived.
 
@@ -243,7 +409,7 @@ def cohorts(reader):
     Lifespan is the death row for whoever has one, and the last age logged
     for whoever is still walking around.
     """
-    births = reader.births()
+    births = read(reader, "births")
     childhood = childhood_length(reader)
 
     born = {}
@@ -275,7 +441,7 @@ def cohorts(reader):
     }
 
     lifespan = {}
-    deaths = reader.deaths()
+    deaths = read(reader, "deaths")
 
     if deaths.num_rows:
         lifespan = dict(zip(deaths["agent_id"].to_pylist(), deaths["lifespan"].to_pylist()))
@@ -283,7 +449,7 @@ def cohorts(reader):
     # Whoever has no death row is still walking around, and how long it has
     # lived so far is the oldest age any window ever logged for it.
     buried = set(lifespan)
-    windows = reader.episode_agents()
+    windows = read(reader, "episode_agents")
 
     if windows.num_rows:
         encoded = pc.dictionary_encode(windows["agent_id"]).combine_chunks()
@@ -499,7 +665,7 @@ def rewards(reader, cohort="all", min_steps=None, max_steps=None, leak=False):
     on one axis. It is computed per agent and is not free, so it is only
     computed when the chart is actually showing it.
     """
-    population = reader.episode_population()
+    population = read(reader, "episode_population")
     filtered = cohort != "all" or min_steps is not None or max_steps is not None
 
     out = {
@@ -520,7 +686,7 @@ def rewards(reader, cohort="all", min_steps=None, max_steps=None, leak=False):
     if not (filtered or leak) or not out["episodes"]:
         return out
 
-    windows = reader.episode_agents()
+    windows = read(reader, "episode_agents")
 
     if windows.num_rows == 0:
         return out
@@ -566,7 +732,7 @@ def learning(reader, cohort="all", min_steps=None, max_steps=None):
     agent's age on that step is the step minus its birth - which is all a
     cohort needs to be told apart.
     """
-    population = reader.episode_population()
+    population = read(reader, "episode_population")
     filtered = cohort != "all" or min_steps is not None or max_steps is not None
 
     out = {
@@ -584,7 +750,7 @@ def learning(reader, cohort="all", min_steps=None, max_steps=None):
     if not filtered or not out["episodes"]:
         return out
 
-    table = reader.updates()
+    table = read(reader, "updates")
 
     if table.num_rows == 0:
         return out
@@ -631,7 +797,7 @@ def heatmap(reader, recent_share=0.2):
     just walked into the corners looks exactly like one that never left
     the middle, if you only ever add the two up.
     """
-    table = reader.world_agents()
+    table = read(reader, "world_agents")
     size = world_size(reader)
 
     if table.num_rows == 0 or size <= 0:
@@ -679,8 +845,8 @@ def family(reader):
     ended, and an agent with no death row is simply still alive - so a node
     holds everything hovering over it should show.
     """
-    births = reader.births().to_pylist()
-    deaths = {row["agent_id"]: row for row in reader.deaths().to_pylist()}
+    births = read(reader, "births").to_pylist()
+    deaths = {row["agent_id"]: row for row in read(reader, "deaths").to_pylist()}
 
     nodes = []
     edges = []
@@ -741,7 +907,7 @@ def agent(reader, agent_id):
     of seconds on a long run, and it is the only place in the panel that
     touches the step table at all.
     """
-    births = reader.births()
+    births = read(reader, "births")
     row = None
 
     if births.num_rows:
@@ -755,7 +921,7 @@ def agent(reader, agent_id):
 
     death = None
 
-    for candidate in reader.deaths().to_pylist():
+    for candidate in read(reader, "deaths").to_pylist():
         if candidate["agent_id"] == agent_id:
             death = candidate
             break
@@ -771,7 +937,7 @@ def agent(reader, agent_id):
     if births.num_rows:
         born = dict(zip(births["agent_id"].to_pylist(), births["step"].to_pylist()))
 
-    population = reader.episode_population()
+    population = read(reader, "episode_population")
     ends = np.asarray(column(population, "step_end"), dtype=np.int64)
     numbers = column(population, "episode")
 
@@ -789,7 +955,7 @@ def agent(reader, agent_id):
         if child in born
     ]
 
-    windows = reader.episode_agents()
+    windows = read(reader, "episode_agents")
     earned = {"env": 0.0, "intrinsic": 0.0, "shaped": 0.0}
     steps_logged = 0
     last_age = None
@@ -888,7 +1054,7 @@ def leaderboard(reader, by="per_episode", limit=20):
     if by not in LEADERBOARD:
         by = "per_episode"
 
-    births = reader.births()
+    births = read(reader, "births")
 
     if births.num_rows == 0:
         return {"by": by, "agents": 0, "bred": 0, "rows": []}
@@ -896,10 +1062,10 @@ def leaderboard(reader, by="per_episode", limit=20):
     who = cohorts(reader)
     ids = births["agent_id"].to_pylist()
     indexes = births["index"].to_pylist()
-    dead = set(reader.deaths()["agent_id"].to_pylist()) if reader.deaths().num_rows else set()
+    dead = set(read(reader, "deaths")["agent_id"].to_pylist()) if read(reader, "deaths").num_rows else set()
 
     earned = {}
-    windows = reader.episode_agents()
+    windows = read(reader, "episode_agents")
 
     if windows.num_rows:
         encoded = pc.dictionary_encode(windows["agent_id"]).combine_chunks()
@@ -1003,7 +1169,7 @@ def compare(logs_dir, worlds, metric):
 
     for world in worlds:
         reader = open_world(logs_dir, world)
-        table = reader.episode_population()
+        table = read(reader, "episode_population")
 
         series.append({
             "id": world,
