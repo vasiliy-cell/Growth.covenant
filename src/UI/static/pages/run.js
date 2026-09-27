@@ -9,8 +9,8 @@
 // of that run, not every so many seconds: one knob, in the run's own time.
 
 import {
-  api, h, fmt, button, chips, popup, chartBase, chartIn, line, COLORS,
-  CHART_INK, cleanup,
+  api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, line,
+  COLORS, CHART_INK, cleanup,
 } from "../lib.js";
 import { liveStage } from "./live.js";
 
@@ -26,9 +26,24 @@ const COHORTS = [
 
 const REFRESH = [[0, "off"], [200, "200"], [1000, "1000"], [5000, "5000"]];
 
+// The three rewards, and which of them the chart draws. They are three
+// different questions - what the world paid, what curiosity added, what the
+// networks actually learned from - so any of them can be on alone.
+const REWARDS = [
+  ["shaped", "shaped", "what the networks learned from: the world plus curiosity"],
+  ["env", "env", "what the world itself paid"],
+  ["intrinsic", "curiosity", "what curiosity added on top"],
+];
+
 export async function runView(node, worldId, { live = false } = {}) {
   const filter = { cohort: "all", min_steps: null, max_steps: null };
-  const view = { mode: "agent", heat: "recent", onlyParents: true, refresh: 1000 };
+  const view = {
+    mode: "agent",
+    shown: new Set(["shaped", "env", "intrinsic"]),
+    heat: "recent",
+    onlyParents: true,
+    refresh: 1000,
+  };
 
   const charts = {};
   const state = {};
@@ -112,6 +127,7 @@ export async function runView(node, worldId, { live = false } = {}) {
       "Reward per episode",
       h("span", { class: "note" }, "env · curiosity · what the networks learned from"),
       h("span", { class: "spacer" }),
+      toggles(REWARDS, view.shown, () => drawRewards(charts, rewardNode, state.rewards, view)),
       chips([["agent", "per agent"], ["total", "total"]], view.mode, (mode) => {
         view.mode = mode;
         drawRewards(charts, rewardNode, state.rewards, view);
@@ -181,7 +197,7 @@ function runStats(details, family) {
       stat("agents ever", fmt.int(family.nodes.length)),
       stat("deaths", fmt.int(details.counts.deaths), "bad"),
       stat("updates", fmt.int(details.counts.updates)),
-      stat("seed", sessions[0]?.seed ?? "—", "tight"),
+      stat("seed", sessions[0]?.seed ?? "—", "scrollx"),
     ]),
     h("div", { class: "mono dim", style: "font-size:11px;margin-top:10px;line-height:1.7" }, [
       `${details.species} · commit ${(details.commit || "—").slice(0, 10)} · episode = ${details.episode_length} steps`,
@@ -253,8 +269,8 @@ function perAgent(values, agents) {
 function rewardSeries(rewards, view) {
   const scale = (values) => (view.mode === "agent" ? perAgent(values, rewards.agents) : values);
 
-  return [
-    line("shaped", scale(rewards.shaped), COLORS.orange, {
+  const drawn = {
+    shaped: () => line("shaped", scale(rewards.shaped), COLORS.orange, {
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: "rgba(224,139,62,.22)" },
@@ -262,9 +278,11 @@ function rewardSeries(rewards, view) {
         ]),
       },
     }),
-    line("env", scale(rewards.env), COLORS.sage),
-    line("curiosity", scale(rewards.intrinsic), COLORS.cyan),
-  ];
+    env: () => line("env", scale(rewards.env), COLORS.sage),
+    intrinsic: () => line("curiosity", scale(rewards.intrinsic), COLORS.cyan),
+  };
+
+  return REWARDS.filter(([key]) => view.shown.has(key)).map(([key]) => drawn[key]());
 }
 
 function drawRewards(charts, node, rewards, view) {
@@ -303,7 +321,7 @@ function drawRewards(charts, node, rewards, view) {
       name: view.mode === "agent" ? "reward per agent per episode" : "reward per episode, whole population",
     },
     series: rewardSeries(rewards, view),
-  });
+  }, { replaceMerge: ["series"] });
 }
 
 function drawLearning(charts, node, learning) {

@@ -240,9 +240,16 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
 .stat .name { color: var(--steel); font-size: 11px; }
 .stat .value { font: 600 18px/1.25 var(--mono); margin-top: 3px; overflow-wrap: anywhere; }
 
-/* A seed is nineteen digits and is read, not admired: it gets the small
-   type so it stays inside its card instead of running out of it. */
-.stat .value.tight { font-size: 12px; letter-spacing: -.2px; }
+/* A seed is nineteen digits: it keeps the type everything else has and
+   scrolls sideways inside its own card. */
+.stat .value.scrollx { overflow-x: auto; overflow-wrap: normal; white-space: nowrap; }
+.stat .value.scrollx::-webkit-scrollbar { height: 5px; }
+
+/* How much of the map pays and how much of it hurts, right now. */
+.balance { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--inset); }
+.balance span { display: block; height: 100%; }
+.balance-food { background: var(--sage); }
+.balance-danger { background: var(--crimson); }
 
 /* ---------------- buttons ---------------- */
 .btn {

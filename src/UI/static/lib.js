@@ -465,6 +465,36 @@ export function chips(options, value, onchange) {
   return box;
 }
 
+// Chips where ANY NUMBER can be on at once - for a chart that draws one
+// line, or two, or all of them. The last one on cannot be switched off:
+// an empty chart answers no question at all.
+export function toggles(options, selected, onchange) {
+  const box = h("div", { class: "row", style: "gap:4px;flex-wrap:nowrap" });
+
+  const draw = () => {
+    box.replaceChildren(...options.map(([key, text, title]) =>
+      h("button", {
+        class: `chip ${selected.has(key) ? "on" : ""}`,
+        style: "margin:0",
+        title: title || null,
+        onclick: () => {
+          if (selected.has(key)) {
+            if (selected.size === 1) return;
+            selected.delete(key);
+          } else {
+            selected.add(key);
+          }
+
+          draw();
+          onchange(selected);
+        },
+      }, text)));
+  };
+
+  draw();
+  return box;
+}
+
 export function toggle(checked, onchange) {
   const input = h("input", { type: "checkbox", class: "switch", checked });
   input.addEventListener("change", () => onchange(input.checked));
