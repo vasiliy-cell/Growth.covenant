@@ -671,7 +671,6 @@ async function openAgent(worldId, node) {
 function agentBody(agent) {
   const heat = h("div", { class: "chart tall" });
   const earned = h("div", { class: "chart" });
-  const living = h("div", { class: "chart" });
   const ended = agent.bred_at !== null && agent.bred_at !== undefined
     ? `${fmt.int(agent.childhood_ended_at)} (its first child)`
     : `${fmt.int(agent.childhood_ended_at)} (the clock)`;
@@ -695,23 +694,14 @@ function agentBody(agent) {
       stat("parents", agent.parents.length ? agent.parents.map(shortId).join(" + ") : "founder"),
     ]),
 
-    // The same numbers as above, but as a life: totals say what it ended up
-    // with, these say when it happened.
-    h("div", { class: "grid-2", style: "margin-top:6px" }, [
-      h("div", { class: "panel" }, [
-        h("header", {}, [
-          "What it earned",
-          h("span", { class: "note" }, "per episode of its life"),
-        ]),
-        h("div", { class: "body" }, earned),
+    // The same numbers as above, but as a life: the totals say what it ended
+    // up with, this says when it happened - and where its children arrived.
+    h("div", { class: "panel", style: "margin-top:6px" }, [
+      h("header", {}, [
+        "What it earned",
+        h("span", { class: "note" }, lifeNote(agent)),
       ]),
-      h("div", { class: "panel" }, [
-        h("header", {}, [
-          "What it was carrying",
-          h("span", { class: "note" }, "energy, and how much of its choosing was random"),
-        ]),
-        h("div", { class: "body" }, living),
-      ]),
+      h("div", { class: "body" }, earned),
     ]),
 
     h("div", { class: "grid-2", style: "margin-top:6px" }, [
@@ -746,7 +736,7 @@ function agentBody(agent) {
   // The charts are drawn once the popup is on screen and the boxes have a
   // width of their own.
   setTimeout(() => {
-    drawLife(earned, living, agent.series);
+    drawLife(earned, agent);
 
     if (!agent.heat.size) {
       heat.replaceChildren(h("div", { class: "empty" }, "no steps of this agent are in the log"));
@@ -759,43 +749,62 @@ function agentBody(agent) {
   return body;
 }
 
-// One agent's life, window by window. A short life is a handful of points,
-// so the points are drawn: a two-window line with no symbols is invisible.
-function drawLife(earnedNode, livingNode, series) {
-  const windows = (series && series.episodes) || [];
+function lifeNote(agent) {
+  const windows = agent.series?.episodes || [];
+
+  if (!windows.length) return "no window ever closed on it";
+
+  const span = windows.length === 1
+    ? `episode ${windows[0]}`
+    : `episodes ${windows[0]}–${windows[windows.length - 1]}`;
+
+  return `${span} · its whole life${agent.offspring ? `, ${agent.offspring} children marked` : ""}`;
+}
+
+// One agent's whole life, window by window, with a mark where each of its
+// children arrived. A short life is a handful of points, so the points are
+// drawn: a two-window line with no symbols is invisible.
+function drawLife(node, agent) {
+  const series = agent.series || {};
+  const windows = series.episodes || [];
 
   if (!windows.length) {
-    const nothing = () => h("div", { class: "empty" }, "no logging window ever closed on this agent");
-    earnedNode.replaceChildren(nothing());
-    livingNode.replaceChildren(nothing());
+    node.replaceChildren(h("div", { class: "empty" }, "no logging window ever closed on this agent"));
     return;
   }
 
   const dots = windows.length < 60 ? { symbol: "circle", symbolSize: 4 } : {};
   const base = chartBase();
 
-  chartIn(earnedNode).setOption({
+  // A category axis places a mark by the value of the category, so only the
+  // births that fall inside a window this agent was logged in can be shown -
+  // which is all of them, a parent being alive when its child is born.
+  const inside = new Set(windows);
+  const marks = (agent.arrivals || []).filter((birth) => inside.has(birth.episode));
+
+  chartIn(node).setOption({
     ...base,
     xAxis: { ...base.xAxis, data: windows, name: "episode" },
     yAxis: { ...base.yAxis, name: "reward in that episode" },
     series: [
-      line("shaped", series.shaped, COLORS.orange, dots),
+      line("shaped", series.shaped, COLORS.orange, {
+        ...dots,
+        markLine: {
+          symbol: "none",
+          silent: true,
+          label: {
+            formatter: "child",
+            color: COLORS.amber,
+            fontSize: 10,
+            fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
+            position: "insideEndTop",
+          },
+          lineStyle: { color: COLORS.amber, type: "dashed", width: 1 },
+          data: marks.map((birth) => ({ xAxis: birth.episode })),
+        },
+      }),
       line("env", series.env, COLORS.sage, dots),
       line("curiosity", series.intrinsic, COLORS.cyan, dots),
-    ],
-  });
-
-  chartIn(livingNode).setOption({
-    ...base,
-    grid: { ...base.grid, right: 64 },
-    xAxis: { ...base.xAxis, data: windows, name: "episode" },
-    yAxis: [
-      { ...base.yAxis, name: "energy" },
-      { ...base.yAxis, name: "epsilon", position: "right", nameGap: 44, splitLine: { show: false } },
-    ],
-    series: [
-      line("energy", series.energy, COLORS.sage, { ...dots, areaStyle: { color: "rgba(142,196,163,.10)" } }),
-      line("epsilon", series.epsilon, COLORS.cyan, { ...dots, yAxisIndex: 1 }),
     ],
   });
 }

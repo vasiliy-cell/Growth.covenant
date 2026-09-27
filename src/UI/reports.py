@@ -763,6 +763,32 @@ def agent(reader, agent_id):
     who = cohorts(reader)
     children = who["children"].get(agent_id, [])
 
+    # When each child arrived, on the same axis the agent's life is drawn on:
+    # a birth is the loudest thing that happens to a body that is not its
+    # death, and it should be visible next to what the body earned.
+    born = {}
+
+    if births.num_rows:
+        born = dict(zip(births["agent_id"].to_pylist(), births["step"].to_pylist()))
+
+    population = reader.episode_population()
+    ends = np.asarray(column(population, "step_end"), dtype=np.int64)
+    numbers = column(population, "episode")
+
+    def episode_of(step):
+        if not len(ends):
+            return None
+
+        slot = int(np.searchsorted(ends, step, side="left"))
+
+        return numbers[min(slot, len(numbers) - 1)]
+
+    arrivals = [
+        {"id": child, "step": born[child], "episode": episode_of(born[child])}
+        for child in children
+        if child in born
+    ]
+
     windows = reader.episode_agents()
     earned = {"env": 0.0, "intrinsic": 0.0, "shaped": 0.0}
     steps_logged = 0
@@ -819,6 +845,7 @@ def agent(reader, agent_id):
         "cause_of_death": death["cause_of_death"] if death else None,
         "cumulative_reward": death["cumulative_reward"] if death else None,
         "children": children,
+        "arrivals": arrivals,
         "offspring": len(children),
         "childhood_ended_at": who["adulthood"].get(agent_id, who["childhood"]),
         "childhood_length": who["childhood"],
