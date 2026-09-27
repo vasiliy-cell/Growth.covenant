@@ -29,8 +29,8 @@ const REFRESH = [[0, "off"], [200, "200"], [1000, "1000"], [5000, "5000"]];
 // What the agents of a run can be ranked on. Four columns, because a
 // leaderboard of one number is a claim about what this world is for.
 const RANKS = [
-  ["shaped", "reward learned from"],
-  ["env", "reward from the world"],
+  ["per_episode", "reward per episode"],
+  ["env", "reward, total"],
   ["children", "children"],
   ["lived", "ticks lived"],
 ];
@@ -59,7 +59,8 @@ export async function runView(node, worldId, { live = false } = {}) {
   const filter = { cohort: "all", min_steps: null, max_steps: null };
   const view = {
     mode: "agent",
-    by: "shaped",
+    by: "per_episode",
+    top: 10,
     leaders: new Set(),
     ema: 0,
     shown: new Set(["shaped", "env", "intrinsic", "leak"]),
@@ -106,7 +107,7 @@ export async function runView(node, worldId, { live = false } = {}) {
   };
 
   const reloadBoard = async () => {
-    state.board = await api.leaderboard(worldId, view.by, 20);
+    state.board = await api.leaderboard(worldId, view.by, view.top);
 
     // The tree shows the same bodies, so it lights up the same ones.
     const leaders = new Set(state.board.rows.map((row) => row.id));
@@ -220,9 +221,11 @@ export async function runView(node, worldId, { live = false } = {}) {
   parts.push(h("div", { class: "panel" }, [
     h("header", {}, [
       "Leaderboard",
-      h("span", { class: "note" }, "click one to open it"),
+      h("span", { class: "note" }, "click one to open it · these are the yellow ones on the tree"),
       h("span", { class: "spacer" }),
       chips(RANKS, view.by, (by) => { view.by = by; reloadBoard().catch(() => {}); }),
+      h("span", { class: "dim mono", style: "font-size:11px" }, "top"),
+      topInput(view, () => reloadBoard().catch(() => {})),
     ]),
     boardNode,
   ]));
@@ -554,14 +557,34 @@ function drawHeatmap(charts, node, heat, mode) {
 
 // ---------------- leaderboard ----------------
 
+// How many agents are on the board - and therefore how many of them are lit
+// up on the family tree. It was a fixed twenty, which on a small world is
+// everybody, and a tree where every node is a leader says nothing.
+function topInput(view, onchange) {
+  const input = h("input", {
+    type: "number", min: "1", max: "200", value: view.top,
+    style: "width:66px;height:28px;padding:0 8px",
+  });
+
+  input.addEventListener("change", () => {
+    const wanted = Math.max(1, Math.min(200, Number(input.value) || 1));
+
+    input.value = wanted;
+    view.top = wanted;
+    onchange();
+  });
+
+  return input;
+}
+
 function boardTable(board, worldId, view) {
   if (!board || !board.rows.length) {
     return h("div", { class: "empty" }, "nobody has been born in this world yet");
   }
 
   const columns = [
-    ["shaped", "reward learned from", (row) => fmt.number(row.shaped, 1)],
-    ["env", "from the world", (row) => fmt.number(row.env, 1)],
+    ["per_episode", "reward from the world, per episode", (row) => fmt.number(row.per_episode, 2)],
+    ["env", "reward from the world, total", (row) => fmt.number(row.env, 1)],
     ["children", "children", (row) => fmt.int(row.children)],
     ["lived", "ticks lived", (row) => fmt.int(row.lived)],
   ];

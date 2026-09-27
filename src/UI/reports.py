@@ -869,14 +869,14 @@ def agent(reader, agent_id):
 # about what this world is for, so the panel offers all four and says which
 # one it is sorted by.
 LEADERBOARD = {
+    "per_episode": "reward from the world, per episode",
+    "env": "reward from the world",
     "children": "children",
     "lived": "ticks lived",
-    "shaped": "reward it learned from",
-    "env": "reward from the world",
 }
 
 
-def leaderboard(reader, by="children", limit=20):
+def leaderboard(reader, by="per_episode", limit=20):
     """
     The agents of one world, ranked - and how many of them bred at all.
 
@@ -886,7 +886,7 @@ def leaderboard(reader, by="children", limit=20):
     and the lifespans come from `cohorts`.
     """
     if by not in LEADERBOARD:
-        by = "children"
+        by = "per_episode"
 
     births = reader.births()
 
@@ -906,17 +906,22 @@ def leaderboard(reader, by="children", limit=20):
         codes = encoded.indices.to_numpy(zero_copy_only=False)
         names = encoded.dictionary.to_pylist()
 
-        sums = {
-            name: np.bincount(
-                codes,
-                weights=windows[column].to_numpy(zero_copy_only=False).astype(np.float64),
-                minlength=len(names),
-            )
-            for name, column in (("env", "env_reward"), ("shaped", "shaped_reward"))
-        }
+        # The total, and the total divided by the windows it was earned
+        # over: a body that lived ten times as long earns ten times as much
+        # without ever being ten times as good at anything.
+        paid = np.bincount(
+            codes,
+            weights=windows["env_reward"].to_numpy(zero_copy_only=False).astype(np.float64),
+            minlength=len(names),
+        )
+        seen = np.bincount(codes, minlength=len(names))
 
         earned = {
-            agent_id: {"env": float(sums["env"][slot]), "shaped": float(sums["shaped"][slot])}
+            agent_id: {
+                "env": float(paid[slot]),
+                "per_episode": float(paid[slot] / seen[slot]) if seen[slot] else 0.0,
+                "episodes": int(seen[slot]),
+            }
             for slot, agent_id in enumerate(names)
         }
 
@@ -928,7 +933,8 @@ def leaderboard(reader, by="children", limit=20):
             "children": len(who["children"].get(agent_id, [])),
             "lived": who["lifespan"].get(agent_id, 0),
             "env": earned.get(agent_id, {}).get("env", 0.0),
-            "shaped": earned.get(agent_id, {}).get("shaped", 0.0),
+            "per_episode": earned.get(agent_id, {}).get("per_episode", 0.0),
+            "episodes": earned.get(agent_id, {}).get("episodes", 0),
         }
         for agent_id, index in zip(ids, indexes)
     ]
