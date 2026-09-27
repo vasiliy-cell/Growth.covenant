@@ -307,6 +307,13 @@ class RunLog:
         self.tables["steps"].append(row)
         self._count_step(step, agent_id, env_reward, intrinsic_reward, shaped_reward)
 
+        # The body as its last step left it. An agent that died inside the
+        # window is not in the population when the window closes, and this
+        # is all that is left to say how old and how hungry it ended.
+        window = self._window_agents[agent_id]
+        window["energy"] = energy
+        window["age"] = age
+
         # Everything a step decided, in the order it was decided - two runs
         # of one seed print the same digest, and the first window where
         # they differ is where they diverged.
@@ -578,8 +585,8 @@ class RunLog:
                 "shaped_reward": sums["shaped_reward"],
                 "epsilon": _number(state.get("epsilon")),
                 "curiosity_beta": _number(state.get("curiosity_beta")),
-                "energy": _number(state.get("energy")),
-                "age": int(state.get("age") or 0),
+                "energy": _number(state.get("energy", sums["energy"])),
+                "age": int(state.get("age", sums["age"])),
             })
 
         epsilons = [
