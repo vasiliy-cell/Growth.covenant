@@ -157,8 +157,9 @@ def world_rewards(
     cohort: str = "all",
     min_steps: Optional[int] = None,
     max_steps: Optional[int] = None,
+    leak: bool = False,
 ):
-    return reports.rewards(reader_for(world), cohort, min_steps, max_steps)
+    return reports.rewards(reader_for(world), cohort, min_steps, max_steps, leak)
 
 
 @app.get("/api/worlds/{world:path}/learning")

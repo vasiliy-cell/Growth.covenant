@@ -43,6 +43,7 @@ const REWARDS = [
   ["shaped", "shaped", "what the networks learned from: the world plus curiosity"],
   ["env", "env", "what the world itself paid"],
   ["intrinsic", "curiosity", "what curiosity added on top"],
+  ["leak", "leak", "what being alive cost the population that window, as a negative"],
 ];
 
 export async function runView(node, worldId, { live = false } = {}) {
@@ -50,7 +51,7 @@ export async function runView(node, worldId, { live = false } = {}) {
   const view = {
     mode: "agent",
     ema: 0,
-    shown: new Set(["shaped", "env", "intrinsic"]),
+    shown: new Set(["shaped", "env", "intrinsic", "leak"]),
     heat: "recent",
     onlyParents: true,
     refresh: 1000,
@@ -68,9 +69,15 @@ export async function runView(node, worldId, { live = false } = {}) {
   const statsNode = h("div", { class: "body" });
   const filterNote = h("span", { class: "note" });
 
+  // The leak is the only line the server has to add up per agent, so it is
+  // asked for only while the chart is showing it.
+  let askedLeak = null;
+
   const reload = async () => {
+    askedLeak = view.shown.has("leak");
+
     const [rewards, learning] = await Promise.all([
-      api.rewards(worldId, filter),
+      api.rewards(worldId, { ...filter, leak: askedLeak ? 1 : null }),
       api.learning(worldId, filter),
     ]);
 
@@ -142,7 +149,10 @@ export async function runView(node, worldId, { live = false } = {}) {
       "Reward per episode",
       h("span", { class: "note" }, "env · curiosity · what the networks learned from"),
       h("span", { class: "spacer" }),
-      toggles(REWARDS, view.shown, () => drawRewards(charts, rewardNode, state.rewards, view)),
+      toggles(REWARDS, view.shown, () => {
+        if (view.shown.has("leak") !== askedLeak) reload().catch(() => {});
+        else drawRewards(charts, rewardNode, state.rewards, view);
+      }),
       chips([["agent", "per agent"], ["total", "total"]], view.mode, (mode) => {
         view.mode = mode;
         drawRewards(charts, rewardNode, state.rewards, view);
@@ -306,6 +316,7 @@ function rewardSeries(rewards, view) {
     }),
     env: () => line("env", scale(rewards.env), COLORS.sage),
     intrinsic: () => line("curiosity", scale(rewards.intrinsic), COLORS.cyan),
+    leak: () => line("leak", scale(rewards.leak || []), COLORS.crimson),
   };
 
   return REWARDS.filter(([key]) => view.shown.has(key)).map(([key]) => drawn[key]());
@@ -659,6 +670,8 @@ async function openAgent(worldId, node) {
 
 function agentBody(agent) {
   const heat = h("div", { class: "chart tall" });
+  const earned = h("div", { class: "chart" });
+  const living = h("div", { class: "chart" });
   const ended = agent.bred_at !== null && agent.bred_at !== undefined
     ? `${fmt.int(agent.childhood_ended_at)} (its first child)`
     : `${fmt.int(agent.childhood_ended_at)} (the clock)`;
@@ -680,6 +693,25 @@ function agentBody(agent) {
       stat("reward it learned from", fmt.number(agent.reward.shaped, 1)),
       stat("of that, curiosity", fmt.number(agent.reward.intrinsic, 1)),
       stat("parents", agent.parents.length ? agent.parents.map(shortId).join(" + ") : "founder"),
+    ]),
+
+    // The same numbers as above, but as a life: totals say what it ended up
+    // with, these say when it happened.
+    h("div", { class: "grid-2", style: "margin-top:6px" }, [
+      h("div", { class: "panel" }, [
+        h("header", {}, [
+          "What it earned",
+          h("span", { class: "note" }, "per episode of its life"),
+        ]),
+        h("div", { class: "body" }, earned),
+      ]),
+      h("div", { class: "panel" }, [
+        h("header", {}, [
+          "What it was carrying",
+          h("span", { class: "note" }, "energy, and how much of its choosing was random"),
+        ]),
+        h("div", { class: "body" }, living),
+      ]),
     ]),
 
     h("div", { class: "grid-2", style: "margin-top:6px" }, [
@@ -711,8 +743,11 @@ function agentBody(agent) {
     ]),
   ]);
 
-  // The chart is drawn once the popup is on screen and the box has a width.
+  // The charts are drawn once the popup is on screen and the boxes have a
+  // width of their own.
   setTimeout(() => {
+    drawLife(earned, living, agent.series);
+
     if (!agent.heat.size) {
       heat.replaceChildren(h("div", { class: "empty" }, "no steps of this agent are in the log"));
       return;
@@ -722,6 +757,47 @@ function agentBody(agent) {
   }, 0);
 
   return body;
+}
+
+// One agent's life, window by window. A short life is a handful of points,
+// so the points are drawn: a two-window line with no symbols is invisible.
+function drawLife(earnedNode, livingNode, series) {
+  const windows = (series && series.episodes) || [];
+
+  if (!windows.length) {
+    const nothing = () => h("div", { class: "empty" }, "no logging window ever closed on this agent");
+    earnedNode.replaceChildren(nothing());
+    livingNode.replaceChildren(nothing());
+    return;
+  }
+
+  const dots = windows.length < 60 ? { symbol: "circle", symbolSize: 4 } : {};
+  const base = chartBase();
+
+  chartIn(earnedNode).setOption({
+    ...base,
+    xAxis: { ...base.xAxis, data: windows, name: "episode" },
+    yAxis: { ...base.yAxis, name: "reward in that episode" },
+    series: [
+      line("shaped", series.shaped, COLORS.orange, dots),
+      line("env", series.env, COLORS.sage, dots),
+      line("curiosity", series.intrinsic, COLORS.cyan, dots),
+    ],
+  });
+
+  chartIn(livingNode).setOption({
+    ...base,
+    grid: { ...base.grid, right: 64 },
+    xAxis: { ...base.xAxis, data: windows, name: "episode" },
+    yAxis: [
+      { ...base.yAxis, name: "energy" },
+      { ...base.yAxis, name: "epsilon", position: "right", nameGap: 44, splitLine: { show: false } },
+    ],
+    series: [
+      line("energy", series.energy, COLORS.sage, { ...dots, areaStyle: { color: "rgba(142,196,163,.10)" } }),
+      line("epsilon", series.epsilon, COLORS.cyan, { ...dots, yAxisIndex: 1 }),
+    ],
+  });
 }
 
 function genotypeBody(genotype) {

@@ -41,12 +41,6 @@ export function liveStage(worldId, { onFrame } = {}) {
 
   let running = true;
 
-  // What the map is made of right now. Counted from the frame the panel
-  // already has - a grid only travels when it has changed, so this is
-  // recounted then and not once a frame.
-  let mapKey = null;
-  let cells = { food: 0, danger: 0, total: 0 };
-
   const ask = () => { if (running) api.watch(id, chosenSpeed).catch(() => {}); };
 
   const drawSpeeds = () => {
@@ -100,16 +94,10 @@ export function liveStage(worldId, { onFrame } = {}) {
 
     // replaceChildren turns a null into the word "null" on the page, so the
     // hint is only passed when there is one.
-    if (frame.grid !== mapKey) {
-      mapKey = frame.grid;
-      cells = countCells(frame.grid);
-    }
-
     side.replaceChildren(...[
       stat("step", fmt.int(frame.step)),
       stat("episode", fmt.int(frame.episode)),
       stat("agents", fmt.int(frame.agents)),
-      balance(cells),
       stat("reward this episode", fmt.number(frame.reward, 1)),
       stat("epsilon", fmt.number(frame.epsilon, 3)),
       stat("speed", `${fmt.number(frame.steps_per_second, 0)} steps/s`),
@@ -133,44 +121,6 @@ export function livePage(root, id) {
 
 function stat(name, value) {
   return h("div", { class: "stat" }, [h("div", { class: "name" }, name), h("div", { class: "value" }, value)]);
-}
-
-// ---------------- what is left on the map ----------------
-
-function countCells(grid) {
-  const binary = atob(grid);
-  let food = 0;
-  let danger = 0;
-
-  for (let index = 0; index < binary.length; index += 1) {
-    const code = binary.charCodeAt(index);
-
-    if (code === 1) food += 1;
-    else if (code === 2) danger += 1;
-  }
-
-  return { food, danger, total: binary.length };
-}
-
-// The balance the agents are living in: how much of the map pays, how much
-// of it hurts, and which of the two is winning right now.
-function balance(cells) {
-  const coloured = Math.max(1, cells.food + cells.danger);
-  const share = (count) => (cells.total ? ((count / cells.total) * 100).toFixed(1) : "0.0");
-
-  return h("div", { class: "stat" }, [
-    h("div", { class: "name" }, "food vs danger"),
-    h("div", { class: "row", style: "gap:8px;margin:4px 0 7px;flex-wrap:nowrap" }, [
-      h("span", { class: "mono good", style: "font:600 16px var(--mono)" }, fmt.int(cells.food)),
-      h("span", { class: "mono bad", style: "font:600 16px var(--mono)" }, fmt.int(cells.danger)),
-      h("span", { class: "spacer" }),
-      h("span", { class: "dim mono", style: "font-size:10px" }, `${share(cells.food + cells.danger)}% full`),
-    ]),
-    h("div", { class: "balance" }, [
-      h("span", { class: "balance-food", style: `width:${(cells.food / coloured) * 100}%` }),
-      h("span", { class: "balance-danger", style: `width:${(cells.danger / coloured) * 100}%` }),
-    ]),
-  ]);
 }
 
 // ---------------- the player ----------------

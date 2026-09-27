@@ -305,6 +305,70 @@ def cohorts(reader):
     }
 
 
+def life_rules(reader):
+    """
+    The `life` / `energy` numbers this world was run with.
+
+    The newest session wins, the same way `cohorts` takes childhood from it:
+    a world continued under a different leak is describing the rules it is
+    living under now.
+    """
+    for session in reversed(reader.sessions):
+        config = session.get("config") or {}
+
+        if config:
+            life = config.get("life", {})
+            energy = config.get("energy", {})
+
+            return {
+                "base": float(energy.get("energy_leak", 0.0)),
+                "every": int((life.get("aging") or {}).get("every", 0) or 0),
+                "amount": float((life.get("aging") or {}).get("amount", 0.0)),
+                "childhood": int(life.get("max_childhood_steps", 0) or 0),
+            }
+
+    return {"base": 0.0, "every": 0, "amount": 0.0, "childhood": 0}
+
+
+def leak_per_row(reader, table, who):
+    """
+    What each per-agent window cost its agent in energy, just to be alive.
+
+    This is `Life.leak` written in arrays: the base cost of a tick, plus one
+    `aging.amount` for every full `aging.every` ticks of ADULT life - and a
+    child pays the base cost and nothing more. The rules are read out of the
+    session's own config, so a world run with a different leak reports its
+    own, and the core is not asked to log anything.
+
+    An age here is the age at the END of the window, and aging moves in
+    steps of hundreds of ticks against a window of twenty, so the cost of a
+    window is that tick price times the ticks the agent was there for.
+    """
+    rules = life_rules(reader)
+
+    encoded = pc.dictionary_encode(table["agent_id"]).combine_chunks()
+    codes = encoded.indices.to_numpy(zero_copy_only=False)
+    names = encoded.dictionary.to_pylist()
+
+    adulthood = np.array(
+        [who["adulthood"].get(name, rules["childhood"]) for name in names],
+        dtype=np.int64,
+    )
+
+    ages = table["age"].to_numpy(zero_copy_only=False).astype(np.int64)
+    steps = table["steps"].to_numpy(zero_copy_only=False).astype(np.float64)
+
+    grown = ages - adulthood[codes]
+    aged = np.zeros(len(ages), dtype=np.float64)
+
+    if rules["every"] > 0 and rules["amount"]:
+        aged = np.maximum(grown, 0) // rules["every"] * rules["amount"]
+
+    per_tick = rules["base"] + np.where(grown >= 0, aged, 0.0)
+
+    return per_tick * steps
+
+
 def keep_agents(who, min_steps, max_steps):
     """Which agents a filter leaves in, by how long they ended up living."""
     lifespan = who["lifespan"]
@@ -416,7 +480,7 @@ def column(table, name):
     return table[name].to_pylist() if name in table.schema.names else []
 
 
-def rewards(reader, cohort="all", min_steps=None, max_steps=None):
+def rewards(reader, cohort="all", min_steps=None, max_steps=None, leak=False):
     """
     Every kind of reward on one chart, per logging window.
 
@@ -429,6 +493,11 @@ def rewards(reader, cohort="all", min_steps=None, max_steps=None):
     chart into a question about a part of the population, and then the
     per-agent windows are added up instead. Births and deaths always count
     the whole world: an event belongs to the world, not to a cohort.
+
+    `leak` adds a fourth line: what being alive COST the population that
+    window, as a negative number, so what came in and what went out are read
+    on one axis. It is computed per agent and is not free, so it is only
+    computed when the chart is actually showing it.
     """
     population = reader.episode_population()
     filtered = cohort != "all" or min_steps is not None or max_steps is not None
@@ -445,9 +514,10 @@ def rewards(reader, cohort="all", min_steps=None, max_steps=None):
         "sessions": column(population, "session"),
         "cohort": cohort,
         "filtered": False,
+        "leak": None,
     }
 
-    if not filtered or not out["episodes"]:
+    if not (filtered or leak) or not out["episodes"]:
         return out
 
     windows = reader.episode_agents()
@@ -468,6 +538,13 @@ def rewards(reader, cohort="all", min_steps=None, max_steps=None):
     def summed(name):
         values = windows[name].to_numpy(zero_copy_only=False).astype(np.float64)
         return sums_per_slot(slots, values, keep, size).tolist()
+
+    if leak:
+        spent = sums_per_slot(slots, leak_per_row(reader, windows, who), keep, size)
+        out["leak"] = (-spent).tolist()
+
+    if not filtered:
+        return out
 
     out.update({
         "env": summed("env_reward"),
@@ -692,6 +769,14 @@ def agent(reader, agent_id):
     last_age = None
     last_energy = None
 
+    # Its whole life, window by window: the same three rewards the world
+    # chart draws, plus what it was carrying and how much of its choosing
+    # was still random.
+    series = {
+        "episodes": [], "steps": [], "env": [], "intrinsic": [], "shaped": [],
+        "energy": [], "age": [], "epsilon": [], "curiosity_beta": [],
+    }
+
     if windows.num_rows:
         table = windows.to_pydict()
 
@@ -705,6 +790,16 @@ def agent(reader, agent_id):
             steps_logged += table["steps"][index]
             last_age = table["age"][index]
             last_energy = table["energy"][index]
+
+            series["episodes"].append(table["episode"][index])
+            series["steps"].append(table["steps"][index])
+            series["env"].append(table["env_reward"][index])
+            series["intrinsic"].append(table["intrinsic_reward"][index])
+            series["shaped"].append(table["shaped_reward"][index])
+            series["energy"].append(table["energy"][index])
+            series["age"].append(table["age"][index])
+            series["epsilon"].append(table["epsilon"][index])
+            series["curiosity_beta"].append(table["curiosity_beta"][index])
 
     return {
         "id": agent_id,
@@ -731,6 +826,7 @@ def agent(reader, agent_id):
             who["adulthood"][agent_id] if who["adulthood"][agent_id] < who["childhood"] else None
         ),
         "reward": earned,
+        "series": series,
         "steps_logged": steps_logged,
         "last_age": last_age,
         "last_energy": last_energy,

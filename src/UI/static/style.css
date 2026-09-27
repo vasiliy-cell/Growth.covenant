@@ -245,11 +245,6 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
 .stat .value.scrollx { overflow-x: auto; overflow-wrap: normal; white-space: nowrap; }
 .stat .value.scrollx::-webkit-scrollbar { height: 5px; }
 
-/* How much of the map pays and how much of it hurts, right now. */
-.balance { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--inset); }
-.balance span { display: block; height: 100%; }
-.balance-food { background: var(--sage); }
-.balance-danger { background: var(--crimson); }
 
 /* ---------------- buttons ---------------- */
 .btn {
