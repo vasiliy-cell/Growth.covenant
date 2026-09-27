@@ -798,9 +798,12 @@ def agent(reader, agent_id):
     # Its whole life, window by window: the same three rewards the world
     # chart draws, plus what it was carrying and how much of its choosing
     # was still random.
+    # A life is measured in TICKS, so the series carries the step each window
+    # ended on and the age the agent was then. An episode number is a logging
+    # window and means nothing on one body's own clock.
     series = {
-        "episodes": [], "steps": [], "env": [], "intrinsic": [], "shaped": [],
-        "energy": [], "age": [], "epsilon": [], "curiosity_beta": [],
+        "episodes": [], "step_end": [], "steps": [], "env": [], "intrinsic": [],
+        "shaped": [], "energy": [], "age": [], "epsilon": [], "curiosity_beta": [],
     }
 
     if windows.num_rows:
@@ -818,6 +821,7 @@ def agent(reader, agent_id):
             last_energy = table["energy"][index]
 
             series["episodes"].append(table["episode"][index])
+            series["step_end"].append(table["step_end"][index])
             series["steps"].append(table["steps"][index])
             series["env"].append(table["env_reward"][index])
             series["intrinsic"].append(table["intrinsic_reward"][index])

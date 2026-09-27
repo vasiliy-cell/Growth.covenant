@@ -749,16 +749,22 @@ function agentBody(agent) {
   return body;
 }
 
+// Everything about one body is counted in TICKS - it was born on a step and
+// it died on a step - so its own chart says the same thing its cards do.
 function lifeNote(agent) {
-  const windows = agent.series?.episodes || [];
+  const ends = agent.series?.step_end || [];
 
-  if (!windows.length) return "no window ever closed on it";
+  if (!ends.length) return "no logging window ever closed on it";
 
-  const span = windows.length === 1
-    ? `episode ${windows[0]}`
-    : `episodes ${windows[0]}–${windows[windows.length - 1]}`;
+  const ages = agent.series?.age || [];
+  const children = agent.arrivals?.length || 0;
 
-  return `${span} · its whole life${agent.offspring ? `, ${agent.offspring} children marked` : ""}`;
+  // Steps are the world's clock and age is the body's own: it is born on a
+  // step with age 0 and its age is counted after the tick it dies in, so the
+  // two never have to be the same number.
+  return `steps ${fmt.int(agent.birth_step)}–${fmt.int(ends[ends.length - 1])}` +
+    ` · age 0→${fmt.int(ages[ages.length - 1])}` +
+    (children ? ` · ${children} ${children === 1 ? "child" : "children"} marked` : "");
 }
 
 // One agent's whole life, window by window, with a mark where each of its
@@ -766,7 +772,7 @@ function lifeNote(agent) {
 // drawn: a two-window line with no symbols is invisible.
 function drawLife(node, agent) {
   const series = agent.series || {};
-  const windows = series.episodes || [];
+  const windows = series.step_end || [];
 
   if (!windows.length) {
     node.replaceChildren(h("div", { class: "empty" }, "no logging window ever closed on this agent"));
@@ -776,16 +782,28 @@ function drawLife(node, agent) {
   const dots = windows.length < 60 ? { symbol: "circle", symbolSize: 4 } : {};
   const base = chartBase();
 
-  // A category axis places a mark by the value of the category, so only the
-  // births that fall inside a window this agent was logged in can be shown -
-  // which is all of them, a parent being alive when its child is born.
-  const inside = new Set(windows);
-  const marks = (agent.arrivals || []).filter((birth) => inside.has(birth.episode));
+  // A category axis places a mark on a category, and a birth happens inside
+  // a window rather than at the end of one: each child is marked on the
+  // window that was open when it arrived.
+  const marks = (agent.arrivals || [])
+    .map((birth) => windows.find((end) => end >= birth.step))
+    .filter((end) => end !== undefined);
 
   chartIn(node).setOption({
     ...base,
-    xAxis: { ...base.xAxis, data: windows, name: "episode" },
-    yAxis: { ...base.yAxis, name: "reward in that episode" },
+    xAxis: { ...base.xAxis, data: windows, name: "step of the world" },
+    yAxis: { ...base.yAxis, name: "reward in the ticks up to that step" },
+    tooltip: {
+      ...base.tooltip,
+      formatter: (points) => {
+        const at = windows.indexOf(Number(points[0].axisValue));
+        const age = series.age?.[at];
+        const head = `step ${fmt.int(points[0].axisValue)}` + (age === null || age === undefined ? "" : ` · age ${fmt.int(age)}`);
+
+        return [head, ...points.map((point) =>
+          `${point.marker} ${point.seriesName} ${fmt.number(point.value, 2)}`)].join("<br/>");
+      },
+    },
     series: [
       line("shaped", series.shaped, COLORS.orange, {
         ...dots,
@@ -800,7 +818,7 @@ function drawLife(node, agent) {
             position: "insideEndTop",
           },
           lineStyle: { color: COLORS.amber, type: "dashed", width: 1 },
-          data: marks.map((birth) => ({ xAxis: birth.episode })),
+          data: marks.map((end) => ({ xAxis: end })),
         },
       }),
       line("env", series.env, COLORS.sage, dots),
