@@ -321,7 +321,10 @@ learning outright:
   back on top of the half that pulled it up,
 - `epsilon_decay` and `curiosity_decay` above 1 become 0.999 - a decay
   above 1 makes epsilon or curiosity GROW instead of fading,
-- `sigma` below 0 becomes 0.01.
+- `sigma` below 0 becomes 0.01,
+- `alpha` below 0 becomes 0.001 - `alpha` is blended between the parents
+  like every other gene, and below -0.5 the blend's lower edge passes its
+  upper one and non_linear cannot draw a child at all.
 
 ### The genes
 

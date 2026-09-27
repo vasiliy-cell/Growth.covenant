@@ -28,6 +28,9 @@ class reuse:
         if genotype["sigma"] <0:
             genotype["sigma"] = 0.01
 
+        if genotype["alpha"] < 0:
+            genotype["alpha"] = 0.001
+
         if genotype["max_norm"] < 0:
             genotype["max_norm"] = 0.0001
 
@@ -73,6 +76,9 @@ class reuse:
 
         if mutated_genotype["sigma"] <0:
             mutated_genotype["sigma"] = 0.01
+
+        if mutated_genotype["alpha"] < 0:
+            mutated_genotype["alpha"] = 0.001
 
         if mutated_genotype["max_norm"] < 0:
             mutated_genotype["max_norm"] = 0.0001

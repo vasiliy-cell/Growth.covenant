@@ -62,6 +62,8 @@ class MendelGeneticsSpecies:
                     mutated_genotype["learning_rate"][i][0] = 0.0001
                 if mutated_genotype["sigma"][i][0] <0:
                     mutated_genotype["sigma"][i][0] = 0.01
+                if mutated_genotype["alpha"][i][0] < 0:
+                    mutated_genotype["alpha"][i][0] = 0.001
                 if mutated_genotype["max_norm"][i][0] < 0:
                     mutated_genotype["max_norm"][i][0] = 0.0001
                 if mutated_genotype["epsilon_decay"][i][0] >= 1:
