@@ -3,6 +3,8 @@ from src.world.Grid_world.objects import OBJECTS
 
 class Map:
     """
+    shares: {object id: share of the map} - how much of each kind the one
+            generation lays down; the empty cells are whatever is left.
     grid: an existing map to carry on with, instead of generating one.
 
     A restored map must not be generated first and overwritten after: a
@@ -10,9 +12,9 @@ class Map:
     would carry on from a different place in it than the run that saved it.
     """
 
-    def __init__(self, size=8, empty_ratio=0.8, rng=None, grid=None):
+    def __init__(self, size=8, shares=None, rng=None, grid=None):
         self.size = size
-        self.empty_ratio = empty_ratio
+        self.shares = shares or {}
         self.object_ids = list(OBJECTS.keys())
         self.non_empty_ids = [obj for obj in self.object_ids if obj != 0]
 
@@ -25,27 +27,14 @@ class Map:
     def _generate(self):
         total_cells = self.size * self.size
 
-        empty_count = int(total_cells * self.empty_ratio)
-
         non_empty_ids = self.non_empty_ids
 
-        remaining = total_cells - empty_count
+        cells = []
 
-        cells = [0] * empty_count
+        for obj in non_empty_ids:
+            cells.extend([obj] * int(total_cells * self.shares.get(obj, 0.0)))
 
-        if non_empty_ids:
-            per_object = remaining // len(non_empty_ids)
-            remainder = remaining % len(non_empty_ids)
-
-            for obj in non_empty_ids:
-                count = per_object
-                if remainder > 0:
-                    count += 1
-                    remainder -= 1
-
-                cells.extend([obj] * count)
-
-        cells = cells[:total_cells]
+        cells = [0] * (total_cells - len(cells)) + cells
 
         # Ensure every object appears at least once
         for obj in non_empty_ids:

@@ -66,9 +66,10 @@ The world is generated **once** in `GridWorldEnv.start()` and is never reset:
 - an agent keeps its position for as long as it lives — it is never
   teleported back to the start of the map,
 - eaten cells stay eaten; instead of regeneration the map tops itself up
-  (`World.maybe_refill` → `Map.refill`): every `world.refill.every` steps, if
-  colored cells drop below `world.refill.threshold`, `world.refill.amount`
-  random objects are added to empty cells,
+  (`World.maybe_refill` → `Map.refill`): every `world.refill.every` steps,
+  each kind of object that dropped below its share in `world.balance`
+  (`danger` = red, `food` = green) is topped back up to it on random empty
+  cells. The same shares are what the one generation lays down,
 - there is no terminal state, so `env.step()` returns `(observation, reward,
   info)` and the training loop always stores `done=False`.
 

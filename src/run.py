@@ -417,7 +417,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
             else world_cfg.get("size", 64)
         ),
         rng=rng,
-        empty_ratio=world_cfg.get("empty_ratio", 0.8),
+        balance=world_cfg["balance"],
         refill=world_cfg.get("refill", {}),
         agent_count=agent_count,
         run_id=world_id,

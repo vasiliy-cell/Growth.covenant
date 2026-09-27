@@ -32,7 +32,7 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, empty_ratio=0.8, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7):
+    def __init__(self, size=8, rng=None, balance=None, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7):
         self.size = size
 
         # Every stream of chance in this run (src/utils/rng.py). The world
@@ -48,7 +48,7 @@ class GridWorldEnv:
         # born in this world (see the `life` section of config.yml).
         self.life = life if life is not None else Life.from_config(config)
 
-        self.world = World(size=size, empty_ratio=empty_ratio, refill=refill)
+        self.world = World(size=size, balance=balance, refill=refill)
         self.agents = AgentManager(
             self.world,
             rng=self.rng.python("population"),
@@ -136,7 +136,6 @@ class GridWorldEnv:
             "world": self.world.state(),
             "refill": {
                 "every": self.world.refill_every,
-                "threshold": self.world.refill_threshold,
             },
             "current_step": self.current_step,
             "species": self.species_name,

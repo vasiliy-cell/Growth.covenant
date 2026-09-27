@@ -8,7 +8,7 @@ FOOD, DANGER = 1, 2
 
 
 def make_world(size=20):
-    world = World(size=size, empty_ratio=0.7, refill={"every": 5, "threshold": 0.15})
+    world = World(size=size, balance={"danger": 0.15, "food": 0.15}, refill={"every": 5})
     world.generate(rng=random.Random(0))
     return world
 

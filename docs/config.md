@@ -64,12 +64,14 @@ places instead of what they saw, and walked into walls.
 ## `world`
 
 - **`size`** - side of the square map.
-- **`empty_ratio`** - share of empty cells at the first (and only)
-  generation. The rest is split evenly between the kinds of object, so 0.7
-  means 15% food and 15% danger.
-- **`refill.every`** - check the map every N steps.
-- **`refill.threshold`** - food and danger are EACH topped back up to this
-  share of the map, counted separately.
+- **`balance.danger`** (red) and **`balance.food`** (green) - the share of
+  the map each kind of object takes. One number per kind does both jobs:
+  the first (and only) generation lays down that share, and the refill
+  tops the kind back up to it. The empty cells are whatever is left, so
+  the two must not add up to more than 1. They are set apart so the map
+  can be asymmetric - more danger than food, or the other way round.
+- **`refill.every`** - check the map every N steps; food and danger are
+  EACH topped back up to their own share, counted separately.
 
   Counted together (as they were once), the danger that agents learn to
   walk around kept the total up while the food was eaten: the refill never

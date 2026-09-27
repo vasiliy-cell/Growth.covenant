@@ -18,10 +18,11 @@ agents:
 # --- WORLD ---
 world:
   size: 64
-  empty_ratio: 0.7        # empty share at the one generation; the rest is 15% food, 15% danger
+  balance:                # share of the map each kind is generated at AND refilled to
+    danger: 0.15          # red
+    food: 0.15            # green
   refill:
     every: 5              # check the map every N steps
-    threshold: 0.15       # food and danger are EACH topped back up to this share
 
 # --- LOGGING ---
 # One folder per WORLD, not per process: logs/<world_id>[_<label>]/

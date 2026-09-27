@@ -1,24 +1,35 @@
 from src.world.Grid_world.map import Map
+from src.world.Grid_world.objects import OBJECTS
 from src.world.Grid_world.reward_for_objects import REWARDS
+
+DEFAULT_BALANCE = {"danger": 0.15, "food": 0.15}
 
 
 class World:
-    def __init__(self, size=8, empty_ratio=0.8, refill=None):
+    def __init__(self, size=8, balance=None, refill=None):
         self.size = size
-        self.empty_ratio = empty_ratio
         self.map = None
 
-        # Refill rules (see world.refill in config.yml). The threshold is
-        # the share of the map EACH kind of object is kept at, not the
-        # share of all of them together.
+        # The balance (see world.balance in config.yml): the share of the
+        # map EACH kind of object is generated at, and the share the refill
+        # keeps it at. Keyed by object id, the way the map counts cells.
+        balance = DEFAULT_BALANCE if balance is None else balance
+        self.shares = {
+            obj: float(balance[OBJECTS[obj]["name"]])
+            for obj in OBJECTS if obj != 0
+        }
+
+        if sum(self.shares.values()) > 1:
+            raise ValueError(f"world.balance adds up to more than the map: {balance}")
+
+        # Refill rules (see world.refill in config.yml).
         refill = refill or {}
         self.refill_every = refill.get("every", 5)
-        self.refill_threshold = refill.get("threshold", 0.15)
 
     # --- generate world using provided RNG (ONCE per run) ---
     def generate(self, rng):
         # World is responsible for creating its map
-        self.map = Map(size=self.size, empty_ratio=self.empty_ratio, rng=rng)
+        self.map = Map(size=self.size, shares=self.shares, rng=rng)
 
     # --- or carry on with the map a checkpoint remembered ---
     def restore(self, state, rng):
@@ -31,11 +42,10 @@ class World:
         hours.
         """
         self.size = state["size"]
-        self.empty_ratio = state["empty_ratio"]
 
         self.map = Map(
             size=self.size,
-            empty_ratio=self.empty_ratio,
+            shares=self.shares,
             rng=rng,
             grid=state["grid"],
         )
@@ -59,7 +69,7 @@ class World:
     def maybe_refill(self, step, exclude=None):
         """
         Every refill_every steps: every kind of object (food, danger) that
-        dropped below refill_threshold of the map is topped back up to it.
+        dropped below its own share of the map is topped back up to it.
         The map is NOT generated from scratch.
 
         Each kind is counted on its own. Counted together, the danger that
@@ -78,10 +88,10 @@ class World:
         if self.refill_every <= 0 or step % self.refill_every != 0:
             return 0
 
-        target = int(self.refill_threshold * self.size * self.size)
         added = 0
 
         for obj in self.map.non_empty_ids:
+            target = int(self.shares[obj] * self.size * self.size)
             missing = target - self.map.count(obj)
 
             if missing > 0:
@@ -95,7 +105,6 @@ class World:
     def state(self):
         return {
             "size": self.size,
-            "empty_ratio": self.empty_ratio,
             "grid": self.map.state() if self.map is not None else None,
         }
 
