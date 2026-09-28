@@ -837,6 +837,215 @@ def world_size(reader):
     return 0
 
 
+# -----------------------------
+# GENES
+# -----------------------------
+# A birth row carries the phenotype the agent was READ INTO - one column per
+# gene - and the per-window table says who was alive when. Together they are
+# the only honest way to ask what the population's genes looked like at a
+# given moment: the genes of the agents that were actually there.
+
+
+def phenotypes(reader):
+    """Every agent's phenotype at birth, as arrays: {gene: {agent_id: value}}."""
+    births = read(reader, "births")
+
+    if births.num_rows == 0:
+        return {}, []
+
+    ids = births["agent_id"].to_pylist()
+    genes = [name[len("phen_"):] for name in births.schema.names if name.startswith("phen_")]
+
+    return (
+        {gene: dict(zip(ids, births[f"phen_{gene}"].to_pylist())) for gene in genes},
+        genes,
+    )
+
+
+def genes(reader, names=None):
+    """
+    What the population's genes looked like, window by window.
+
+    The mean is taken over the agents ALIVE in that window - one row each,
+    so a body counts once however long it has lived - and not over everyone
+    ever born: a gene that killed its carriers early should leave the
+    average, and it cannot if the dead keep voting.
+
+    Genes have wildly different units (a learning rate and a buffer size are
+    not the same kind of number), so each one comes back as its own series
+    and the panel draws each in its own box.
+    """
+    population = read(reader, "episode_population")
+    order = column(population, "episode")
+    everything, known = phenotypes(reader)
+    wanted = [gene for gene in (names or known) if gene in everything]
+
+    out = {"episodes": order, "genes": known, "series": {}, "agents": []}
+
+    if not order or not wanted:
+        return out
+
+    windows = read(reader, "episode_agents")
+
+    if windows.num_rows == 0:
+        return out
+
+    encoded = pc.dictionary_encode(windows["agent_id"]).combine_chunks()
+    codes = encoded.indices.to_numpy(zero_copy_only=False)
+    agent_ids = encoded.dictionary.to_pylist()
+
+    slots = slots_for(windows["episode"].to_numpy(zero_copy_only=False), order)
+    inside = slots >= 0
+    size = len(order)
+
+    for gene in wanted:
+        by_agent = everything[gene]
+        values = np.array([by_agent.get(agent_id, np.nan) for agent_id in agent_ids], dtype=np.float64)
+        per_row = values[codes]
+
+        # An agent with no birth row of its own (a world continued from a
+        # checkpoint written before its birth was logged) has no genes to
+        # average, and must not be counted as a zero.
+        known_row = inside & ~np.isnan(per_row)
+
+        total = np.bincount(slots[known_row], weights=per_row[known_row], minlength=size)[:size]
+        count = np.bincount(slots[known_row], minlength=size)[:size]
+
+        out["series"][gene] = [
+            float(sum_) / int(n) if n else None for sum_, n in zip(total, count)
+        ]
+
+        if not out["agents"]:
+            out["agents"] = count.astype(int).tolist()
+
+    return out
+
+
+def lineage(reader, agent_id):
+    """
+    One agent's direct line: the founder it descends from, down to it.
+
+    Not its family - its LINE. Every step up is the first parent, the same
+    one the family tree draws its edges through, so what comes back is a
+    chain with no branches: a gene read along it is the history of that one
+    gene on its way to this body.
+
+    For a mendel world each link also carries its two alleles and whether
+    the allele it inherited came down changed - a value that is neither of
+    the parent's, or a dominance letter that flipped, is a mutation.
+    """
+    births = read(reader, "births")
+
+    if births.num_rows == 0:
+        raise KeyError(agent_id)
+
+    rows = {row["agent_id"]: row for row in births.to_pylist()}
+
+    if agent_id not in rows:
+        raise KeyError(agent_id)
+
+    chain = []
+    seen = set()
+    walker = agent_id
+
+    while walker in rows and walker not in seen:
+        seen.add(walker)
+        chain.append(rows[walker])
+        parents = rows[walker]["parents"] or []
+        walker = next((parent for parent in parents if parent in rows), None)
+
+    chain.reverse()
+
+    genes_of = lambda row: {
+        name[len("phen_"):]: value
+        for name, value in row.items()
+        if name.startswith("phen_")
+    }
+
+    line = []
+
+    for generation, row in enumerate(chain):
+        genotype = json.loads(row["genotype_json"] or "null")
+        parent = chain[generation - 1] if generation else None
+
+        line.append({
+            "id": row["agent_id"],
+            "index": row["index"],
+            "birth_step": row["step"],
+            "generation": generation,
+            "parents": row["parents"],
+            "phenotype": genes_of(row),
+            "alleles": alleles_of(genotype),
+            "mutated": mutations(
+                genotype,
+                json.loads(parent["genotype_json"] or "null") if parent else None,
+            ),
+        })
+
+    return {
+        "agent": agent_id,
+        "species": reader.header.get("species"),
+        "genes": [name[len("phen_"):] for name in births.schema.names if name.startswith("phen_")],
+        "line": line,
+    }
+
+
+def alleles_of(genotype):
+    """
+    The two alleles per gene, or nothing at all.
+
+    Only a mendel genome has them: it stores [[value, "A"], [value, "a"]]
+    per gene, where the letter is dominance. The other species keep one
+    number per gene and there is nothing here to show.
+    """
+    if not isinstance(genotype, dict):
+        return {}
+
+    found = {}
+
+    for gene, value in genotype.items():
+        if (
+            isinstance(value, list) and len(value) == 2
+            and all(isinstance(half, list) and len(half) == 2 for half in value)
+        ):
+            found[gene] = [[float(half[0]), str(half[1])] for half in value]
+
+    return found
+
+
+def mutations(genotype, parent_genotype):
+    """
+    Which genes of this body are not what it was handed.
+
+    A child gets one whole allele from each parent, so every allele it holds
+    should be an allele one of them held. When it is not - a value that is
+    nobody's, or a dominance letter that is - that allele mutated on the way
+    down. Without a parent (a founder) nothing was handed down and nothing
+    can have changed.
+    """
+    mine = alleles_of(genotype)
+    theirs = alleles_of(parent_genotype)
+
+    if not mine or not theirs:
+        return {}
+
+    changed = {}
+
+    for gene, pair in mine.items():
+        had = theirs.get(gene)
+
+        if not had:
+            continue
+
+        # The first parent's side is the one this line follows.
+        inherited = pair[0]
+        changed[gene] = all(
+            inherited[0] != half[0] or inherited[1] != half[1] for half in had
+        )
+
+    return changed
+
+
 def family(reader):
     """
     The whole population as a tree: a node per agent, an edge per parent.

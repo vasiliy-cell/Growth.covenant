@@ -177,6 +177,28 @@ def world_family(world: str):
     return reports.family(reader_for(world))
 
 
+@app.get("/api/worlds/{world:path}/genes")
+def world_genes(world: str, names: str = ""):
+    """
+    The population's genes, window by window.
+
+    `names` is a comma-separated list; empty asks for every gene this world
+    has, which is what the panel does once to learn what to offer.
+    """
+    wanted = [name for name in names.split(",") if name] or None
+
+    return reports.genes(reader_for(world), wanted)
+
+
+@app.get("/api/worlds/{world:path}/lineage/{agent_id}")
+def world_lineage(world: str, agent_id: str):
+    """One agent's direct line, founder first."""
+    try:
+        return reports.lineage(reader_for(world), agent_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"No agent {agent_id} in this world")
+
+
 @app.get("/api/worlds/{world:path}/leaderboard")
 def world_leaderboard(world: str, by: str = "children", limit: int = 20):
     return reports.leaderboard(reader_for(world), by, limit)
