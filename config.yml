@@ -19,8 +19,8 @@ agents:
 world:
   size: 64
   balance:                # share of the map each kind is generated at AND refilled to
-    danger: 0.10          # red
-    food: 0.10            # green
+    danger: 0.15          # red
+    food: 0.15            # green
   refill:
     every: 5              # check the map every N steps
 
