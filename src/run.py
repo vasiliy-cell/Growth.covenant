@@ -150,7 +150,7 @@ def choose_species(default="clons"):
     """
     print("How do agents reproduce?")
     print("  1) clons       - asexual: energy-gated cloning")
-    print("  2) non_linear  - sexual: BLX-a blend of two nearby parents")
+    print("  2) non_linear  - sexual: BLX-a blend of two parents")
     print("  3) mendel  - sexual: has dominance of genes the most biologicaly inspired of all")
     choice = ask(f"Enter choice (1/2/3) [{default}]: ").strip()
     if choice == "1":
