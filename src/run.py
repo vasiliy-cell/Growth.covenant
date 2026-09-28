@@ -434,10 +434,6 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     # epsilon and curiosity. Nothing about learning is shared, which is the
     # entire point: without a private mind an agent has no identity to
     # grow.
-    #
-    # Because each agent stores exactly one transition per tick, every
-    # setting under replay_buffer in config.yml keeps the meaning it had
-    # when a single agent lived in the world.
     archive = CheckpointWriter(
         models_dir=checkpoints_cfg.get("models_dir", "models"),
         run_id=run_id,
@@ -764,9 +760,6 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     f"filled={summary['non_empty_ratio']:.3f}"
                 )
 
-                # Every mind decays its OWN epsilon and clears its OWN
-                # curiosity: the schedule belongs to the individual, so an
-                # agent born late still starts out exploring.
                 brains.next_episode()
 
             # --- checkpoint ---

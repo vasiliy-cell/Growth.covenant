@@ -97,7 +97,7 @@ genome:
       mean: 0.5
       scale: 0.5
       type: float
-    sigma:                        # width of mutation, and the chance of a huge one
+    sigma:                        # probability that each gene of a child mutates
       mean: 0.005
       scale: 0.001
       type: float
@@ -107,7 +107,7 @@ genome:
       mean: 0.001
       scale: 0.0005
       type: float
-    max_norm:                     # gradient clipping; decides the effective lr
+    max_norm:                     # gradient clipping (max total norm)
       mean: 0.01
       scale: 0.005
       type: float

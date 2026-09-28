@@ -159,11 +159,10 @@ both parents is passed on unchanged (the draw is still taken).
 ### `mendel` - sexual, two alleles with dominance
 
 - genotype: two alleles per gene, each `[value, "A" | "a"]`,
-- **inheritance**: the child starts as a copy of the mother; then for each
-  gene and for each allele slot `i` (0 and 1) separately, slot `i` is
-  taken from the mother's slot `i` or the father's slot `i` with
-  probability 0.5 each. (So a child can receive both alleles of a gene
-  from the same parent.)
+- **inheritance** (segregation): for each gene independently, allele
+  slot 0 is one of the mother's two alleles and slot 1 one of the
+  father's two, each picked at random (`rng.choice([0, 1])`). A child
+  always gets exactly one allele of every gene from each parent.
 - then the mendel mutation above,
 - **phenotype** (read once, with the agent's own
   `numpy:agent/<index>/phenotype` stream):

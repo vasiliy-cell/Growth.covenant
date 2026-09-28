@@ -31,8 +31,6 @@ A few commitments that shape every design decision here:
   metrics exist *only* as instruments of observation — never as a selection
   mechanism.
 - **Emergence over authorship.** Behaviour should be learned, not scripted.
-  There is no `if energy > threshold: reproduce` rule; mate choice and
-  reproduction have to come out of the agent's own policy.
 - **Biology as inspiration, not as a specification.** Only the mechanisms that
   buy something are reproduced: mutation, recombination, dominance/recessivity,
   genetic diversity, speciation. Faithful biochemistry is deliberately out of

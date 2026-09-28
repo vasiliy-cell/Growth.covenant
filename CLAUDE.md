@@ -105,7 +105,7 @@ last agent starves.
 ### "Episode" = logging window only
 An episode no longer affects the world. It only:
 
-- flushes an `episode_summary` line to the log,
+- closes a row of `episodes/agents` and `episodes/population` in the log,
 - decays `policy.epsilon` (`Policy.next_episode`) and the curiosity
   strength `beta` (`RewardShaping.next_episode`). The curiosity visit
   counts are NOT cleared: they last the agent's whole life.

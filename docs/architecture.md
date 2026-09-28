@@ -64,11 +64,10 @@ scripts/                        checkpoints.py, logs.py, auto_train.py
 tests/                          pytest suite
 ```
 
-Files that exist but are not used by a run today:
-`src/Brain/q_estimater/encoder.py` (an old encoder that fed x, y and raw
-cell ids; the runner uses `encode_observation` in `src/run.py`),
-`src/utils/td_estimator.py`, `src/Agent/Actions/movement/movements.py`
-(`apply_movement`), `src/persistence/archive_writer.py` (empty).
+The observation encoder is `encode_observation` in `src/run.py`.
+
+A file that exists but is not used by a run today:
+`src/Agent/Actions/movement/movements.py` (`apply_movement`).
 
 ### Boundaries
 

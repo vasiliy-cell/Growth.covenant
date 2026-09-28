@@ -78,9 +78,12 @@ class MendelGeneticsSpecies:
         dad_genotype = copy.deepcopy(dad_genotype) 
         mom_genotype = copy.deepcopy(mom_genotype)   
 
+        # Segregation: exactly one allele from each parent, each picked at
+        # random from that parent's two - slot 0 from the mother, slot 1
+        # from the father.
         for gene_name in mom_genotype:
-            for i in range(2):
-                child_genotype[gene_name][i] = (mom_genotype if rng.random() < 0.5 else dad_genotype)[gene_name][i]
+            child_genotype[gene_name][0] = mom_genotype[gene_name][rng.choice([0, 1])]
+            child_genotype[gene_name][1] = dad_genotype[gene_name][rng.choice([0, 1])]
         genotype = child_genotype
         child_genotype = self.mutate(child_genotype, rng)
         return child_genotype

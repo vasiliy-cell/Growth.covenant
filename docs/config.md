@@ -335,14 +335,13 @@ learning outright:
 
 - `alpha` - how far outside the parents' range a `non_linear` child may be
   drawn (BLX-a).
-- `sigma` - the width of mutation, and the chance of a huge one. See above.
+- `sigma` - the probability that each gene of a child mutates. See above.
 
 **Optimizer**
 
 - `learning_rate` - Adam's step size.
-- `max_norm` - gradient clipping. It is the tightest clip in the project,
-  so it decides the effective learning rate far more than `learning_rate`
-  does; it belongs in the genome next to it.
+- `max_norm` - gradient clipping: before each Adam step the whole gradient
+  is scaled down to at most this norm.
 
 **DQN targets** - how far ahead this mind looks and how stale the target it
 chases is.
