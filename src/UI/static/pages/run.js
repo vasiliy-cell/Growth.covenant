@@ -68,6 +68,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     onlyParents: true,
     refresh: 1000,
     genes: new Set(),
+    stack: false,
   };
 
   const charts = {};
@@ -138,6 +139,8 @@ export async function runView(node, worldId, { live = false } = {}) {
     drawGenes(geneCharts, geneNode, state.geneData, view);
   };
 
+  // Two ways to read genes, and the switch above says which: one at a time
+  // in one big box, or a box each so two can be watched side by side.
   const pickGenes = (all) => {
     if (!view.genes.size && all.length) view.genes.add(all[0]);
 
@@ -145,13 +148,7 @@ export async function runView(node, worldId, { live = false } = {}) {
       class: `chip ${view.genes.has(gene) ? "on" : ""}`,
       style: "margin:0",
       onclick: () => {
-        if (view.genes.has(gene)) {
-          if (view.genes.size === 1) return;
-          view.genes.delete(gene);
-        } else {
-          view.genes.add(gene);
-        }
-
+        pickGene(view.genes, gene, view.stack);
         pickGenes(all);
         reloadGenes().catch(() => {});
       },
@@ -249,7 +246,21 @@ export async function runView(node, worldId, { live = false } = {}) {
   parts.push(h("div", { class: "panel" }, [
     h("header", {}, [
       "Genes",
-      h("span", { class: "note" }, "averaged over the agents alive in each window · pick as many as you like"),
+      h("span", { class: "note" }, "averaged over the agents alive in each window"),
+      h("span", { class: "spacer" }),
+      chips([["one", "switch"], ["many", "add a chart"]], view.stack ? "many" : "one", (how) => {
+        view.stack = how === "many";
+
+        // Going back to one chart keeps the gene that was picked last.
+        if (!view.stack && view.genes.size > 1) {
+          const last = [...view.genes].pop();
+          view.genes.clear();
+          view.genes.add(last);
+        }
+
+        pickGenes(state.geneNames || []);
+        reloadGenes().catch(() => {});
+      }),
     ]),
     genePicker,
     h("div", { class: "body", style: "padding-top:8px" }, geneNode),
@@ -544,7 +555,7 @@ function drawGenes(charts, node, data, view) {
 
     node.dataset.genes = signature;
     node.replaceChildren(...wanted.map((gene) => {
-      const box = h("div", { class: "chart" });
+      const box = h("div", { class: wanted.length === 1 ? "chart tall" : "chart" });
       box.dataset.gene = gene;
 
       return h("div", { class: "panel" }, [
@@ -1080,10 +1091,28 @@ function drawLife(node, agent) {
 // founder down to it. A gene read along that chain is the history of that
 // one gene on its way to this body, with nobody else's branch in it.
 
+// A gene was clicked: either it becomes the only one shown, or it joins
+// what is already there. The last one on cannot be switched off - an empty
+// panel answers nothing.
+function pickGene(picked, gene, stack) {
+  if (!stack) {
+    picked.clear();
+    picked.add(gene);
+    return;
+  }
+
+  if (!picked.has(gene)) {
+    picked.add(gene);
+    return;
+  }
+
+  if (picked.size > 1) picked.delete(gene);
+}
+
 function lineagePanel(line, view) {
   const links = (line && line.line) || [];
   const node = h("div", { class: "gene-grid" });
-  const picker = h("div", { class: "gene-picker" });
+  const picker = h("div", { class: "gene-picker", style: "align-items:center" });
   const charts = new Map();
 
   if (links.length < 2) {
@@ -1099,21 +1128,31 @@ function lineagePanel(line, view) {
 
   if (!picked.size && line.genes.length) picked.add(line.genes[0]);
 
+  const stack = { on: Boolean(view?.stack) };
+
   const draw = () => {
-    picker.replaceChildren(...line.genes.map((gene) => h("button", {
-      class: `chip ${picked.has(gene) ? "on" : ""}`,
-      style: "margin:0",
-      onclick: () => {
-        if (picked.has(gene)) {
-          if (picked.size === 1) return;
-          picked.delete(gene);
-        } else {
-          picked.add(gene);
+    picker.replaceChildren(
+      ...line.genes.map((gene) => h("button", {
+        class: `chip ${picked.has(gene) ? "on" : ""}`,
+        style: "margin:0",
+        onclick: () => {
+          pickGene(picked, gene, stack.on);
+          draw();
+        },
+      }, gene)),
+      h("span", { class: "spacer" }),
+      chips([["one", "switch"], ["many", "add a chart"]], stack.on ? "many" : "one", (how) => {
+        stack.on = how === "many";
+
+        if (!stack.on && picked.size > 1) {
+          const last = [...picked].pop();
+          picked.clear();
+          picked.add(last);
         }
 
         draw();
-      },
-    }, gene)));
+      }),
+    );
 
     drawLineage(charts, node, line, picked);
   };
@@ -1127,7 +1166,7 @@ function lineagePanel(line, view) {
       "Its line",
       h("span", { class: "note" },
         `${links.length} generations, founder first` +
-        (mendel ? " · both alleles, and where one mutated" : "")),
+        (mendel ? " · both alleles: filled = A dominant, hollow = a recessive" : "")),
     ]),
     picker,
     h("div", { class: "body", style: "padding-top:8px" }, node),
@@ -1145,7 +1184,7 @@ function drawLineage(charts, node, line, picked) {
 
     node.dataset.genes = signature;
     node.replaceChildren(...wanted.map((gene) => {
-      const box = h("div", { class: "chart" });
+      const box = h("div", { class: wanted.length === 1 ? "chart tall" : "chart" });
       box.dataset.gene = gene;
 
       return h("div", { class: "panel" }, [
@@ -1194,12 +1233,24 @@ function drawLineage(charts, node, line, picked) {
 
     if (mendel) {
       // The one it was handed down this line, and the one from the other
-      // parent. Which of them is EXPRESSED is the dominance letter's job.
+      // parent. A FILLED point is a dominant allele (A), a hollow one is
+      // recessive (a): that letter, not the value, decides which of the two
+      // the body was actually read into.
+      const side = (slot) => alleles.map((pair) => {
+        if (!pair) return null;
+
+        const [value, letter] = pair[slot];
+
+        return {
+          value,
+          symbol: letter === "A" ? "circle" : "emptyCircle",
+          symbolSize: letter === "A" ? 7 : 6,
+        };
+      });
+
       series.push(
-        line_("inherited allele", alleles.map((pair) => (pair ? pair[0][0] : null)), COLORS.cyan,
-          { symbol: "circle", symbolSize: 3, lineStyle: { width: 1, type: "dashed" } }),
-        line_("other allele", alleles.map((pair) => (pair ? pair[1][0] : null)), COLORS.steel,
-          { symbol: "circle", symbolSize: 3, lineStyle: { width: 1, type: "dashed" } }),
+        line_("inherited allele", side(0), COLORS.cyan, { lineStyle: { width: 1, type: "dashed" } }),
+        line_("other allele", side(1), COLORS.steel, { lineStyle: { width: 1, type: "dashed" } }),
       );
     }
 
@@ -1236,20 +1287,50 @@ function drawLineage(charts, node, line, picked) {
 function genotypeBody(genotype) {
   if (!genotype || typeof genotype !== "object") return h("div", { class: "dim" }, "—");
 
-  const pairs = Object.entries(genotype).filter(([, value]) => Array.isArray(value));
+  const pairs = Object.entries(genotype).filter(
+    ([, value]) => Array.isArray(value) && value.every((half) => Array.isArray(half)),
+  );
 
-  // A mendel genotype is two alleles per gene; the other species keep one
-  // number per gene, and both are worth seeing next to the phenotype.
-  return h("div", { class: "kv gene-list" }, (pairs.length ? pairs : Object.entries(genotype))
+  // A mendel genotype is two alleles per gene, and WHICH of them the body
+  // was read into is the whole point of the letter: A is dominant and wins,
+  // a is recessive and only shows when both alleles are a. So the letter is
+  // not a character next to the number - it is what the number is drawn in.
+  if (pairs.length) {
+    return h("div", {}, [
+      h("div", { class: "kv gene-list" }, pairs
+        .sort(([a], [b]) => a.localeCompare(b))
+        .flatMap(([name, value]) => [
+          h("span", {}, name),
+          h("span", { class: "row", style: "gap:10px;justify-content:flex-end;flex-wrap:nowrap" },
+            value.map((allele) => alleleChip(allele, value))),
+        ])),
+      h("div", { class: "dim", style: "margin-top:8px;font-size:10px;line-height:1.5" }, [
+        h("span", { class: "accent" }, "A dominant"),
+        " · a recessive · two of the same letter and it is a coin toss which one is read",
+      ]),
+    ]);
+  }
+
+  return h("div", { class: "kv gene-list" }, Object.entries(genotype)
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([name, value]) => [
       h("span", {}, name),
-      h("span", {}, Array.isArray(value)
-        ? value.map((allele) => (Array.isArray(allele)
-          ? `${fmt.number(allele[0], Math.abs(allele[0]) >= 100 ? 0 : 3)}${allele[1]}`
-          : fmt.number(allele, 3))).join("  ")
-        : fmt.number(value, 3)),
+      h("span", {}, fmt.number(value, 3)),
     ]));
+}
+
+// One allele: its value, and whether it is the one that got expressed.
+function alleleChip([value, letter], pair) {
+  const dominant = letter === "A";
+  const decides = pair[0][1] !== pair[1][1];
+
+  return h("span", {
+    class: dominant ? "accent" : "dim",
+    style: dominant && decides ? "font-weight:700" : "",
+    title: dominant
+      ? (decides ? "dominant: this is the one that was expressed" : "dominant")
+      : (decides ? "recessive: hidden behind the dominant one" : "recessive"),
+  }, `${fmt.number(value, Math.abs(value) >= 100 ? 0 : 3)} ${letter}`);
 }
 
 function shortId(agentId) {

@@ -933,6 +933,11 @@ def lineage(reader, agent_id):
     For a mendel world each link also carries its two alleles and whether
     the allele it inherited came down changed - a value that is neither of
     the parent's, or a dominance letter that flipped, is a mutation.
+
+    The two halves line up on purpose: a birth records its parents as
+    [mother, father], and mendel's reproduce() puts the MOTHER's allele in
+    slot 0. So walking up through the first parent walks up through the
+    allele in slot 0 - the line and the allele it carries are the same line.
     """
     births = read(reader, "births")
 
