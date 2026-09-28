@@ -19,8 +19,8 @@ agents:
 world:
   size: 64
   balance:                # share of the map each kind is generated at AND refilled to
-    danger: 0.15          # red
-    food: 0.15            # green
+    danger: 0.10          # red
+    food: 0.10            # green
   refill:
     every: 5              # check the map every N steps
 
@@ -57,7 +57,7 @@ energy:
   start_energy: 50        # what the first agents are born with
   max_energy: 300         # stomach ceiling: energy never goes above this
   reproduction_threshold: 100  # energy at which an agent makes a child
-  reproduction_cost: 100   # what the parents pay, and what the child is born with
+  reproduction_cost: 80   # what the parents pay, and what the child is born with
 
 # --- LIFE ---
 life:
