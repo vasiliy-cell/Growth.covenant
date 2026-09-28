@@ -9,8 +9,8 @@
 // of that run, not every so many seconds: one knob, in the run's own time.
 
 import {
-  api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, line, ema,
-  COLORS, CHART_INK, cleanup,
+  api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, ema,
+  line as line_, COLORS, CHART_INK, cleanup,
 } from "../lib.js";
 import { liveStage } from "./live.js";
 
@@ -67,9 +67,11 @@ export async function runView(node, worldId, { live = false } = {}) {
     heat: "recent",
     onlyParents: true,
     refresh: 1000,
+    genes: new Set(),
   };
 
   const charts = {};
+  const geneCharts = new Map();
   const state = {};
 
   const rewardNode = h("div", { class: "chart tall" });
@@ -78,6 +80,8 @@ export async function runView(node, worldId, { live = false } = {}) {
   const heatNode = h("div", { class: "chart tall" });
   const treeNode = h("div", { class: "tree" });
   const boardNode = h("div", {});
+  const genePicker = h("div", { class: "gene-picker" });
+  const geneNode = h("div", { class: "gene-grid" });
   const treeNote = h("span", { class: "note" });
   const statsNode = h("div", { class: "body" });
   const filterNote = h("span", { class: "note" });
@@ -125,6 +129,35 @@ export async function runView(node, worldId, { live = false } = {}) {
     if (changed && state.family) drawTree(treeNode, treeNote, state.family, worldId, view);
   };
 
+  // Which genes are drawn, and their averages over the population. The genes
+  // themselves are whatever this world was run with - they are in its header.
+  const reloadGenes = async () => {
+    if (!view.genes.size) return;
+
+    state.geneData = await api.genes(worldId, [...view.genes]);
+    drawGenes(geneCharts, geneNode, state.geneData, view);
+  };
+
+  const pickGenes = (all) => {
+    if (!view.genes.size && all.length) view.genes.add(all[0]);
+
+    genePicker.replaceChildren(...all.map((gene) => h("button", {
+      class: `chip ${view.genes.has(gene) ? "on" : ""}`,
+      style: "margin:0",
+      onclick: () => {
+        if (view.genes.has(gene)) {
+          if (view.genes.size === 1) return;
+          view.genes.delete(gene);
+        } else {
+          view.genes.add(gene);
+        }
+
+        pickGenes(all);
+        reloadGenes().catch(() => {});
+      },
+    }, gene)));
+  };
+
   const reloadWorld = async () => {
     const [details, family, heat] = await Promise.all([
       api.details(worldId), api.family(worldId), api.heatmap(worldId),
@@ -132,6 +165,12 @@ export async function runView(node, worldId, { live = false } = {}) {
 
     state.details = details;
     state.heat = heat;
+
+    if (!state.geneNames) {
+      state.geneNames = details.genes || [];
+      pickGenes(state.geneNames);
+      await reloadGenes();
+    }
 
     statsNode.replaceChildren(...runStats(details, family, state.board));
     drawHeatmap(charts, heatNode, heat, view.heat);
@@ -160,6 +199,7 @@ export async function runView(node, worldId, { live = false } = {}) {
         reload().catch(() => {});
         reloadWorld().catch(() => {});
         reloadBoard().catch(() => {});
+        reloadGenes().catch(() => {});
       },
     }));
   }
@@ -175,6 +215,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     drawRewards(charts, rewardNode, state.rewards, view);
     drawLearning(charts, learningNode, state.learning, view);
     drawPopulation(charts, populationNode, state.rewards, view);
+    drawGenes(geneCharts, geneNode, state.geneData, view);
   }));
 
   parts.push(h("div", { class: "panel" }, [
@@ -203,6 +244,15 @@ export async function runView(node, worldId, { live = false } = {}) {
       h("header", {}, ["Population", h("span", { class: "note" }, "agents · births · deaths")]),
       h("div", { class: "body" }, populationNode),
     ]),
+  ]));
+
+  parts.push(h("div", { class: "panel" }, [
+    h("header", {}, [
+      "Genes",
+      h("span", { class: "note" }, "averaged over the agents alive in each window · pick as many as you like"),
+    ]),
+    genePicker,
+    h("div", { class: "body", style: "padding-top:8px" }, geneNode),
   ]));
 
   parts.push(h("div", { class: "panel" }, [
@@ -362,7 +412,7 @@ function rewardSeries(rewards, view) {
     ema(view.mode === "agent" ? perAgent(values, rewards.agents) : values, view.ema);
 
   const drawn = {
-    shaped: () => line("shaped", scale(rewards.shaped), COLORS.orange, {
+    shaped: () => line_("shaped", scale(rewards.shaped), COLORS.orange, {
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: "rgba(224,139,62,.22)" },
@@ -370,9 +420,9 @@ function rewardSeries(rewards, view) {
         ]),
       },
     }),
-    env: () => line("env", scale(rewards.env), COLORS.sage),
-    intrinsic: () => line("curiosity", scale(rewards.intrinsic), COLORS.cyan),
-    leak: () => line("leak", scale(rewards.leak || []), COLORS.crimson),
+    env: () => line_("env", scale(rewards.env), COLORS.sage),
+    intrinsic: () => line_("curiosity", scale(rewards.intrinsic), COLORS.cyan),
+    leak: () => line_("leak", scale(rewards.leak || []), COLORS.crimson),
   };
 
   return REWARDS.filter(([key]) => view.shown.has(key)).map(([key]) => drawn[key]());
@@ -441,8 +491,8 @@ function drawLearning(charts, node, learning, view) {
       { ...base.yAxis, name: axisName("|td error|", view), position: "right", nameGap: 44, splitLine: { show: false } },
     ],
     series: [
-      line("loss", ema(learning.loss, view.ema), COLORS.orange),
-      line("|td error|", ema(learning.td_error, view.ema), COLORS.yellow, { yAxisIndex: 1 }),
+      line_("loss", ema(learning.loss, view.ema), COLORS.orange),
+      line_("|td error|", ema(learning.td_error, view.ema), COLORS.yellow, { yAxisIndex: 1 }),
     ],
   });
 }
@@ -464,11 +514,83 @@ function drawPopulation(charts, node, rewards, view) {
     xAxis: { ...base.xAxis, data: rewards.episodes, name: "episode" },
     yAxis: { ...base.yAxis, name: axisName("agents alive", view) + " · births · deaths" },
     series: [
-      line("agents", ema(rewards.agents, view.ema), COLORS.orange, { areaStyle: { color: "rgba(224,139,62,.1)" } }),
+      line_("agents", ema(rewards.agents, view.ema), COLORS.orange, { areaStyle: { color: "rgba(224,139,62,.1)" } }),
       { name: "births", type: "bar", data: rewards.births, itemStyle: { color: COLORS.sage }, barMaxWidth: 6 },
       { name: "deaths", type: "bar", data: rewards.deaths, itemStyle: { color: COLORS.crimson }, barMaxWidth: 6 },
     ],
   });
+}
+
+// ---------------- genes ----------------
+// One gene, one box. They share an x axis and nothing else: alpha lives
+// between 0 and 1 and a buffer size is ten thousand, and a chart that holds
+// both shows one flat line and one that is all noise.
+
+function drawGenes(charts, node, data, view) {
+  if (!data || !data.episodes.length) {
+    node.replaceChildren(h("div", { class: "empty" }, "no births in this world yet"));
+    return;
+  }
+
+  const wanted = [...view.genes].filter((gene) => data.series[gene]);
+  const signature = wanted.join(",");
+
+  // The boxes are only rebuilt when the choice of genes changes; a refresh
+  // while a run is going just puts new numbers into the charts that are
+  // already there.
+  if (node.dataset.genes !== signature) {
+    for (const chart of charts.values()) chart.dispose();
+    charts.clear();
+
+    node.dataset.genes = signature;
+    node.replaceChildren(...wanted.map((gene) => {
+      const box = h("div", { class: "chart" });
+      box.dataset.gene = gene;
+
+      return h("div", { class: "panel" }, [
+        h("header", {}, [gene, h("span", { class: "note" }, "mean of the living")]),
+        h("div", { class: "body" }, box),
+      ]);
+    }));
+  }
+
+  for (const box of node.querySelectorAll(".chart")) {
+    const gene = box.dataset.gene;
+    let chart = charts.get(gene);
+
+    if (!chart) {
+      chart = chartIn(box);
+      charts.set(gene, chart);
+    }
+
+    const base = chartBase();
+
+    chart.setOption({
+      ...base,
+      legend: { show: false },
+      grid: { ...base.grid, left: 72, top: 26 },
+      dataZoom: [{ type: "inside" }],
+      xAxis: { ...base.xAxis, data: data.episodes, name: "episode" },
+      yAxis: { ...base.yAxis, name: axisName(gene, view), scale: true },
+      tooltip: {
+        ...base.tooltip,
+        formatter: (points) => {
+          const at = data.episodes.indexOf(Number(points[0].axisValue));
+
+          return `episode ${points[0].axisValue}<br/>${gene} ${fmt.number(points[0].value, 5)}` +
+            `<br/><span style="color:${CHART_INK.label}">averaged over ${fmt.int(data.agents[at])} agents</span>`;
+        },
+      },
+      series: [line_(gene, ema(data.series[gene], view.ema), COLORS.orange, {
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(224,139,62,.16)" },
+            { offset: 1, color: "rgba(224,139,62,0)" },
+          ]),
+        },
+      })],
+    });
+  }
 }
 
 // ---------------- where the agents are ----------------
@@ -598,7 +720,7 @@ function boardTable(board, worldId, view) {
     ])),
     h("tbody", {}, board.rows.map((row, place) => h("tr", {
       class: "clickable",
-      onclick: () => openAgent(worldId, row),
+      onclick: () => openAgent(worldId, row, view),
     }, [
       h("td", { class: "mono", style: place === 0 ? "color:var(--accent);font-weight:700" : "color:var(--dim)" }, place + 1),
       h("td", {}, h("div", { class: "row", style: "gap:8px;flex-wrap:nowrap" }, [
@@ -724,7 +846,7 @@ function drawTree(node, note, family, worldId, view) {
     .on("mouseleave", () => { card.style.display = "none"; })
     .on("click", (event, item) => {
       card.style.display = "none";
-      openAgent(worldId, item.data.agent);
+      openAgent(worldId, item.data.agent, view);
     });
 
   node.addEventListener("mouseleave", () => { card.style.display = "none"; });
@@ -773,7 +895,7 @@ function showCard(card, event, agent) {
 
 // ---------------- one agent, as a page-sized popup ----------------
 
-async function openAgent(worldId, node) {
+async function openAgent(worldId, node, view) {
   const box = popup({
     title: `Agent #${node.index}`,
     note: node.alive ? "alive" : "died",
@@ -781,13 +903,18 @@ async function openAgent(worldId, node) {
   });
 
   try {
-    box.fill(agentBody(await api.agent(worldId, node.id)));
+    const [agent, line] = await Promise.all([
+      api.agent(worldId, node.id),
+      api.lineage(worldId, node.id),
+    ]);
+
+    box.fill(agentBody(agent, line, view));
   } catch (error) {
     box.fill(h("div", { class: "empty" }, error.message));
   }
 }
 
-function agentBody(agent) {
+function agentBody(agent, line, view) {
   const heat = h("div", { class: "chart tall" });
   const earned = h("div", { class: "chart" });
   const ended = agent.bred_at !== null && agent.bred_at !== undefined
@@ -812,6 +939,8 @@ function agentBody(agent) {
       stat("of that, curiosity", fmt.number(agent.reward.intrinsic, 1)),
       stat("parents", agent.parents.length ? agent.parents.map(shortId).join(" + ") : "founder"),
     ]),
+
+    lineagePanel(line, view),
 
     // The same numbers as above, but as a life: the totals say what it ended
     // up with, this says when it happened - and where its children arrived.
@@ -924,7 +1053,7 @@ function drawLife(node, agent) {
       },
     },
     series: [
-      line("shaped", series.shaped, COLORS.orange, {
+      line_("shaped", series.shaped, COLORS.orange, {
         ...dots,
         markLine: {
           symbol: "none",
@@ -940,10 +1069,168 @@ function drawLife(node, agent) {
           data: marks.map((end) => ({ xAxis: end })),
         },
       }),
-      line("env", series.env, COLORS.sage, dots),
-      line("curiosity", series.intrinsic, COLORS.cyan, dots),
+      line_("env", series.env, COLORS.sage, dots),
+      line_("curiosity", series.intrinsic, COLORS.cyan, dots),
     ],
   });
+}
+
+// ---------------- one line's genes ----------------
+// Not the agent's family - its LINE: the chain of first parents from the
+// founder down to it. A gene read along that chain is the history of that
+// one gene on its way to this body, with nobody else's branch in it.
+
+function lineagePanel(line, view) {
+  const links = (line && line.line) || [];
+  const node = h("div", { class: "gene-grid" });
+  const picker = h("div", { class: "gene-picker" });
+  const charts = new Map();
+
+  if (links.length < 2) {
+    return h("div", { class: "panel", style: "margin-top:6px" }, [
+      h("header", {}, ["Its line", h("span", { class: "note" }, "from the founder down to it")]),
+      h("div", { class: "empty" }, "this one is a founder: there is no line above it"),
+    ]);
+  }
+
+  // Whatever the page is showing for the whole population, so the two are
+  // read against each other.
+  const picked = new Set([...(view?.genes || [])].filter((gene) => line.genes.includes(gene)));
+
+  if (!picked.size && line.genes.length) picked.add(line.genes[0]);
+
+  const draw = () => {
+    picker.replaceChildren(...line.genes.map((gene) => h("button", {
+      class: `chip ${picked.has(gene) ? "on" : ""}`,
+      style: "margin:0",
+      onclick: () => {
+        if (picked.has(gene)) {
+          if (picked.size === 1) return;
+          picked.delete(gene);
+        } else {
+          picked.add(gene);
+        }
+
+        draw();
+      },
+    }, gene)));
+
+    drawLineage(charts, node, line, picked);
+  };
+
+  draw();
+
+  const mendel = links.some((link) => Object.keys(link.alleles || {}).length);
+
+  return h("div", { class: "panel", style: "margin-top:6px" }, [
+    h("header", {}, [
+      "Its line",
+      h("span", { class: "note" },
+        `${links.length} generations, founder first` +
+        (mendel ? " · both alleles, and where one mutated" : "")),
+    ]),
+    picker,
+    h("div", { class: "body", style: "padding-top:8px" }, node),
+  ]);
+}
+
+function drawLineage(charts, node, line, picked) {
+  const links = line.line;
+  const wanted = [...picked];
+  const signature = wanted.join(",");
+
+  if (node.dataset.genes !== signature) {
+    for (const chart of charts.values()) chart.dispose();
+    charts.clear();
+
+    node.dataset.genes = signature;
+    node.replaceChildren(...wanted.map((gene) => {
+      const box = h("div", { class: "chart" });
+      box.dataset.gene = gene;
+
+      return h("div", { class: "panel" }, [
+        h("header", {}, [gene, h("span", { class: "note" }, "down this line")]),
+        h("div", { class: "body" }, box),
+      ]);
+    }));
+  }
+
+  const generations = links.map((link) => link.generation);
+  const base = chartBase();
+
+  for (const box of node.querySelectorAll(".chart")) {
+    const gene = box.dataset.gene;
+    let chart = charts.get(gene);
+
+    if (!chart) {
+      chart = chartIn(box);
+      charts.set(gene, chart);
+    }
+
+    const expressed = links.map((link) => link.phenotype[gene] ?? null);
+    const alleles = links.map((link) => (link.alleles || {})[gene] || null);
+    const mendel = alleles.some(Boolean);
+    const mutated = links.filter((link) => (link.mutated || {})[gene]);
+
+    const series = [
+      line_(gene, expressed, COLORS.orange, {
+        symbol: "circle",
+        symbolSize: 5,
+        markLine: {
+          symbol: "none",
+          silent: true,
+          label: {
+            formatter: "mutation",
+            color: COLORS.yellow,
+            fontSize: 10,
+            fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
+            position: "insideEndTop",
+          },
+          lineStyle: { color: COLORS.yellow, type: "dashed", width: 1 },
+          data: mutated.map((link) => ({ xAxis: link.generation })),
+        },
+      }),
+    ];
+
+    if (mendel) {
+      // The one it was handed down this line, and the one from the other
+      // parent. Which of them is EXPRESSED is the dominance letter's job.
+      series.push(
+        line_("inherited allele", alleles.map((pair) => (pair ? pair[0][0] : null)), COLORS.cyan,
+          { symbol: "circle", symbolSize: 3, lineStyle: { width: 1, type: "dashed" } }),
+        line_("other allele", alleles.map((pair) => (pair ? pair[1][0] : null)), COLORS.steel,
+          { symbol: "circle", symbolSize: 3, lineStyle: { width: 1, type: "dashed" } }),
+      );
+    }
+
+    chart.setOption({
+      ...base,
+      legend: { ...base.legend, show: mendel },
+      grid: { ...base.grid, left: 72, top: mendel ? 34 : 26 },
+      xAxis: { ...base.xAxis, data: generations, name: "generation (0 = the founder)" },
+      yAxis: { ...base.yAxis, name: gene, scale: true },
+      tooltip: {
+        ...base.tooltip,
+        formatter: (points) => {
+          const at = generations.indexOf(Number(points[0].axisValue));
+          const link = links[at];
+          const pair = (link.alleles || {})[gene];
+
+          return [
+            `generation ${link.generation} · agent #${link.index} · born step ${fmt.int(link.birth_step)}`,
+            `${gene} expressed ${fmt.number(link.phenotype[gene], 5)}`,
+            pair
+              ? `alleles ${fmt.number(pair[0][0], 5)}${pair[0][1]} / ${fmt.number(pair[1][0], 5)}${pair[1][1]}`
+              : null,
+            (link.mutated || {})[gene]
+              ? `<span style="color:${COLORS.yellow}">the allele it inherited had mutated</span>`
+              : null,
+          ].filter(Boolean).join("<br/>");
+        },
+      },
+      series,
+    }, { replaceMerge: ["series"] });
+  }
 }
 
 function genotypeBody(genotype) {

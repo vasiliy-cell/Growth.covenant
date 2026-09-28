@@ -498,6 +498,12 @@ td.name .ellipsis { display: block; }
 
 /* ---------------- charts ---------------- */
 .chart { width: 100%; height: 300px; }
+
+/* One gene per box: a learning rate and a buffer size cannot share an axis,
+   so picking a second gene adds a chart instead of a line. */
+.gene-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: var(--gap); }
+.gene-grid .chart { height: 240px; }
+.gene-picker { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px 6px; }
 .chart.tall { height: 420px; }
 
 .range {

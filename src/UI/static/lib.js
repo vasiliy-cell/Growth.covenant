@@ -40,6 +40,8 @@ export const api = {
   family: (id) => request(world(id, "family")),
   agent: (id, agentId) => request(world(id, `agent/${encodeURIComponent(agentId)}`)),
   leaderboard: (id, by, limit) => request(world(id, `leaderboard${query({ by, limit })}`)),
+  genes: (id, names) => request(world(id, `genes${query({ names: (names || []).join(",") })}`)),
+  lineage: (id, agentId) => request(world(id, `lineage/${encodeURIComponent(agentId)}`)),
   heatmap: (id) => request(world(id, "heatmap")),
   stream: (id) => new EventSource(world(id, "stream")),
 
