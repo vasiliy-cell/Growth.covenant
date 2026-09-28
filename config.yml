@@ -64,7 +64,7 @@ life:
   max_childhood_steps: 2500  # longest childhood; breeding ends it sooner
   death_energy: -20         # an adult at or below this energy dies
   aging:
-    every: 200            # every N ticks of a life...
+    every: 200            # every N ticks of ADULT life (from the end of childhood)...
     amount: 0.05          # ...the personal leak grows by this much, forever
 
 # --- GENOME ---
@@ -160,7 +160,7 @@ genome:
       scale: 0.005
       type: float
 
-    # --- CURIOSITY --- (intrinsic reward for novelty, cleared every window)
+    # --- CURIOSITY --- (intrinsic reward for novelty; visit counts last a whole life)
     curiosity_beta:               # strength, against a food cell worth +5
       mean: 1.0
       scale: 0.5

@@ -172,8 +172,9 @@ What the world charges for being alive and what it takes to make a child.
 Note that the reward the world pays goes straight into energy: one food
 cell is +5 reward AND +5 energy.
 
-- **`energy_leak`** - the BASE cost of being alive, paid by every ADULT on
-  every tick. Children pay nothing at all, and aging adds to it (see
+- **`energy_leak`** - the BASE cost of being alive, paid by every body on
+  every tick. A child pays exactly this and no more, and only down to zero
+  (it cannot go into debt); an adult pays it plus aging (see
   `life.aging`), so this is what a fresh adult pays and no adult ever pays
   less.
 - **`start_energy`** - what a body is born with. A newborn gets
@@ -286,8 +287,10 @@ anything:
 - **`mean`** - center of the draw.
 - **`scale`** - stddev of the first generation's draw. Ignored for a
   frozen gene; `scale: 0` alone does NOT freeze it - mutation still moves it.
-- **`type`** - `float` or `int`, how the drawn number is rounded.
-- **`step`** - round to a multiple of this.
+- **`type`** - `float` or `int`. An `int` gene is rounded to the nearest
+  integer when the phenotype is read; the genotype keeps the float.
+- **`step`** - (optional) round to a multiple of this. No gene sets it
+  today, and the current code does not read it.
 
 ### Mutation
 
@@ -372,9 +375,11 @@ age of the run, so an agent born late still starts out exploring.
   two-cell shuttle at a wall has nothing left to break out with.
 
 **Curiosity** - the intrinsic half of the reward: how loudly novelty pays
-and how fast that voice fades. The visit counts are cleared at every
-logging window, and the key is the map around the agent WITHOUT the other
-bodies.
+and how fast that voice fades. The intrinsic reward is
+`beta / sqrt(N)`, where N is how many times this agent has seen this
+state. The visit counts last the agent's whole life and are never
+cleared; only `beta` fades, once per logging window. The key is the
+agent's position plus the map around it WITHOUT the other bodies.
 
 - `curiosity_beta` - the strength. 4.0 against a food cell worth +5 means a
   newborn is driven mostly by curiosity.

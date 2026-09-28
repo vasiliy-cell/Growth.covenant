@@ -79,19 +79,23 @@ The population turns over even though the world does not. The rules live in
 `life` / `energy` sections of `config.yml`); an agent carries only its own
 `age` and asks `Life` what that age costs it:
 
-- **childhood** — the first `life.max_childhood_steps` ticks after birth. The
-  agent ages and leaks energy, but nothing can kill it,
+- **childhood** — at most the first `life.max_childhood_steps` ticks after
+  birth; breeding ends it on the spot (`Agent.adult_at`). A child pays the
+  base leak only, and only down to zero - it cannot go into debt and
+  nothing can kill it,
 - **adulthood** — mortal. At or below `life.death_energy` the agent starves
   and `GridWorldEnv._reap()` removes it from the run,
-- **aging** — the personal leak is `energy.energy_leak` plus
-  `life.aging.amount` for every full `life.aging.every` ticks lived, so
-  there is no hard age limit: the bill simply keeps rising,
+- **aging** — an adult's leak is `energy.energy_leak` plus
+  `life.aging.amount` for every full `life.aging.every` ticks of ADULT
+  life, counted from the end of childhood (not from birth), so there is no
+  hard age limit: the bill simply keeps rising,
 - a body is born with `energy.start_energy` (a newborn gets
   `energy.reproduction_cost` from its parents instead).
 
 Order inside a tick: eat → leak → **death** → age → birth. Death before
 birth, so a starving agent does not reproduce on its last tick; aging after
-death, so childhood really is `max_childhood_steps` whole ticks.
+death, so childhood really is `max_childhood_steps` whole ticks (unless
+the agent breeds first).
 
 `info` from `env.step()` carries `died` (ids that left this tick) and
 `alive`. An agent in `died` has no next observation, so `src/run.py` logs
@@ -102,8 +106,9 @@ last agent starves.
 An episode no longer affects the world. It only:
 
 - flushes an `episode_summary` line to the log,
-- decays `policy.epsilon` (`Policy.next_episode`) and curiosity
-  (`RewardShaping.reset`).
+- decays `policy.epsilon` (`Policy.next_episode`) and the curiosity
+  strength `beta` (`RewardShaping.next_episode`). The curiosity visit
+  counts are NOT cleared: they last the agent's whole life.
 
 `run.episode_length` comes from `config.yml`; the number of episodes is asked
 in the terminal before the run starts.
