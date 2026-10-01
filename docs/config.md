@@ -184,8 +184,8 @@ cell is +5 reward AND +5 energy.
   (it cannot go into debt); an adult pays it plus aging (see
   `life.aging`), so this is what a fresh adult pays and no adult ever pays
   less.
-- **`start_energy`** - what a body is born with. A newborn gets
-  `reproduction_cost` from its parents instead.
+- **`start_energy`** - what every body is born with: the founders and
+  every newborn alike.
 - **`max_energy`** - the stomach ceiling. Whatever an agent eats above it
   is not kept. Remove the key (or set it to nothing) for no ceiling.
 
@@ -201,11 +201,13 @@ cell is +5 reward AND +5 energy.
   crowds this world already collects in its corners - a crowd is where
   partners are always within reach - and left a good forager working an
   empty stretch of map without one.
-- **`reproduction_cost`** - what the parents pay for it, and what the child
-  is born with. One parent pays it all; two parents pay half each.
+- **`reproduction_cost`** - what the parents pay for it. One parent pays it
+  all; two parents pay half each. The child does not get it - it is born
+  with `start_energy` - so every birth burns this much energy.
 
-  Keep it BELOW `reproduction_threshold`. At or above it, every newborn is
-  born already able to breed, and the population explodes.
+  Keep `start_energy` BELOW `reproduction_threshold`. At or above it,
+  every newborn is born already able to breed, and the population
+  explodes.
 
 Reproduction is gated by energy and by nothing else - **not** by age. A
 child that has fed itself up to the threshold has earned it: getting there

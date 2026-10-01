@@ -89,8 +89,8 @@ The population turns over even though the world does not. The rules live in
   `life.aging.amount` for every full `life.aging.every` ticks of ADULT
   life, counted from the end of childhood (not from birth), so there is no
   hard age limit: the bill simply keeps rising,
-- a body is born with `energy.start_energy` (a newborn gets
-  `energy.reproduction_cost` from its parents instead).
+- every body is born with `energy.start_energy`, founder or newborn; the
+  parents' `energy.reproduction_cost` is spent, not handed to the child.
 
 Order inside a tick: eat → leak → **death** → age → birth. Death before
 birth, so a starving agent does not reproduce on its last tick; aging after

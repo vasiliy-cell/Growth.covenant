@@ -15,8 +15,8 @@ numbers), `src/environment/env.py` (`step`, `_reap`, `_reproduce`,
 - Energy is capped at `energy.max_energy` (300) when food is added - what
   would go above the ceiling is lost. The cap is applied **before** the
   leak, so right after a tick an agent holds at most `300 - leak`.
-- Founders (the first population) are born with `energy.start_energy`
-  (50). A newborn gets `energy.reproduction_cost` (100) instead.
+- Every body is born with `energy.start_energy`: the founders (the first
+  population) and every newborn alike.
 
 The reward a mind learns from is not the same as energy: the food bonus
 and curiosity are added to it (see [brain.md](brain.md)), but energy only
@@ -139,7 +139,7 @@ child this tick:
 - the child's genome is the parent's, mutated (see
   [genome.md](genome.md)),
 - the parent pays `reproduction_cost` (100) in full,
-- the child is born with 100.
+- the child is born with `start_energy`.
 
 One child per parent per tick. A parent with a full stomach (≈300) can
 breed on up to three ticks in a row.
@@ -154,7 +154,7 @@ across the map is as good a partner as a neighbour. An odd one out waits
 for the next tick.
 
 Each pair makes one child; each parent pays `reproduction_cost / 2` (50);
-the child is born with 100.
+the child is born with `start_energy`.
 
 Distance was removed on purpose: pairing by proximity rewarded crowds in
 corners, where partners are always within reach.
@@ -168,19 +168,15 @@ corners, where partners are always within reach.
 - gives it the next index, age 0, `birth_step` = current step, and the
   parents' ids,
 - stores its genotype in the gene pool,
-- sets its energy to `reproduction_cost`,
+- leaves its energy at `start_energy` - what the parents paid is spent,
+  not handed over,
 - for every parent: `offspring += 1` and `grow_up()` - **breeding ends
   childhood on the spot**, however young the parent is.
 
 The newborn gets its mind and acts from the next tick on.
 
-Note on the current numbers: `reproduction_threshold` and
-`reproduction_cost` are both 100, so a newborn starts exactly at the
-threshold. If it eats food on its first tick (100 + 5 - 0.5 = 104.5) it
-reproduces on that tick (for a sexual species, if the pairing gives it a
-partner) and becomes an adult at age 1, with 4.5 energy left (clons) or
-54.5 (sexual). [config.md](config.md#energy) advises keeping the cost below
-the threshold.
+Keep `start_energy` below `reproduction_threshold`: at or above it every
+newborn is born already able to breed, and the population explodes.
 
 ## Identity and lineage
 
@@ -201,10 +197,10 @@ the threshold.
 | key | now | effect |
 |---|---|---|
 | `energy.energy_leak` | 0.5 | base leak per tick |
-| `energy.start_energy` | 50 | founders' starting energy |
+| `energy.start_energy` | 50 | what every body is born with |
 | `energy.max_energy` | 300 | stomach ceiling (null = none) |
 | `energy.reproduction_threshold` | 100 | energy needed to reproduce |
-| `energy.reproduction_cost` | 100 | what parents pay, what the child gets |
+| `energy.reproduction_cost` | 100 | what parents pay for a child |
 | `life.max_childhood_steps` | 2500 | longest childhood |
 | `life.death_energy` | -20 | an adult at or below this dies |
 | `life.aging.every` | 200 | adult ticks per aging step |

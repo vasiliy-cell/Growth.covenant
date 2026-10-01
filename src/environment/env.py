@@ -212,7 +212,7 @@ class GridWorldEnv:
             for parent in parents:
                 genotype = self.genomes.get_genotype(parent.agent_id)
                 child = self.species.reproduce(genotype, None, self.genome_rng)
-                born.append(self._birth(child, cost, [parent]))
+                born.append(self._birth(child, [parent]))
                 parent.energy -= cost
         else:
             # sexual: choose_partners pairs up everybody who can afford it
@@ -221,7 +221,7 @@ class GridWorldEnv:
                 g_mother = self.genomes.get_genotype(mother.agent_id)
                 g_father = self.genomes.get_genotype(father.agent_id)
                 child = self.species.reproduce(g_father, g_mother, self.genome_rng)
-                born.append(self._birth(child, cost, [mother, father]))
+                born.append(self._birth(child, [mother, father]))
                 mother.energy -= cost/2
                 father.energy -= cost/2
 
@@ -260,13 +260,17 @@ class GridWorldEnv:
 
         return records
 
-    def _birth(self, child_genotype, start_energy, parents):
+    def _birth(self, child_genotype, parents):
         """
         Give a new child genome a body and register it in every registry.
 
         The parents are named on the child and counted on them: a lineage
         is the one thing about a population that cannot be reconstructed
         afterwards from anything else in the logs.
+
+        A newborn starts with `life.start_energy` like a founder does, not
+        with what its parents paid: the reproduction cost is spent, not
+        handed over.
         """
         baby = self.agents.spawn(
             1,
@@ -275,7 +279,6 @@ class GridWorldEnv:
         )[0]
 
         self.genomes.put(baby.agent_id, child_genotype)
-        baby.energy = start_energy
 
         for parent in parents:
             parent.offspring += 1

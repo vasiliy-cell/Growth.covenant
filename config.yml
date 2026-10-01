@@ -55,10 +55,10 @@ reward_shaping:
 # The world's reward IS energy: a food cell is +5 reward and +5 energy.
 energy:
   energy_leak: 0.4        # base cost of a tick, before aging
-  start_energy: 0        # what the first agents are born with
+  start_energy: 0        # what every body is born with, founders and newborns alike
   max_energy: 300         # stomach ceiling: energy never goes above this
   reproduction_threshold: 100  # energy at which an agent makes a child
-  reproduction_cost: 80   # what the parents pay, and what the child is born with
+  reproduction_cost: 80   # what the parents pay for a child; the child does not get it
 
 # --- LIFE ---
 life:

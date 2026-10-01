@@ -238,6 +238,18 @@ def test_a_birth_names_its_parents_and_counts_them(tmp_path):
     assert env.agents.get(parent_id).offspring >= 1
 
 
+def test_a_newborn_gets_start_energy_and_not_what_its_parents_paid():
+    env = make_env(make_life(max_childhood_steps=10 ** 9, start_energy=7.0))
+
+    for agent in env.agents:
+        agent.energy = 10000.0
+
+    _, _, info = stand_still(env)
+
+    assert info["births"], "well fed agents must reproduce"
+    assert all(birth["energy"] == 7.0 for birth in info["births"])
+
+
 def test_a_starving_adult_leaves_the_run():
     # a leak nothing on the map can pay for, so the outcome does not depend
     # on what the bodies happen to be standing on
