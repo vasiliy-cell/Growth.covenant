@@ -25,11 +25,9 @@ engineering milestone.
 
 A few commitments that shape every design decision here:
 
-- **Artificial life, not genetic algorithms.** No external fitness function
+- **Artificial life, not genetic algorithms.** 
   ranks agents and picks survivors. Selection is endogenous: agents eat, run
-  out of energy, die, choose mates, and reproduce inside the world. Fitness
-  metrics exist *only* as instruments of observation — never as a selection
-  mechanism.
+  out of energy, die, choose mates, and reproduce inside the world.
 - **Emergence over authorship.** Behaviour should be learned, not scripted.
 - **Biology as inspiration, not as a specification.** Only the mechanisms that
   buy something are reproduced: mutation, recombination, dominance/recessivity,
