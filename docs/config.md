@@ -77,6 +77,13 @@ places instead of what they saw, and walked into walls.
   walk around kept the total up while the food was eaten: the refill never
   fired and the map drifted towards one food per two dangers, until
   touching anything was a losing bet.
+- **`refill.max_food`** - the most food cells one check may add; `null`
+  tops food up in full, as before. A full top-up feeds any population at
+  all - the food per agent never drops as the population grows, so a run
+  either dies out or explodes. A fixed inflow is the world's carrying
+  capacity: an agent needs about 0.1 food cell per tick (a leak of ~0.5
+  against +5 a cell), so 40 cells per 5 steps feeds roughly 80 agents.
+  Danger is still topped up in full.
 
 ## `logging`
 

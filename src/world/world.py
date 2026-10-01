@@ -26,6 +26,12 @@ class World:
         refill = refill or {}
         self.refill_every = refill.get("every", 5)
 
+        # The most food cells one check may add (None = no limit). A full
+        # top-up feeds any population at all, so the food per agent never
+        # drops as the population grows; a fixed inflow is what gives the
+        # world a carrying capacity. Danger is still topped up in full.
+        self.max_food = refill.get("max_food")
+
     # --- generate world using provided RNG (ONCE per run) ---
     def generate(self, rng):
         # World is responsible for creating its map
@@ -69,8 +75,10 @@ class World:
     def maybe_refill(self, step, exclude=None):
         """
         Every refill_every steps: every kind of object (food, danger) that
-        dropped below its own share of the map is topped back up to it.
-        The map is NOT generated from scratch.
+        dropped below its own share of the map is topped back up to it -
+        food by at most max_food cells per check, so a large population
+        eats faster than the world grows it back. The map is NOT generated
+        from scratch.
 
         Each kind is counted on its own. Counted together, the danger that
         agents learn to walk around kept the total up while the food was
@@ -93,6 +101,9 @@ class World:
         for obj in self.map.non_empty_ids:
             target = int(self.shares[obj] * self.size * self.size)
             missing = target - self.map.count(obj)
+
+            if OBJECTS[obj]["name"] == "food" and self.max_food is not None:
+                missing = min(missing, int(self.max_food))
 
             if missing > 0:
                 added += self.map.refill(obj, missing, exclude=exclude)

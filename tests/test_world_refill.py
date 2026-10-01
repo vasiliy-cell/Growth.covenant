@@ -43,3 +43,17 @@ def test_nothing_is_refilled_between_checks_or_under_a_body():
     world.maybe_refill(step=5, exclude={body})
 
     assert world.get_cell(body) == 0
+
+
+def test_food_comes_back_at_most_max_food_per_check():
+    world = World(size=20, balance={"danger": 0.15, "food": 0.15}, refill={"every": 5, "max_food": 7})
+    world.generate(rng=random.Random(0))
+    target = int(0.15 * 20 * 20)
+
+    world.map.grid[world.map.grid == FOOD] = 0
+    world.map.grid[world.map.grid == DANGER] = 0
+
+    world.maybe_refill(step=5)
+
+    assert world.map.count(FOOD) == 7
+    assert world.map.count(DANGER) == target

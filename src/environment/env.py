@@ -147,6 +147,7 @@ class GridWorldEnv:
             "world": self.world.state(),
             "refill": {
                 "every": self.world.refill_every,
+                "max_food": self.world.max_food,
             },
             "current_step": self.current_step,
             "species": self.species_name,
