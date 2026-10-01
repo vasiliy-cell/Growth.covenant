@@ -10,7 +10,7 @@
 
 import {
   api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, ema,
-  line as line_, COLORS, CHART_INK, cleanup,
+  svgButton, line as line_, COLORS, CHART_INK, cleanup,
 } from "../lib.js";
 import { liveStage } from "./live.js";
 
@@ -75,6 +75,23 @@ export async function runView(node, worldId, { live = false } = {}) {
   const geneCharts = new Map();
   const state = {};
 
+  // What goes into the name of every figure saved from this run. The species
+  // is whatever the log says it is, so a species added tomorrow names its
+  // own figures without anything here being told about it.
+  const figure = () => {
+    const details = state.details || {};
+    const sessions = details.sessions || [];
+    const seeds = [...new Set(sessions.map((session) => session.seed).filter((seed) => seed || seed === 0))];
+
+    return {
+      species: details.species,
+      runs: sessions.length || undefined,
+      seed: seeds.length === 1 ? seeds[0] : undefined,
+      seeds: seeds.length > 1 ? seeds.length : undefined,
+      world: details.world_id,
+    };
+  };
+
   const rewardNode = h("div", { class: "chart tall" });
   const learningNode = h("div", { class: "chart" });
   const populationNode = h("div", { class: "chart" });
@@ -136,7 +153,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     if (!view.genes.size) return;
 
     state.geneData = await api.genes(worldId, [...view.genes]);
-    drawGenes(geneCharts, geneNode, state.geneData, view);
+    drawGenes(geneCharts, geneNode, state.geneData, view, figure);
   };
 
   // Two ways to read genes, and the switch above says which: one at a time
@@ -162,6 +179,7 @@ export async function runView(node, worldId, { live = false } = {}) {
 
     state.details = details;
     state.heat = heat;
+    view.details = details;
 
     if (!state.geneNames) {
       state.geneNames = details.genes || [];
@@ -212,7 +230,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     drawRewards(charts, rewardNode, state.rewards, view);
     drawLearning(charts, learningNode, state.learning, view);
     drawPopulation(charts, populationNode, state.rewards, view);
-    drawGenes(geneCharts, geneNode, state.geneData, view);
+    drawGenes(geneCharts, geneNode, state.geneData, view, figure);
   }));
 
   parts.push(h("div", { class: "panel" }, [
@@ -220,6 +238,7 @@ export async function runView(node, worldId, { live = false } = {}) {
       "Reward per episode",
       h("span", { class: "note" }, "env · curiosity · what the networks learned from"),
       h("span", { class: "spacer" }),
+      svgButton("reward per episode", () => charts.reward, figure),
       toggles(REWARDS, view.shown, () => {
         if (view.shown.has("leak") !== askedLeak) reload().catch(() => {});
         else drawRewards(charts, rewardNode, state.rewards, view);
@@ -234,11 +253,21 @@ export async function runView(node, worldId, { live = false } = {}) {
 
   parts.push(h("div", { class: "grid-2" }, [
     h("div", { class: "panel" }, [
-      h("header", {}, ["Learning", h("span", { class: "note" }, "mean per episode")]),
+      h("header", {}, [
+        "Learning",
+        h("span", { class: "note" }, "mean per episode"),
+        h("span", { class: "spacer" }),
+        svgButton("learning", () => charts.learning, figure),
+      ]),
       h("div", { class: "body" }, learningNode),
     ]),
     h("div", { class: "panel" }, [
-      h("header", {}, ["Population", h("span", { class: "note" }, "agents · births · deaths")]),
+      h("header", {}, [
+        "Population",
+        h("span", { class: "note" }, "agents · births · deaths"),
+        h("span", { class: "spacer" }),
+        svgButton("population", () => charts.population, figure),
+      ]),
       h("div", { class: "body" }, populationNode),
     ]),
   ]));
@@ -275,6 +304,7 @@ export async function runView(node, worldId, { live = false } = {}) {
         view.heat = mode;
         drawHeatmap(charts, heatNode, state.heat, mode);
       }),
+      svgButton("where the agents are", () => charts.heat, figure),
     ]),
     h("div", { class: "body" }, heatNode),
   ]));
@@ -537,7 +567,7 @@ function drawPopulation(charts, node, rewards, view) {
 // between 0 and 1 and a buffer size is ten thousand, and a chart that holds
 // both shows one flat line and one that is all noise.
 
-function drawGenes(charts, node, data, view) {
+function drawGenes(charts, node, data, view, figure) {
   if (!data || !data.episodes.length) {
     node.replaceChildren(h("div", { class: "empty" }, "no births in this world yet"));
     return;
@@ -559,7 +589,12 @@ function drawGenes(charts, node, data, view) {
       box.dataset.gene = gene;
 
       return h("div", { class: "panel" }, [
-        h("header", {}, [gene, h("span", { class: "note" }, "mean of the living")]),
+        h("header", {}, [
+          gene,
+          h("span", { class: "note" }, "mean of the living"),
+          h("span", { class: "spacer" }),
+          svgButton(`gene ${gene}`, () => charts.get(gene), figure),
+        ]),
         h("div", { class: "body" }, box),
       ]);
     }));
@@ -906,6 +941,20 @@ function showCard(card, event, agent) {
 
 // ---------------- one agent, as a page-sized popup ----------------
 
+function agentFigure(view, agent, line) {
+  const details = view?.details || {};
+  const sessions = details.sessions || [];
+  const seeds = [...new Set(sessions.map((session) => session.seed).filter((seed) => seed || seed === 0))];
+
+  return {
+    agent: `${agent.index}`,
+    species: line?.species || details.species,
+    runs: sessions.length || undefined,
+    seed: seeds.length === 1 ? seeds[0] : undefined,
+    world: details.world_id,
+  };
+}
+
 async function openAgent(worldId, node, view) {
   const box = popup({
     title: `Agent #${node.index}`,
@@ -928,6 +977,8 @@ async function openAgent(worldId, node, view) {
 function agentBody(agent, line, view) {
   const heat = h("div", { class: "chart tall" });
   const earned = h("div", { class: "chart" });
+  const charts = {};
+  const figure = agentFigure(view, agent, line);
   const ended = agent.bred_at !== null && agent.bred_at !== undefined
     ? `${fmt.int(agent.childhood_ended_at)} (its first child)`
     : `${fmt.int(agent.childhood_ended_at)} (the clock)`;
@@ -951,7 +1002,7 @@ function agentBody(agent, line, view) {
       stat("parents", agent.parents.length ? agent.parents.map(shortId).join(" + ") : "founder"),
     ]),
 
-    lineagePanel(line, view),
+    lineagePanel(line, view, figure),
 
     // The same numbers as above, but as a life: the totals say what it ended
     // up with, this says when it happened - and where its children arrived.
@@ -959,6 +1010,8 @@ function agentBody(agent, line, view) {
       h("header", {}, [
         "What it earned",
         h("span", { class: "note" }, lifeNote(agent)),
+        h("span", { class: "spacer" }),
+        svgButton(`agent ${agent.index} reward`, () => charts.life, () => figure),
       ]),
       h("div", { class: "body" }, earned),
     ]),
@@ -987,6 +1040,8 @@ function agentBody(agent, line, view) {
       h("header", {}, [
         "Where this one walked",
         h("span", { class: "note" }, `${fmt.int(agent.heat.samples)} of its own steps`),
+        h("span", { class: "spacer" }),
+        svgButton(`agent ${agent.index} heat map`, () => charts.heat, () => figure),
       ]),
       h("div", { class: "body" }, heat),
     ]),
@@ -995,14 +1050,15 @@ function agentBody(agent, line, view) {
   // The charts are drawn once the popup is on screen and the boxes have a
   // width of their own.
   setTimeout(() => {
-    drawLife(earned, agent);
+    charts.life = drawLife(earned, agent);
 
     if (!agent.heat.size) {
       heat.replaceChildren(h("div", { class: "empty" }, "no steps of this agent are in the log"));
       return;
     }
 
-    chartIn(heat).setOption(heatOption(agent.heat.grid, agent.heat.size, { title: "ticks" }));
+    charts.heat = chartIn(heat);
+    charts.heat.setOption(heatOption(agent.heat.grid, agent.heat.size, { title: "ticks" }));
   }, 0);
 
   return body;
@@ -1035,7 +1091,7 @@ function drawLife(node, agent) {
 
   if (!windows.length) {
     node.replaceChildren(h("div", { class: "empty" }, "no logging window ever closed on this agent"));
-    return;
+    return null;
   }
 
   const dots = windows.length < 60 ? { symbol: "circle", symbolSize: 4 } : {};
@@ -1048,7 +1104,9 @@ function drawLife(node, agent) {
     .map((birth) => windows.find((end) => end >= birth.step))
     .filter((end) => end !== undefined);
 
-  chartIn(node).setOption({
+  const chart = chartIn(node);
+
+  chart.setOption({
     ...base,
     xAxis: { ...base.xAxis, data: windows, name: "step of the world" },
     yAxis: { ...base.yAxis, name: "reward in the ticks up to that step" },
@@ -1084,6 +1142,8 @@ function drawLife(node, agent) {
       line_("curiosity", series.intrinsic, COLORS.cyan, dots),
     ],
   });
+
+  return chart;
 }
 
 // ---------------- one line's genes ----------------
@@ -1109,7 +1169,7 @@ function pickGene(picked, gene, stack) {
   if (picked.size > 1) picked.delete(gene);
 }
 
-function lineagePanel(line, view) {
+function lineagePanel(line, view, figure) {
   const links = (line && line.line) || [];
   const node = h("div", { class: "gene-grid" });
   const picker = h("div", { class: "gene-picker", style: "align-items:center" });
@@ -1154,7 +1214,7 @@ function lineagePanel(line, view) {
       }),
     );
 
-    drawLineage(charts, node, line, picked);
+    drawLineage(charts, node, line, picked, figure);
   };
 
   draw();
@@ -1173,7 +1233,7 @@ function lineagePanel(line, view) {
   ]);
 }
 
-function drawLineage(charts, node, line, picked) {
+function drawLineage(charts, node, line, picked, figure) {
   const links = line.line;
   const wanted = [...picked];
   const signature = wanted.join(",");
@@ -1188,7 +1248,12 @@ function drawLineage(charts, node, line, picked) {
       box.dataset.gene = gene;
 
       return h("div", { class: "panel" }, [
-        h("header", {}, [gene, h("span", { class: "note" }, "down this line")]),
+        h("header", {}, [
+          gene,
+          h("span", { class: "note" }, "down this line"),
+          h("span", { class: "spacer" }),
+          svgButton(`line of ${figure?.agent ?? "agent"} gene ${gene}`, () => charts.get(gene), () => figure || {}),
+        ]),
         h("div", { class: "body" }, box),
       ]);
     }));

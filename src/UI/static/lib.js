@@ -116,6 +116,7 @@ const PATHS = {
   rename: '<path d="M10.6 2.8 13.2 5.4 5.8 12.8 2.8 13.2 3.2 10.2Z"/>',
   keep: '<path d="M4.4 2.4h7.2v11.2L8 11 4.4 13.6Z"/>',
   more: '<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>',
+  download: '<path d="M8 2.6v7.8M4.9 7.4 8 10.5l3.1-3.1M3 12.6h10"/>',
 };
 
 export function icon(name) {
@@ -289,6 +290,137 @@ export function chartIn(node) {
   return chart;
 }
 
+// ---------------- a chart as a figure ----------------
+//
+// The charts on screen are drawn on canvas, which is right for a page that
+// redraws itself while a run is going and wrong for a paper. So a download
+// renders the SAME option again, off screen, through the SVG renderer: what
+// comes out is vector, and a figure in a paper can be scaled to any size and
+// still have real text in it.
+//
+// The page is dark and paper is white, so the exported copy changes its
+// BACKGROUND and nothing else about the data: the series keep the colours
+// they are read in here. What has to follow the background is the frame
+// around them - axes, labels, grid, legend - or it would be pale grey on
+// white and unreadable.
+
+const PAPER = {
+  background: "#ffffff",
+  ink: "#1c1c1c",
+  line: "#4a4a4a",
+  grid: "#e2e2e2",
+};
+
+function reink(option) {
+  const axes = [...(option.xAxis || []), ...(option.yAxis || [])];
+
+  for (const axis of axes) {
+    axis.axisLine = { ...(axis.axisLine || {}), lineStyle: { ...((axis.axisLine || {}).lineStyle || {}), color: PAPER.line } };
+    axis.axisLabel = { ...(axis.axisLabel || {}), color: PAPER.ink };
+    axis.nameTextStyle = { ...(axis.nameTextStyle || {}), color: PAPER.ink };
+    axis.splitLine = { ...(axis.splitLine || {}), lineStyle: { ...((axis.splitLine || {}).lineStyle || {}), color: PAPER.grid } };
+  }
+
+  for (const legend of option.legend || []) {
+    legend.textStyle = { ...(legend.textStyle || {}), color: PAPER.ink };
+  }
+
+  for (const map of option.visualMap || []) {
+    map.textStyle = { ...(map.textStyle || {}), color: PAPER.ink };
+  }
+
+  // A zoom slider is a control, not data: the range it is holding stays,
+  // the handle it is drawn with does not.
+  for (const zoom of option.dataZoom || []) {
+    zoom.show = false;
+  }
+
+  option.backgroundColor = PAPER.background;
+  option.textStyle = { ...(option.textStyle || {}), color: PAPER.ink };
+  option.animation = false;
+  option.tooltip = [];
+
+  return option;
+}
+
+export function chartSVG(chart, { light = true } = {}) {
+  // getOption() hands back the option as the chart actually resolved it,
+  // data and all; the copy drops the formatter functions with it, which a
+  // picture has no use for anyway.
+  const option = JSON.parse(JSON.stringify(chart.getOption()));
+  const width = Math.max(320, Math.round(chart.getWidth()));
+  const height = Math.max(240, Math.round(chart.getHeight()));
+
+  const box = h("div", { style: `position:fixed;left:-10000px;top:0;width:${width}px;height:${height}px` });
+  document.body.append(box);
+
+  const ghost = echarts.init(box, null, { renderer: "svg", width, height });
+
+  try {
+    ghost.setOption(light ? reink(option) : option, true);
+    return ghost.renderToSVGString();
+  } finally {
+    ghost.dispose();
+    box.remove();
+  }
+}
+
+// ---------------- what a figure is called ----------------
+//
+// Everything in the name comes from the run itself - the species is
+// whatever string the log says it is - so a species that does not exist yet
+// names its own figures the day it is added, and nothing here has to know
+// about it.
+
+export function slug(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "unnamed";
+}
+
+export function figureName(title, meta = {}) {
+  const parts = [slug(title)];
+
+  for (const [key, value] of Object.entries(meta)) {
+    if (value === null || value === undefined || value === "") continue;
+
+    parts.push(`${slug(key)}-${slug(value)}`);
+  }
+
+  return `${parts.join("_")}.svg`;
+}
+
+export function saveSVG(chart, title, meta, { light = true } = {}) {
+  const blob = new Blob([chartSVG(chart, { light })], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = h("a", { href: url, download: figureName(title, meta) });
+
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// The button that sits in a chart panel's header. Nothing about it appears
+// on the page: it renders the chart again off screen and hands over the
+// file. `chart` and `meta` are read when it is pressed, not when it is
+// built, so a panel that has refreshed its chart saves the one on screen.
+export function svgButton(title, chartOf, metaOf) {
+  return button({
+    icon: "download",
+    small: true,
+    title: "Download this chart as SVG",
+    onclick: () => {
+      const chart = chartOf();
+
+      if (chart) saveSVG(chart, title, metaOf ? metaOf() : {});
+    },
+  });
+}
+
 // ---------------- page lifetime ----------------
 // Whatever a page starts - timers, streams, charts - is registered here
 // and stopped when the page is left, so nothing keeps polling behind the
@@ -349,8 +481,8 @@ export function every(ms, fn) {
 // A "more" button that opens a short list of actions under itself - for
 // the things a row can do that do not all fit on the row.
 // items: [{ label, icon, danger, onclick }], null entries are skipped.
-export function menu(items) {
-  const trigger = button({ icon: "more", small: true, title: "More" });
+export function menu(items, iconName = "more", title = "More") {
+  const trigger = button({ icon: iconName, small: true, title });
 
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();

@@ -2,7 +2,7 @@
 // on, look at the charts. Each step has its own address, so the browser's
 // back button walks back through them.
 
-import { api, h, fmt, button, go, route, chartBase, chartIn, ema, SERIES_COLORS } from "../lib.js";
+import { api, h, fmt, button, go, route, chartBase, chartIn, ema, svgButton, SERIES_COLORS } from "../lib.js";
 
 // What has been picked so far, kept across the three steps and across a
 // reload of the page.
@@ -184,13 +184,36 @@ async function charts(worlds, metrics) {
       h("span", { class: "dim mono" }, ` · seed ${byId.get(id)?.seeds[0] ?? "—"}`),
     ]))));
 
+  // What a figure saved from this page is called: how many runs are on it,
+  // which species they are - whatever strings the logs hold - and the seed
+  // when there is only one of it.
+  const picked = state.runs.map((id) => byId.get(id)).filter(Boolean);
+  const species = [...new Set(picked.map((world) => world.species).filter(Boolean))];
+  const seeds = [...new Set(picked.map((world) => world.seeds?.[0]).filter((seed) => seed || seed === 0))];
+
+  const figure = {
+    species: species.join("+") || undefined,
+    runs: picked.length || undefined,
+    seed: seeds.length === 1 ? seeds[0] : undefined,
+    seeds: seeds.length > 1 ? seeds.length : undefined,
+  };
+
   const blocks = results.map((result) => {
     const node = h("div", { class: "chart" });
+    const drawn = {};
 
-    requestAnimationFrame(() => drawChart(chartIn(node), result, state.smoothing, color));
+    requestAnimationFrame(() => {
+      drawn.chart = chartIn(node);
+      drawChart(drawn.chart, result, state.smoothing, color);
+    });
 
     return h("div", { class: "panel" }, [
-      h("header", {}, [result.name, h("span", { class: "note" }, result.description)]),
+      h("header", {}, [
+        result.name,
+        h("span", { class: "note" }, result.description),
+        h("span", { class: "spacer" }),
+        svgButton(`compare ${result.name}`, () => drawn.chart, () => figure),
+      ]),
       h("div", { class: "body" }, node),
       table(result, color),
     ]);
