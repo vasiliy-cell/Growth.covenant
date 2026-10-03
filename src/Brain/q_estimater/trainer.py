@@ -29,7 +29,12 @@ class DQNTrainer:
         for param in self.target_net.parameters():
             param.requires_grad = False
         self.loss_fn = nn.MSELoss()
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
+        # foreach: one kernel per kind of op over all parameters instead of
+        # a Python loop over them. Same math; on CPU a reference run came
+        # out bit-identical to the per-tensor Adam, but that is not promised.
+        self.optimizer = optim.Adam(
+            self.policy_net.parameters(), lr=learning_rate, foreach=True
+        )
 
     # -------------------------
     # WEIGHTS
