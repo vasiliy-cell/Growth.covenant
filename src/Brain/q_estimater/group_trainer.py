@@ -1,6 +1,65 @@
 import torch
 
 
+# -----------------------------
+# THE ARITHMETIC, COMPILED
+# -----------------------------
+# The two functions below are where a group spends its time, and both are
+# compiled by torch.compile. Run op by op, Adam walks every member's
+# weights, gradients and both moments some ten times per update - each walk
+# a separate pass over megabytes of memory - and the update waits on
+# memory, not on arithmetic. Compiled, the chain of elementwise ops becomes
+# one loop that reads every number once and writes it once; in the forward
+# pass the bias and the ReLU are folded around the matrix product.
+#
+# The formulas are exactly the ones written here. What can move is the last
+# bits of a float (the order of roundings), so a run is reproducible against
+# itself, not bit for bit against a run of the uncompiled code.
+#
+# dynamic=True: a group changes size whenever somebody is born, dies or
+# finishes warming up, and that must not trigger a fresh compilation.
+# The first call of a process compiles (seconds), every later one does not.
+
+def _forward_core(params, x, layers):
+    """
+    params is [weight, bias, weight, bias, ...] stacked over members, the
+    order MLP lays its layers down in: Linear -> ReLU after every layer
+    except the last.
+    """
+    for layer in range(layers):
+        weight, bias = params[2 * layer], params[2 * layer + 1]
+        x = torch.baddbmm(bias.unsqueeze(1), x, weight.transpose(1, 2))
+
+        if layer < layers - 1:
+            x = torch.relu(x)
+
+    return x
+
+
+def _adam_core(params, grads, exp_avgs, exp_avg_sqs,
+               one_minus_beta1, beta2, one_minus_beta2, eps,
+               step_size, bias_correction2_sqrt):
+    """
+    The elementwise half of torch's Adam (no weight decay, no amsgrad), in
+    place, for every member at once. The per-member constants come already
+    broadcast to each parameter's shape, one list entry per parameter.
+    """
+    for k, (param, grad, exp_avg, exp_avg_sq) in enumerate(
+        zip(params, grads, exp_avgs, exp_avg_sqs)
+    ):
+        shape = (-1,) + (1,) * (grad.dim() - 1)
+
+        exp_avg.lerp_(grad, one_minus_beta1[k])
+        exp_avg_sq.mul_(beta2[k]).addcmul_(grad, grad * one_minus_beta2[k])
+
+        denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt.view(shape)).add_(eps[k])
+        param.addcdiv_(exp_avg * step_size.view(shape), denom, value=-1)
+
+
+_forward_stack = torch.compile(_forward_core, dynamic=True)
+_adam_step = torch.compile(_adam_core, dynamic=True)
+
+
 class GroupTrainer:
     """
     One DQN update for SEVERAL minds at once, when their networks have the
@@ -131,19 +190,9 @@ class GroupTrainer:
     def _forward(self, params, x):
         """
         The MLP of every member at once: (G, B, in) -> (G, B, actions).
-
-        params is [weight, bias, weight, bias, ...] stacked over members,
-        the order MLP lays its layers down in: Linear -> ReLU after every
-        layer except the last.
+        See _forward_stack.
         """
-        for layer in range(self.layers):
-            weight, bias = params[2 * layer], params[2 * layer + 1]
-            x = torch.baddbmm(bias.unsqueeze(1), x, weight.transpose(1, 2))
-
-            if layer < self.layers - 1:
-                x = torch.relu(x)
-
-        return x
+        return _forward_stack(list(params), x, self.layers)
 
     # -----------------------------
     # ACTING
@@ -255,20 +304,11 @@ class GroupTrainer:
             (1 - b2 ** step) ** 0.5 for b2, step in zip(self.beta2, steps)
         ])
 
-        for k, (param, grad, exp_avg, exp_avg_sq) in enumerate(zip(
-            self.policy, grads, self.exp_avg, self.exp_avg_sq
-        )):
-            shape = self._shapes[k]
-
-            exp_avg.lerp_(grad, self._one_minus_beta1[k])
-            exp_avg_sq.mul_(self._beta2[k]).addcmul_(
-                grad, grad * self._one_minus_beta2[k]
-            )
-
-            denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt.view(shape)).add_(
-                self._eps[k]
-            )
-            param.addcdiv_(exp_avg * step_size.view(shape), denom, value=-1)
+        _adam_step(
+            self.policy, list(grads), self.exp_avg, self.exp_avg_sq,
+            self._one_minus_beta1, self._beta2, self._one_minus_beta2, self._eps,
+            step_size, bias_correction2_sqrt,
+        )
 
     def _sync_targets(self):
         """Each member copies its policy net into its target on ITS schedule."""

@@ -146,6 +146,11 @@ group's stacks, so `choose_action` and the checkpoint read exactly what
 the group learned. The group is rebuilt when its membership changes (an
 agent finishes warming up, dies, or is born into it).
 
+The group's forward pass and its Adam step are compiled by
+`torch.compile`: the chain of elementwise ops becomes one loop over the
+weights instead of a dozen passes over memory. The first update of a
+process compiles (seconds); a C++ compiler must be present.
+
 A grouped update matches the solo one to float32 precision (~1e-7 after
 one update), not bit for bit; over many updates that noise grows like
 any other, so a run with groups does not follow the same trajectory as
