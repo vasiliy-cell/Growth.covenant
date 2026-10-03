@@ -146,6 +146,18 @@ class GroupTrainer:
         return x
 
     # -----------------------------
+    # ACTING
+    # -----------------------------
+    def q_values(self, states):
+        """
+        Q for one state per member, (G, obs) -> (G, actions): the acting
+        twin of update(), each row through that member's own policy net,
+        no gradient.
+        """
+        with torch.no_grad():
+            return self._forward(self.policy, states.unsqueeze(1)).squeeze(1)
+
+    # -----------------------------
     # DQN UPDATE
     # -----------------------------
     def update(self, batches):

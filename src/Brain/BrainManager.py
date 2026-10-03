@@ -128,6 +128,57 @@ class BrainManager:
             )
 
     # -----------------------------
+    # ACTING
+    # -----------------------------
+    def choose_actions(self, states, available_actions):
+        """
+        One action per agent in `states`, chosen by that agent's own
+        policy on that agent's own stream.
+
+        Minds standing in a group take their forward pass together,
+        through the group's stacks (one batched kernel instead of a small
+        forward per mind); everybody else - a newborn, a mind still
+        warming up - runs alone through Brain.choose_action. The
+        exploration draws are untouched either way, so WHO explores never
+        depends on who acts in whose company; only the float path of the
+        Q values moves, the same way it does inside a grouped update.
+
+        The groups are the ones learn() built last tick. A member that
+        died since is not in `states` - its row runs on a zero state and
+        the result is thrown away.
+        """
+        actions = {}
+        waiting = dict(states)
+        zero = None
+
+        for ids, group in self.groups.values():
+            if not any(agent_id in waiting for agent_id in ids):
+                continue
+
+            if zero is None:
+                zero = torch.zeros(self.obs_size)
+
+            batch = torch.stack([
+                waiting[agent_id] if agent_id in waiting else zero
+                for agent_id in ids
+            ])
+            q_values = group.q_values(batch)
+
+            for row, agent_id in enumerate(ids):
+                if agent_id in waiting:
+                    actions[agent_id] = self.brains[agent_id].policy.select_action(
+                        q_values[row], available_actions[agent_id]
+                    )
+                    del waiting[agent_id]
+
+        for agent_id, state in waiting.items():
+            actions[agent_id] = self.brains[agent_id].choose_action(
+                state, available_actions[agent_id]
+            )
+
+        return actions
+
+    # -----------------------------
     # LEARNING
     # -----------------------------
     def learn(self, agent_ids):

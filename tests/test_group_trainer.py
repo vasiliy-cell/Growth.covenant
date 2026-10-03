@@ -109,3 +109,18 @@ def test_state_of_a_grouped_mind_holds_only_its_own_numbers():
 
     for slot in state["optimizer"]["state"].values():
         assert slot["exp_avg"].untyped_storage().nbytes() == slot["exp_avg"].numel() * 4
+
+
+def test_group_q_values_match_every_net_alone():
+    trainers = make_trainers()
+    group = GroupTrainer(trainers)
+
+    torch.manual_seed(7)
+    states = torch.rand(len(trainers), OBS)
+    q_values = group.q_values(states)
+
+    for row, trainer in enumerate(trainers):
+        with torch.no_grad():
+            alone = trainer.policy_net(states[row])
+
+        assert torch.allclose(q_values[row], alone, atol=1e-5)

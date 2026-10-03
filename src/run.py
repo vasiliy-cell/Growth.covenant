@@ -595,13 +595,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
             }
             encoded = {}
 
-            # One forward pass per agent, through that agent's own network.
-            actions = {
-                agent_id: brains.get(agent_id).choose_action(
-                    state, available_actions[agent_id]
-                )
-                for agent_id, state in states.items()
-            }
+            # One forward pass per agent, through that agent's own network;
+            # minds grouped for learning take it side by side through the
+            # group's stacks (BrainManager.choose_actions).
+            actions = brains.choose_actions(states, available_actions)
 
             # One call = one tick of the world in which everybody moves.
             next_observations, env_rewards, info = env.step(actions)
