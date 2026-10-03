@@ -42,6 +42,18 @@ class GroupTrainer:
         self.beta2 = [g["betas"][1] for g in group]
         self.eps = self._column([g["eps"] for g in group])
 
+        # The per-member Adam constants, already broadcast to every
+        # parameter's shape - computed once here because _adam runs on
+        # every update of the group.
+        self._shapes = [(-1, *[1] * (stack.dim() - 1)) for stack in self.policy]
+
+        beta1 = self._column(self.beta1)
+        beta2 = self._column(self.beta2)
+        self._one_minus_beta1 = [(1 - beta1).view(s) for s in self._shapes]
+        self._beta2 = [beta2.view(s) for s in self._shapes]
+        self._one_minus_beta2 = [(1 - beta2).view(s) for s in self._shapes]
+        self._eps = [self.eps.view(s) for s in self._shapes]
+
     # -----------------------------
     # STACKING
     # -----------------------------
@@ -143,8 +155,17 @@ class GroupTrainer:
 
         Returns one metrics dict per member, the same as DQNTrainer.update.
         """
-        states = torch.stack([torch.stack(b[0]) for b in batches])        # (G, B, obs)
-        next_states = torch.stack([torch.stack(b[3]) for b in batches])   # (G, B, obs)
+        # One flat stack and a reshape instead of a stack per member: the
+        # values and their layout are identical, the per-call overhead is
+        # one stack instead of G+1.
+        members, batch_size = len(batches), len(batches[0][0])
+
+        states = torch.stack(
+            [state for batch in batches for state in batch[0]]
+        ).view(members, batch_size, -1)                                   # (G, B, obs)
+        next_states = torch.stack(
+            [state for batch in batches for state in batch[3]]
+        ).view(members, batch_size, -1)                                   # (G, B, obs)
         actions = torch.tensor([b[1] for b in batches], dtype=torch.long)       # (G, B)
         rewards = torch.tensor([b[2] for b in batches], dtype=torch.float32)    # (G, B)
         dones = torch.tensor([b[4] for b in batches], dtype=torch.float32)      # (G, B)
@@ -215,9 +236,6 @@ class GroupTrainer:
         self.steps.add_(1)
         steps = self.steps.tolist()
 
-        beta1 = self._column(self.beta1)
-        beta2 = self._column(self.beta2)
-
         step_size = self._column([
             lr / (1 - b1 ** step) for lr, b1, step in zip(self.lr, self.beta1, steps)
         ])
@@ -225,18 +243,18 @@ class GroupTrainer:
             (1 - b2 ** step) ** 0.5 for b2, step in zip(self.beta2, steps)
         ])
 
-        for param, grad, exp_avg, exp_avg_sq in zip(
+        for k, (param, grad, exp_avg, exp_avg_sq) in enumerate(zip(
             self.policy, grads, self.exp_avg, self.exp_avg_sq
-        ):
-            shape = (-1, *[1] * (grad.dim() - 1))
+        )):
+            shape = self._shapes[k]
 
-            exp_avg.lerp_(grad, (1 - beta1).view(shape))
-            exp_avg_sq.mul_(beta2.view(shape)).addcmul_(
-                grad, grad * (1 - beta2).view(shape)
+            exp_avg.lerp_(grad, self._one_minus_beta1[k])
+            exp_avg_sq.mul_(self._beta2[k]).addcmul_(
+                grad, grad * self._one_minus_beta2[k]
             )
 
             denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt.view(shape)).add_(
-                self.eps.view(shape)
+                self._eps[k]
             )
             param.addcdiv_(exp_avg * step_size.view(shape), denom, value=-1)
 
