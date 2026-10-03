@@ -75,23 +75,23 @@ genome:
   type: clons             # reproduction species: clons | non_linear | mendel
   # Genes that vary and mutate. Any gene left out is frozen: every agent
   # carries exactly its mean, from the first one on, and passes it on as is.
-  evolve:
-    - alpha
-    - sigma
-    - learning_rate
-    - max_norm
-    - gamma
-    - target_update_freq
-    - hidden_size
-    - hidden_layers
-    - buffer_size
-    - batch_size
-    - min_buffer_size
-    - epsilon
-    - epsilon_decay
-    - epsilon_min
-    - curiosity_beta
-    - curiosity_decay
+  evolve: []
+    # - alpha
+    # - sigma
+    # - learning_rate
+    # - max_norm
+    # - gamma
+    # - target_update_freq
+    # - hidden_size
+    # - hidden_layers
+    # - buffer_size
+    # - batch_size
+    # - min_buffer_size
+    # - epsilon
+    # - epsilon_decay
+    # - epsilon_min
+    # - curiosity_beta
+    # - curiosity_decay
   genes:
     # --- REPRODUCTION ---
     alpha:                        # non_linear: how far outside the parents a child may fall
