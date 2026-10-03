@@ -56,7 +56,7 @@ Pass one with `python src/run.py --seed <seed>` or type it at the seed prompt.
 
 Multi-agent with reproduction, no gene ever varies or mutates: every agent
 carries the `mean` of each gene (`genome.evolve: []`, commit `5ff034b`).
-40000 episodes per seed, all 15 seeds, logs in `logs/<world_id>_baseline-s<n>/`
+40000 episodes per seed, all 15 seeds, logs in `logs/baseline/<world_id>_baseline-s<n>/`
 (series `baseline`). Started 2026-10-03, 6 runs at a time, torch on one
 thread per process:
 
