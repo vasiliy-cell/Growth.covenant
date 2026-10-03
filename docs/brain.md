@@ -122,14 +122,35 @@ done=False)` into the agent's replay buffer and increases `Brain.age`.
 
 ## Learning: Double DQN
 
-`Brain.learn()` runs **once per tick per agent**, right after
-`remember`:
+Every agent takes **one update per tick**, after every agent of that tick
+has run `remember` (`BrainManager.learn`):
 
 - if the buffer holds fewer than `min_buffer_size` transitions: nothing
   (no update row in the log),
 - otherwise: sample `batch_size` transitions **without replacement** with
-  the agent's `agent/<index>/replay` stream, and call
-  `DQNTrainer.update`.
+  the agent's `agent/<index>/replay` stream, and update.
+
+### Learning side by side (`GroupTrainer`)
+
+Agents whose networks have the same shape (same `hidden_size`,
+`hidden_layers`, same input) and the same `batch_size` are updated
+**together**: their weights are stacked and the update below runs for all
+of them as one batched computation. Nothing is shared - each keeps its
+own weights, target net, Adam moments and step, `learning_rate`, `gamma`,
+`max_norm` and target schedule, and its own batch. An agent with no
+partner is updated alone by `DQNTrainer.update`.
+
+While a group lives, each member's network is a view into one row of the
+group's stacks, so `choose_action` and the checkpoint read exactly what
+the group learned. The group is rebuilt when its membership changes (an
+agent finishes warming up, dies, or is born into it).
+
+A grouped update matches the solo one to float32 precision (~1e-7 after
+one update), not bit for bit; over many updates that noise grows like
+any other, so a run with groups does not follow the same trajectory as
+one without. With `genome.evolve: []` every agent is in one group; with
+`hidden_size` or `batch_size` evolving, groups split into many small
+ones and the gain shrinks.
 
 `DQNTrainer.update`:
 

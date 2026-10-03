@@ -3,6 +3,7 @@ import torch
 from src.Brain.brain import Brain
 from src.Brain.policy.policy import Policy
 from src.Brain.q_estimater.mlp import MLP
+from src.Brain.q_estimater.group_trainer import GroupTrainer
 from src.Brain.q_estimater.trainer import DQNTrainer
 from src.Brain.replay_buffer import ReplayBuffer
 from src.Brain.reward_shaping.reward_shaping import RewardShaping
@@ -38,6 +39,9 @@ class BrainManager:
         self.checkpoints = checkpoints
         self.rng = rng if rng is not None else RunRandom(0)
         self.brains = {}
+
+        # group key -> (member ids, GroupTrainer); see learn()
+        self.groups = {}
 
 
     # -----------------------------
@@ -122,6 +126,57 @@ class BrainManager:
                 hidden_layers=phenotype["hidden_layers"],
                 action_size=self.action_size,
             )
+
+    # -----------------------------
+    # LEARNING
+    # -----------------------------
+    def learn(self, agent_ids):
+        """
+        One update for every mind in agent_ids that is past its warmup.
+        Returns {agent_id: metrics}; a mind still warming up is left out.
+
+        Minds that can learn side by side (Brain.group_key: same network
+        shape, same batch size) are updated together by one GroupTrainer;
+        a mind with no partner learns alone, exactly as Brain.learn does.
+        Either way every mind takes the update it would take on its own -
+        a group only does the arithmetic of its members in one batch.
+
+        A group is kept from tick to tick while its membership stays the
+        same, and rebuilt when it changes: somebody finished warming up,
+        died, or was born into it.
+        """
+        members = {}
+
+        for agent_id in agent_ids:
+            brain = self.brains[agent_id]
+
+            if brain.ready_to_learn():
+                members.setdefault(brain.group_key(), []).append(agent_id)
+
+        wanted = {key: tuple(ids) for key, ids in members.items() if len(ids) > 1}
+
+        for key in list(self.groups):
+            ids, group = self.groups[key]
+
+            if wanted.get(key) != ids:
+                group.dissolve()
+                del self.groups[key]
+
+        for key, ids in wanted.items():
+            if key not in self.groups:
+                group = GroupTrainer([self.brains[i].trainer for i in ids])
+                self.groups[key] = (ids, group)
+
+        metrics = {}
+
+        for key, ids in members.items():
+            if key in self.groups:
+                batches = [self.brains[i].sample_batch() for i in ids]
+                metrics.update(zip(ids, self.groups[key][1].update(batches)))
+            else:
+                metrics[ids[0]] = self.brains[ids[0]].learn()
+
+        return metrics
 
     # -----------------------------
     # LOGGING WINDOW BOUNDARY

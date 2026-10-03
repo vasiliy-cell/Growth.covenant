@@ -614,6 +614,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
             # one either - a starved agent is removed, and the transition
             # that killed it is simply never stored.
             bodies = {record["agent_id"]: record for record in info["deaths"]}
+            learners = []
 
             for agent_id in actions:
                 env_reward = env_rewards[agent_id]
@@ -654,11 +655,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     next_state=encoded[agent_id],
                     done=False
                 )
-
-                # None while this agent's buffer is still warming up: a
-                # step happens, no gradient does, and the updates table
-                # simply has no row for this tick.
-                metrics = brain.learn()
+                learners.append(agent_id)
 
                 log.log_step(
                     step=step,
@@ -672,18 +669,28 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     age=agent.age,
                 )
 
-                if metrics is not None:
-                    summary = brain.summary()
+            # Every mind takes its gradient on its own memories; minds with
+            # the same network shape do the arithmetic side by side (see
+            # BrainManager.learn). A mind still warming up its buffer has
+            # no metrics, and the updates table simply has no row for it.
+            metrics = brains.learn(learners)
 
-                    log.log_update(
-                        step=step,
-                        agent_id=agent_id,
-                        training_step=brain.trainer.training_step,
-                        metrics=metrics,
-                        curiosity_beta=summary["curiosity_beta"],
-                        epsilon=summary["epsilon"],
-                        buffer_size=len(brain.replay_buffer),
-                    )
+            for agent_id in learners:
+                if agent_id not in metrics:
+                    continue
+
+                brain = brains.get(agent_id)
+                summary = brain.summary()
+
+                log.log_update(
+                    step=step,
+                    agent_id=agent_id,
+                    training_step=brain.trainer.training_step,
+                    metrics=metrics[agent_id],
+                    curiosity_beta=summary["curiosity_beta"],
+                    epsilon=summary["epsilon"],
+                    buffer_size=len(brain.replay_buffer),
+                )
 
             # --- events ---
             # A newborn is read here and not on the next tick's sync: the

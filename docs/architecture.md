@@ -44,6 +44,7 @@ src/Brain/brain.py              Brain - act, shape reward, remember, learn
 src/Brain/policy/policy.py      epsilon-greedy
 src/Brain/q_estimater/mlp.py    the network
 src/Brain/q_estimater/trainer.py  Double DQN update, target net, Adam
+src/Brain/q_estimater/group_trainer.py  the same update for many minds at once
 src/Brain/replay_buffer.py      one agent's memory
 src/Brain/reward_shaping/       food bonus + curiosity
 

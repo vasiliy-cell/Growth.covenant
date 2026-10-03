@@ -76,11 +76,28 @@ class Brain:
         history, so many ticks of warmup. A shared buffer would have
         rescaled both by the size of the population.
         """
-        if len(self.replay_buffer) < self.min_buffer_size:
+        if not self.ready_to_learn():
             return None
 
-        batch = self.replay_buffer.sample(self.batch_size)
-        return self.trainer.update(*batch)
+        return self.trainer.update(*self.sample_batch())
+
+    def ready_to_learn(self):
+        """False while the buffer is still warming up."""
+        return len(self.replay_buffer) >= self.min_buffer_size
+
+    def sample_batch(self):
+        """A batch of this agent's own memories, drawn with its own stream."""
+        return self.replay_buffer.sample(self.batch_size)
+
+    def group_key(self):
+        """
+        Minds with the same key can learn side by side in one GroupTrainer:
+        networks of the same shape, batches of the same size.
+        """
+        shapes = tuple(
+            tuple(param.shape) for param in self.trainer.policy_net.parameters()
+        )
+        return shapes, self.batch_size
 
     # -----------------------------
     # LOGGING WINDOW BOUNDARY

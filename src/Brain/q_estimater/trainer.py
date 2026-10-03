@@ -4,6 +4,30 @@ import torch.optim as optim
 from copy import deepcopy
 
 
+def _owned(value):
+    """
+    The same structure with every tensor cloned.
+
+    While a mind learns in a group (GroupTrainer) its weights and Adam
+    state are views into the group's stacks, and torch.save writes the
+    WHOLE storage behind a view - every member's file would carry the
+    entire group. A clone owns exactly its own numbers.
+    """
+    if torch.is_tensor(value):
+        return value.clone()
+    if isinstance(value, dict):
+        owned = type(value)((key, _owned(item)) for key, item in value.items())
+
+        # a module's state_dict carries its version metadata on the side
+        if hasattr(value, "_metadata"):
+            owned._metadata = value._metadata
+
+        return owned
+    if isinstance(value, list):
+        return [_owned(item) for item in value]
+    return value
+
+
 class DQNTrainer:
     """
     The DQN math for ONE brain: its network, its target copy, its
@@ -41,7 +65,7 @@ class DQNTrainer:
     # -------------------------
     def state_dict(self):
         """The learned part of this brain, for the checkpoint writer."""
-        return self.policy_net.state_dict()
+        return _owned(self.policy_net.state_dict())
 
     def state(self):
         """
@@ -55,12 +79,12 @@ class DQNTrainer:
         moments are momentum, and dropping them restarts the optimiser cold
         in the middle of a run.
         """
-        return {
+        return _owned({
             "policy_net": self.policy_net.state_dict(),
             "target_net": self.target_net.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "training_step": self.training_step,
-        }
+        })
 
     def load_state(self, state):
         self.policy_net.load_state_dict(state["policy_net"])
