@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.Agent.State.observation import Observation
 from src.Agent.life import Life
 
@@ -197,24 +199,27 @@ class Agent:
     # -----------------------------
     @staticmethod
     def get_local_view(grid, position, size=7):
+        """
+        The window around `position`, -1 for every cell off the map.
+
+        Cut out of the map as one slice instead of cell by cell: the part of
+        the window that lies on the map is copied over a window of -1s.
+        """
+        grid = np.asarray(grid)
         x, y = position
         half = size // 2
+        height, width = grid.shape
 
-        view = []
+        view = np.full((2 * half + 1, 2 * half + 1), -1, dtype=grid.dtype)
 
-        for dy in range(-half, half + 1):
-            row = []
-            for dx in range(-half, half + 1):
-                nx, ny = x + dx, y + dy
+        top, bottom = max(y - half, 0), min(y + half + 1, height)
+        left, right = max(x - half, 0), min(x + half + 1, width)
 
-                if 0 <= ny < len(grid) and 0 <= nx < len(grid[0]):
-                    row.append(grid[ny][nx])
-                else:
-                    row.append(-1)
+        if top < bottom and left < right:
+            view[top - (y - half):bottom - (y - half),
+                 left - (x - half):right - (x - half)] = grid[top:bottom, left:right]
 
-            view.append(row)
-
-        return view
+        return view.tolist()
 
     @staticmethod
     def overlay_agents(map_view, position, agent_positions, size=7):
@@ -235,18 +240,15 @@ class Agent:
         x, y = position
         half = size // 2
 
-        view = []
+        view = [list(row) for row in map_view]
 
-        for row_index, dy in enumerate(range(-half, half + 1)):
-            row = list(map_view[row_index])
+        # Walk the bodies, not the window: a body paints the cell it stands
+        # on if that cell is inside the window.
+        for cell in agent_positions:
+            column, row_index = cell[0] - x + half, cell[1] - y + half
 
-            for column, dx in enumerate(range(-half, half + 1)):
-                cell = (x + dx, y + dy)
-
-                if cell != position and cell in agent_positions:
-                    row[column] = AGENT_CELL
-
-            view.append(row)
+            if cell != position and 0 <= row_index <= 2 * half and 0 <= column <= 2 * half:
+                view[row_index][column] = AGENT_CELL
 
         return view
 

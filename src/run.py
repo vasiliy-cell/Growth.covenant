@@ -563,6 +563,8 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
             pinned=pinned,
         )
 
+    encoded = {}
+
     try:
         for step in range(start_step + 1, start_step + total_steps + 1):
             last_step = step
@@ -582,10 +584,16 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
             available_actions = env.get_available_actions()
 
+            # The next_state an agent stored last tick IS its state now, so
+            # it is not encoded twice. Only a body with nothing carried over
+            # - a newborn, or the first tick after start or a restore - is
+            # encoded here.
             states = {
-                agent_id: encode_observation(observation)
+                agent_id: encoded[agent_id] if agent_id in encoded
+                else encode_observation(observation)
                 for agent_id, observation in observations.items()
             }
+            encoded = {}
 
             # One forward pass per agent, through that agent's own network.
             actions = {
@@ -637,11 +645,13 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     next_observation, env_reward
                 )
 
+                encoded[agent_id] = encode_observation(next_observation)
+
                 brain.remember(
                     state=states[agent_id],
                     action=actions[agent_id],
                     reward=shaped_reward,
-                    next_state=encode_observation(next_observation),
+                    next_state=encoded[agent_id],
                     done=False
                 )
 

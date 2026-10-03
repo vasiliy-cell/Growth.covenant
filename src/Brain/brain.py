@@ -1,3 +1,6 @@
+import torch
+
+
 class Brain:
     """
     One mind, belonging to exactly one agent.
@@ -34,8 +37,9 @@ class Brain:
     def choose_action(self, state, available_actions):
         # Policy decides exploration/exploitation inside select_action, so
         # the q values are computed either way - this is a plain forward
-        # for choosing, never a backward.
-        q_values = self.trainer.policy_net(state)
+        # for choosing, never a backward, so no graph is built for it.
+        with torch.no_grad():
+            q_values = self.trainer.policy_net(state)
         return self.policy.select_action(q_values, available_actions)
 
     # -----------------------------
