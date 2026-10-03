@@ -175,7 +175,7 @@ def test_curiosity_key_ignores_other_agents():
     without_neighbour = env.get_states()[watcher]
 
     assert with_neighbour.to_key() == without_neighbour.to_key()
-    assert with_neighbour.local_view != without_neighbour.local_view
+    assert (with_neighbour.local_view != without_neighbour.local_view).any()
 
 
 # -----------------------------

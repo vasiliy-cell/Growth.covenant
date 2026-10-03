@@ -200,7 +200,9 @@ class Agent:
     @staticmethod
     def get_local_view(grid, position, size=7):
         """
-        The window around `position`, -1 for every cell off the map.
+        The window around `position`, -1 for every cell off the map,
+        as a numpy array (the whole observation path stays numpy; only
+        to_key and the tests read it cell by cell).
 
         Cut out of the map as one slice instead of cell by cell: the part of
         the window that lies on the map is copied over a window of -1s.
@@ -219,7 +221,7 @@ class Agent:
             view[top - (y - half):bottom - (y - half),
                  left - (x - half):right - (x - half)] = grid[top:bottom, left:right]
 
-        return view.tolist()
+        return view
 
     @staticmethod
     def overlay_agents(map_view, position, agent_positions, size=7):
@@ -240,7 +242,7 @@ class Agent:
         x, y = position
         half = size // 2
 
-        view = [list(row) for row in map_view]
+        view = map_view.copy()
 
         # Walk the bodies, not the window: a body paints the cell it stands
         # on if that cell is inside the window.
@@ -248,7 +250,7 @@ class Agent:
             column, row_index = cell[0] - x + half, cell[1] - y + half
 
             if cell != position and 0 <= row_index <= 2 * half and 0 <= column <= 2 * half:
-                view[row_index][column] = AGENT_CELL
+                view[row_index, column] = AGENT_CELL
 
         return view
 

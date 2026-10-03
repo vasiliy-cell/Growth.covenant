@@ -268,7 +268,7 @@ def encode_observation(obs):
     danger (2) reads as "twice the food" and another agent (3) as three
     times. As channels, "food here" is one input of its own.
     """
-    view = torch.tensor(obs.local_view, dtype=torch.float32).flatten()
+    view = torch.from_numpy(obs.local_view.ravel())
 
     return torch.cat([(view == kind).float() for kind in CELL_CHANNELS])
 

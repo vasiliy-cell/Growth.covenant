@@ -31,7 +31,7 @@ class Observation:
         """
         return (
             self.position,
-            tuple(tuple(row) for row in self.map_view)
+            tuple(map(tuple, self.map_view.tolist()))
         )
 
     def __repr__(self):
