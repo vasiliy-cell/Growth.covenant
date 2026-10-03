@@ -115,8 +115,9 @@ done=False)` into the agent's replay buffer and increases `Brain.age`.
 
 - One transition per tick per agent, so `buffer_size` and
   `min_buffer_size` are counted in ticks of this agent's own history.
-- The buffer is a `deque` with `maxlen = buffer_size`: the oldest
-  transition drops out when it is full.
+- The buffer is a ring of `buffer_size` slots (kept in the order a deque
+  would keep, oldest first): the oldest transition is overwritten when it
+  is full.
 - `done` is always False: the world has no terminal state. An agent that
   dies on a tick stores nothing for that tick.
 
