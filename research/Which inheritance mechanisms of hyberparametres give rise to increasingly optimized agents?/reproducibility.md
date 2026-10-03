@@ -45,15 +45,36 @@ Pass one with `python src/run.py --seed <seed>` or type it at the seed prompt.
 
 ## Code
 
-- repository commit at the time of writing: `92d5bd8cf4ded3c073a5a3c097a1456510732e44`
+- current commit: `5ff034b46e7f7b1085794e59ea2f4ee36ab56845`
+  (baseline config: every gene frozen, `genome.evolve: []`)
 - every run also records its own commit, config, seed and library versions
   in `logs/<world_id>/run.json`
+
+## Experiments
+
+### Baseline - every gene frozen
+
+Multi-agent with reproduction, no gene ever varies or mutates: every agent
+carries the `mean` of each gene (`genome.evolve: []`, commit `5ff034b`).
+40000 episodes per seed, all 15 seeds, logs in `logs/<world_id>_baseline-s<n>/`
+(series `baseline`). Started 2026-10-03, 6 runs at a time, torch on one
+thread per process:
+
+```bash
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONPATH=. .venv/bin/python src/run.py \
+  --episodes 40000 --seed <seed> --agents 20 --species clons \
+  --label baseline-s<n> --series baseline --resume "" --no-pin
+```
+
+Note: `evolve` with every entry commented out is read as `None`, and the
+env treats `None` as "evolve every gene". Freezing them takes `evolve: []`.
 
 ## Machine
 
 - macOS 15.6 (build 24G84), Apple Silicon (arm64)
 - device: CPU (CUDA not available; MPS available but not used)
-- torch threads: 4 intra-op, 10 inter-op
+- torch threads: 4 intra-op, 10 inter-op by default; the experiment runs
+  set `OMP_NUM_THREADS=1` (a bit-exact re-run must use the same)
 - `run.deterministic: true`
 
 ## Python and libraries
