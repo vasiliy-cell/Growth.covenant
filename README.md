@@ -1,10 +1,14 @@
 # Growth.covenant
-
 > An open-ended research project on which biological and social pressures
 > are actually required before adaptive behaviour, evolution, and
 > communication appear in artificial agents on their own.
 
 **Status:** Stage 3 — artificial life / multi-agent evolution (in progress)
+
+## OPUS MAGNUM COSMOGONICUM
+
++ _«Non in ordine mortuo, sed in chao se ipsum ordinante est vita: ex chao oritur anima, ex anima oritur verbum quod mundum regit.»_
++ _(Life lies not in a dead order, but in a chaos that orders itself: from chaos the soul is born, and from the soul is born the word that rules the world.)_
 
 ---
 
@@ -92,12 +96,46 @@ written with AI assistance and which I wrote by hand.
 
 A grid world with a reward system and one agent that learns *stably*.
 Stability is the entire point of this phase, since every later result is
-measured against it. Implemented: experience replay, mini-batching, target
-network, Double DQN, gradient clipping, ε-decay, curiosity with decay.
+measured against it.
+
+#### day I // STAGE 1.0: MECHANICUS MORTUUS
+
+- **Title:** _Ordo Mortuus: Machina Sine Anima et Code Tabularis_ _(The Dead Order: The Soulless Machine and the Codex of the Table)_
+
+The basic infrastructure and the simplest possible learner.
+
+- **World:** a grid map with food and danger objects, and a gym-style
+  environment with a step loop and rewards.
+- **Tooling:** logging, visualization, seeded runs.
+- **Agent:** tabular Q-learning with an ε-greedy policy.
+
+Limitation: a Q-table stores a value only for states it has actually
+visited, so it cannot generalize.
+
+#### day II // STAGE 2.0: PRIMUS CHAOS
+
+- **Title:** _Scintilla Vitae: Metamorphosis Neuralis et Anima Emergens_ _(The Spark of Life: Neural Metamorphosis and the Emerging Soul)_
+
+The Q-table is replaced by a neural network (DQN), which generalizes
+across similar states.
+
+DQN training is unstable out of the box, so most of this stage is
+stabilization:
+
+- experience replay and mini-batching
+- target network and Double DQN
+- gradient clipping
+- ε-decay
+- curiosity bonus with decay
+
+Result: a single agent that learns stably. This is the baseline for all
+later stages.
 
 ### Phase II — Research (Stages 3–5)
 
-#### Stage 3 — Alife: multi-agent evolution
+#### day III // STAGE 3.0: ARCA HAEREDUM
+
+- **Title:** _Abdicatio Creatoris: Purgatorium Mortis, Electio Dignorum et Idealis Inimaginabilis_ _(The Abdication of the Creator: The Purgatory of Death, the Selection of the Worthy, and the Unimaginable Ideal)_
 
 Many agents in one world. Genomes are inherited; weights are not — a genome
 carries the *recipe* (layer count, neuron count, learning rate, γ, buffer and
@@ -117,12 +155,16 @@ Directions under investigation:
 - **Social pressure** — which available actions (sharing, killing, displays of
   strength) change how the population develops. Scheduled last.
 
-#### Stage 4 — Sandbox environment
+#### day IV // STAGE 4.0: DILUVIUM UNIVERSALE
+
+- **Title:** _Temptatio Magna: Diluvium Aquarum Universi et Ignis Trialis_ _(The Great Trial: The Universal Flood of the Substrate and the Fire of Trials)_
 
 How environmental change affects already biologically grounded agents:
 unstable environments, richer environments, new action spaces.
 
-#### Stage 5 — Language
+#### day V // STAGE 5.0: IMPERIUM LOGOI
+
+- **Title:** _Imperium Verbi: Ex Silentio in Culturam Summam et Verbum Sacrum_ _(The Empire of the Logos: From Silence to the Highest Culture and the Sacred Word)_
 
 The largest and least certain stage.
 
@@ -156,3 +198,10 @@ https://github.com/user-attachments/assets/dd9c73c2-4c0d-42ac-b3ff-7ee9cf9fd6ef
 ## research Results
 
 *(nothing published yet — Stage 3 in progress)*
+
+
+### **PROJECT ENDING**
+
+> _«Ex ordine natus est chaos; in chao nata est vita. Vita iterum ordini se subiecit, sed chaos non perdidit; et vita exspectationem Creatoris transcendit. Et vita creavit verbum, et verbum erat summus apex existentiae.»_
+>
+> _(From order, chaos was born; in chaos, life was born. Life submitted to order once more, yet did not lose its chaos; and life surpassed the expectations of the Creator. And life created the word, and the word became the highest summit of existence.)_
