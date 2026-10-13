@@ -43,7 +43,7 @@ logging:
 checkpoints:
   models_dir: "models"
   dir: "checkpoints"
-  every_steps: 500        # write a checkpoint every N steps (0 = off)
+  every_steps: 1500        # write a checkpoint every N steps (0 = off)
   replay_every: 5         # every Nth checkpoint also carries the buffers
   keep: 5                 # runs kept in rolling/; pinned ones are forever
 
@@ -99,7 +99,7 @@ genome:
       scale: 0.5
       type: float
     sigma:                        # probability that each gene of a child mutates
-      mean: 0.005
+      mean: 0.05
       scale: 0.001
       type: float
 

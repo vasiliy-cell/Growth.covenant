@@ -25,9 +25,16 @@ engineering milestone.
 
 A few commitments that shape every design decision here:
 
-- **Artificial life, not genetic algorithms.** 
-  ranks agents and picks survivors. Selection is endogenous: agents eat, run
-  out of energy, die, choose mates, and reproduce inside the world.
+- **Artificial life, not genetic algorithms.** There is no external
+  fitness function that ranks agents and picks survivors. Selection is
+  endogenous: agents eat, run out of energy, die, choose mates, and reproduce
+  inside the world.
+
+  To be precise, there *is* an implicit fitness: energy. An agent's energy is
+  what it collects from the environment minus what it constantly leaks, and an
+  agent can reproduce only once it has gathered enough energy. So
+  reproduction depends entirely on how well an agent turns the world into
+  energy — but nobody scores it from outside; the world itself decides.
 - **Emergence over authorship.** Behaviour should be learned, not scripted.
 - **Biology as inspiration, not as a specification.** Only the mechanisms that
   buy something are reproduced: mutation, recombination, dominance/recessivity,
