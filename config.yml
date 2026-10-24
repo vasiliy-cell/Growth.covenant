@@ -32,8 +32,8 @@ logging:
   flush_every_steps: 1000         # close a part of every table this often
   max_rows_per_part: 50000        # ...or when a table has this many rows
   world_snapshot_every: 100       # snapshot the map every N steps (0 = off)
-  rng_world_every_episodes: 1     # map/movement/genome streams, per window
-  rng_agents_every_episodes: 100  # the agents' own streams, per window
+  rng_world_every_episodes: 20    # map/movement/genome streams, per window
+  rng_agents_every_episodes: 2000 # the agents' own streams, per window
   archive_dir: "archives"         # where scripts/logs.py puts packed runs
   panel_dir: ".panel"             # the control panel's files; never inside dir
 
