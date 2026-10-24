@@ -1,11 +1,11 @@
-# Growth.covenant
+## Growth.covenant
 > An open-ended research project on which biological and social pressures
 > are actually required before adaptive behaviour, evolution, and
 > communication appear in artificial agents on their own.
 
 **Status:** Stage 3 — artificial life / multi-agent evolution (in progress)
 
-## OPUS MAGNUM COSMOGONICUM
+# OPUS MAGNUM COSMOGONICUM
 
 + _«Non in ordine mortuo, sed in chao se ipsum ordinante est vita: ex chao oritur anima, ex anima oritur verbum quod mundum regit.»_
 + _(Life lies not in a dead order, but in a chaos that orders itself: from chaos the soul is born, and from the soul is born the word that rules the world.)_
@@ -69,7 +69,7 @@ Full disclosure, since this matters for how the results should be read.
 
 I use AI assistants (primarily Claude) in this project for exactly two things:
 
-- **generating some chunks of code** — routine, mechanical parts;
+- **generating some chunks of code**
 - **spelling and grammar checks** in text.
 
 That is the whole list. Specifically, AI does **not**:
