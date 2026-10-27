@@ -45,10 +45,37 @@ Pass one with `python src/run.py --seed <seed>` or type it at the seed prompt.
 
 ## Code
 
-- current commit: `5ff034b46e7f7b1085794e59ea2f4ee36ab56845`
-  (baseline config: every gene frozen, `genome.evolve: []`)
 - every run also records its own commit, config, seed and library versions
-  in `logs/<world_id>/run.json`
+  in `logs/<world_id>/run.json` - that header, not this file, is the exact
+  record of what a given world ran with.
+- `good_baseline.yml` in this folder is kept as a byte-for-byte copy of the
+  live `config.yml` at the moment pass 1 starts (clons, `genome.evolve: []`,
+  every other section exactly as the repo root has it). Re-copy it if
+  `config.yml` changes before a pass that needs it.
+
+## Pipeline
+
+`scripts/pipeline/` runs this research end to end - see that folder for the
+actual scripts; summary here so this file stays the one place the whole
+protocol is described:
+
+- `seeds.sh` - the 15 seeds above, sourced by everything else.
+- `experiments_pass1.sh` - good baseline + the 6 leave-one-in groups.
+- `experiments_pass2.sh` - skeleton; needs `bad_baseline.yml` and the
+  genes pass 1 found worth evolving before it can run (see its comments).
+- `run_pass.sh --pass {1|2} --mode {smoke|full}` - launches every
+  experiment of a pass, all 15 fixed seeds (or a couple, in `smoke`, 10
+  episodes, just to check the flags), delivers each experiment's logs as
+  soon as it finishes.
+- `deliver.sh` - packs one experiment's worlds (`scripts/logs.py archive`)
+  into `<dest-root>/pass<N>/<experiment-name>/`.
+- `watchdog_disk.sh` / `watchdog_remote.sh` - local disk floor / remote
+  reachability and stall detection. The remote one is a stub until the
+  rented server exists.
+- `ship_logs.sh` - periodic push of `logs/` toward `--dest`, triggered by
+  episode progress (default: every 10000 episodes of any running world),
+  not wall clock. `--dest` is a local path for now (stub) - becomes the
+  real remote path once the server and its access are decided.
 
 ## Experiments
 
@@ -71,11 +98,21 @@ env treats `None` as "evolve every gene". Freezing them takes `evolve: []`.
 
 ## Machine
 
+### Smoke tests (--mode smoke, 10 episodes, flags check only - not a result)
+
 - macOS 15.6 (build 24G84), Apple Silicon (arm64)
 - device: CPU (CUDA not available; MPS available but not used)
 - torch threads: 4 intra-op, 10 inter-op by default; the experiment runs
   set `OMP_NUM_THREADS=1` (a bit-exact re-run must use the same)
 - `run.deterministic: true`
+
+### Full runs (--mode full, 40000 episodes x 15 seeds)
+
+TODO - fill in once the rented server is provisioned: CPU model and core
+count, RAM, OS and kernel, whether a GPU is present (this project runs on
+CPU only today - `src/` never calls `.cuda()` - so a GPU's presence does
+not change results, only what else was in the box), and the same torch
+thread settings as above.
 
 ## Python and libraries
 

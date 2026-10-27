@@ -34,20 +34,21 @@ exceptions. This includes comments inside `config.yml` and any new file.
 Chat replies to the user stay in the language the user writes in; only the
 code is English.
 
-### Commit every important change
-Make a git commit for **each important feature or debug fix** — do not pile
-several unrelated changes into one commit, and do not leave finished work
-uncommitted.
+### Commits — only with the user's permission
+**Never commit on your own.** Not for a feature, not for a fix, not for a
+two-line config change. When a piece of work is big enough to be worth a
+commit, finish it, then **ask whether to commit** and wait for a yes. No
+answer is not a yes.
 
-- One logical change = one commit.
-- Message: short imperative summary of what changed and why it matters
-  (e.g. `refill map instead of regenerating it`, `fix epsilon read from config`).
-- Cosmetic-only edits (formatting, typos) do not need their own commit —
-  fold them into the related change.
-- **Moderately often, not constantly.** A commit is a finished logical
-  block, so a large piece of work is a handful of commits and not twenty:
-  do not commit after every edit, and do not wait until three unrelated
-  things are done either.
+- Small edits (a config value, a typo, a comment) are not worth a commit
+  and are not even worth asking about - leave them in the working tree.
+- When the user agrees, one logical change = one commit, with a short
+  imperative message saying what changed and why it matters
+  (e.g. `refill map instead of regenerating it`).
+- Commit only the files of that change; never sweep up the user's other
+  uncommitted work.
+- The goal is a short, readable history: a handful of commits for a large
+  piece of work, not one per edit.
 
 ### Clean code
 - No commented-out dead code left in files — git history is the archive.

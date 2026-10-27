@@ -1,4 +1,4 @@
-## Growth.covenant
+### Growth.covenant
 > An open-ended research project on which biological and social pressures
 > are actually required before adaptive behaviour, evolution, and
 > communication appear in artificial agents on their own.
