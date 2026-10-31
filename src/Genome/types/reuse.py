@@ -97,4 +97,6 @@ class reuse:
             if genome_config["genes"][name].get("type") == "int":
                 value = round(value)    
             phenotype[name] = value
+        if phenotype["batch_size"] > phenotype["buffer_size"]:
+            phenotype["batch_size"] = phenotype["buffer_size"]
         return phenotype

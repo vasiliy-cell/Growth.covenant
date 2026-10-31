@@ -1,37 +1,35 @@
 #!/usr/bin/env bash
-# Pass 2 - direction two: "how should genes be passed on?" NOT READY YET.
+# Pass 2 - direction two: "how should genes be passed on?"
 #
-# This file is a skeleton, not a runnable experiment matrix. Two things are
-# still missing and MUST come from the owner before pass 2 can start - this
-# project's rule is "ask before choosing any value that affects the
-# experiment", and both of the gaps below are exactly that:
+# Plan changed (owner, after seeing cost/time on pass 1): direction 2 runs
+# FIRST, on the GOOD baseline, with ALL 14 of direction 1's genes evolving
+# at once - not "only the genes direction 1 found worth it", since
+# direction 1 may never run. The bad-baseline leg follows once the owner
+# sends concrete worsened gene means (research/.../bad_baseline.yml).
 #
-#   1. research/.../bad_baseline.yml does not exist yet. "bad baseline"
-#      means specific gene MEANS deliberately worsened from good_baseline.yml
-#      - which genes, and to what values, is an experiment design choice,
-#      not something to guess here. Once the owner gives concrete numbers,
-#      clone good_baseline.yml into bad_baseline.yml with just those means
-#      changed (same structure, same scales/types).
-#
-#   2. The "genes that showed themselves worth evolving" are whatever pass 1
-#      (experiments_pass1.sh) actually found - unknown until those 15 seeds
-#      x 7 experiments are run and read. Fill WINNING_GENES below from that
-#      result, not from a guess.
-#
-# Unlike pass 1 (same config.yml for every experiment, only --species and
-# --set genome.evolve differ), pass 2 needs a DIFFERENT set of gene means
-# (the bad baseline's), which --set cannot carry cleanly for a dozen genes
-# at once. The intended mechanism is: copy bad_baseline.yml over config.yml
-# before running this whole pass (pipeline.sh does this, and prints a clear
-# warning before it overwrites the live file) - ask the owner to confirm
-# this is the right mechanism (vs. e.g. adding a --config flag to run.py)
-# before relying on it for a real run.
+# ALL_GENES is direction 1's own 14-gene list (experiments_pass1.sh) minus
+# alpha and sigma - sigma governs evolution itself (excluded there for
+# exactly this reason, see the research draft's Limitations), and alpha
+# only does anything inside non_linear's reproduce(); evolving it for
+# clons/mendel would be inert noise, not a fair three-way comparison.
+ALL_GENES="hidden_layers,hidden_size,gamma,learning_rate,target_update_freq,max_norm,buffer_size,batch_size,min_buffer_size,epsilon,epsilon_decay,epsilon_min,curiosity_beta,curiosity_decay"
 
-WINNING_GENES=""   # e.g. "gamma,epsilon,epsilon_decay" - fill in after pass 1
+# --- GOOD baseline leg: runnable now, config.yml untouched (same means as
+# the already-completed baseline experiment - only --species/--set differ,
+# exactly like every pass-1 experiment). ---
+EXPERIMENTS_PASS2_GOOD=(
+  "clons|clons|${ALL_GENES}|second research/clons"
+  "non_linear|non_linear|${ALL_GENES}|second research/non_linear"
+  "mendel|mendel|${ALL_GENES}|second research/mendel"
+)
 
-EXPERIMENTS_PASS2=(
-  "bad_baseline|clons|"
-  # "clons_evolve|clons|${WINNING_GENES}"
-  # "non_linear_evolve|non_linear|${WINNING_GENES}"
-  # "mendel_evolve|mendel|${WINNING_GENES}"
+# --- BAD baseline leg: NOT ready. Needs research/.../bad_baseline.yml
+# (owner's deliberately worsened gene means) before it can run - refusing
+# to guess those numbers. Once that file exists, run_pass.sh --pass 2
+# --leg bad swaps config.yml to it for this leg's whole duration. ---
+EXPERIMENTS_PASS2_BAD=(
+  "bad_baseline|clons||second research/bad/bad_baseline"
+  "clons|clons|${ALL_GENES}|second research/bad/clons"
+  "non_linear|non_linear|${ALL_GENES}|second research/bad/non_linear"
+  "mendel|mendel|${ALL_GENES}|second research/bad/mendel"
 )

@@ -102,5 +102,7 @@ class MendelGeneticsSpecies:
 
             if genome_config["genes"][gene_name].get("type") == "int":
                     phenotype[gene_name] = round(phenotype[gene_name])
+        if phenotype["batch_size"] > phenotype["buffer_size"]:
+            phenotype["batch_size"] = phenotype["buffer_size"]
         return phenotype
 

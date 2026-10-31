@@ -108,11 +108,34 @@ env treats `None` as "evolve every gene". Freezing them takes `evolve: []`.
 
 ### Full runs (--mode full, 40000 episodes x 15 seeds)
 
-TODO - fill in once the rented server is provisioned: CPU model and core
-count, RAM, OS and kernel, whether a GPU is present (this project runs on
-CPU only today - `src/` never calls `.cuda()` - so a GPU's presence does
-not change results, only what else was in the box), and the same torch
-thread settings as above.
+Rented box, provisioned by `scripts/pipeline/provision_remote.sh`:
+
+- Ubuntu 24.04.4 LTS, kernel 6.8.0-138-generic, x86_64
+- 16 vCPU visible to the OS, 61 GiB RAM, 338 GB disk (/ at ~1% used going
+  in) - but see the note below: everything here still runs ONE
+  SIMULATION AT A TIME, never in parallel, by the owner's own choice.
+- device: CPU (`torch.cuda.is_available()` is False - no GPU on this box
+  either; same as the smoke-test machine, nothing to change there)
+- Python 3.12.3 (NOT 3.9.6 - Ubuntu 24.04 does not ship 3.9, and this
+  project's own stance on cross-machine determinism already says "almost,
+  not an axiom" even with matching Python, so this is not a new gap, just
+  a bigger one; library versions are pinned to match the smoke-test
+  machine exactly where PyPI has them for 3.12):
+  torch 2.8.0+cpu, numpy 2.0.2, pyarrow 21.0.0, PyYAML 6.0.3
+- `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1`, `run.deterministic: true` - same
+  as the smoke-test machine
+- One core, not sixteen: the account this box was rented under could not
+  get a bigger/dedicated plan, and the owner's own prior tests found
+  parallel simulations on one physical core measure WORSE than running
+  them one after another - so `run_pass.sh` queues every seed, strictly
+  sequential, regardless of how many cores the OS reports.
+- test suite: 119/120 pass; the one failure
+  (`test_run_log.py::test_the_live_file_says_what_is_happening_right_now`)
+  is a wall-clock race in a test for the live-monitoring panel's write
+  throttle (`RunLog.should_live`), reproducible in isolation, unrelated to
+  species/genome/reward code - it affects only how often `live.json` (a
+  view for whoever is watching, see `src/persistence/run_log.py`) gets
+  rewritten, never what is logged for analysis. Flagged, not patched.
 
 ## Python and libraries
 
