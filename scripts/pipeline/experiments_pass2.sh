@@ -12,7 +12,10 @@
 # exactly this reason, see the research draft's Limitations), and alpha
 # only does anything inside non_linear's reproduce(); evolving it for
 # clons/mendel would be inert noise, not a fair three-way comparison.
-ALL_GENES="hidden_layers,hidden_size,gamma,learning_rate,target_update_freq,max_norm,buffer_size,batch_size,min_buffer_size,epsilon,epsilon_decay,epsilon_min,curiosity_beta,curiosity_decay"
+# min_buffer_size is excluded too (owner's call, after the validation runs
+# crashed agents by drifting it negative): it stays frozen at its config
+# mean, same as alpha/sigma.
+ALL_GENES="hidden_layers,hidden_size,gamma,learning_rate,target_update_freq,max_norm,buffer_size,batch_size,epsilon,epsilon_decay,epsilon_min,curiosity_beta,curiosity_decay"
 
 # --- GOOD baseline leg: runnable now, config.yml untouched (same means as
 # the already-completed baseline experiment - only --species/--set differ,

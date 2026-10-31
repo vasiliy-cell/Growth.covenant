@@ -38,7 +38,16 @@ class reuse:
             genotype["epsilon_decay"] = 0.999
         if genotype["curiosity_decay"] >= 1:
             genotype["curiosity_decay"] = 0.999
-            
+
+        if genotype["buffer_size"] < 0:
+            genotype["buffer_size"] = genotype["min_buffer_size"]
+        if genotype["hidden_layers"] < 0:
+            genotype["hidden_layers"] = 1
+        if genotype["batch_size"] < 0:
+            genotype["batch_size"] = 10
+        if genotype["hidden_size"] < 0:
+            genotype["hidden_size"] = 30
+
         return genotype
 
     def mutate(genotype, rng, evolve):
@@ -87,6 +96,15 @@ class reuse:
             mutated_genotype["epsilon_decay"] = 0.999
         if mutated_genotype["curiosity_decay"] >= 1:
             mutated_genotype["curiosity_decay"] = 0.999
+
+        if mutated_genotype["buffer_size"] < 0:
+            mutated_genotype["buffer_size"] = mutated_genotype["min_buffer_size"]
+        if mutated_genotype["hidden_layers"] < 0:
+            mutated_genotype["hidden_layers"] = 1
+        if mutated_genotype["batch_size"] < 0:
+            mutated_genotype["batch_size"] = 10
+        if mutated_genotype["hidden_size"] < 0:
+            mutated_genotype["hidden_size"] = 30
 
         return mutated_genotype
 
