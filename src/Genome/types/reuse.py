@@ -39,7 +39,7 @@ class reuse:
         if genotype["curiosity_decay"] >= 1:
             genotype["curiosity_decay"] = 0.999
 
-        if genotype["buffer_size"] < 0:
+        if genotype["buffer_size"] < genotype["min_buffer_size"]:
             genotype["buffer_size"] = genotype["min_buffer_size"]
         if genotype["hidden_layers"] < 0:
             genotype["hidden_layers"] = 1
@@ -97,7 +97,7 @@ class reuse:
         if mutated_genotype["curiosity_decay"] >= 1:
             mutated_genotype["curiosity_decay"] = 0.999
 
-        if mutated_genotype["buffer_size"] < 0:
+        if mutated_genotype["buffer_size"] < mutated_genotype["min_buffer_size"]:
             mutated_genotype["buffer_size"] = mutated_genotype["min_buffer_size"]
         if mutated_genotype["hidden_layers"] < 0:
             mutated_genotype["hidden_layers"] = 1

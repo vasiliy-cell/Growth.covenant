@@ -70,7 +70,7 @@ class MendelGeneticsSpecies:
                     mutated_genotype["epsilon_decay"][i][0] = 0.999
                 if mutated_genotype["curiosity_decay"][i][0] >= 1:
                     mutated_genotype["curiosity_decay"][i][0] = 0.999
-                if mutated_genotype["buffer_size"][i][0] < 0:
+                if mutated_genotype["buffer_size"][i][0] < mutated_genotype["min_buffer_size"][i][0]:
                     mutated_genotype["buffer_size"][i][0] = mutated_genotype["min_buffer_size"][i][0]
                 if mutated_genotype["hidden_layers"][i][0] < 0:
                     mutated_genotype["hidden_layers"][i][0] = 1
