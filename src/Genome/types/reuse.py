@@ -117,4 +117,6 @@ class reuse:
             phenotype[name] = value
         if phenotype["batch_size"] > phenotype["min_buffer_size"]:
             phenotype["batch_size"] = phenotype["min_buffer_size"]
+        if phenotype["hidden_size"] > 256:
+            phenotype["hidden_size"] = 256
         return phenotype
