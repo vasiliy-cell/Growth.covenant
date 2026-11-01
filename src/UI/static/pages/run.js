@@ -10,7 +10,7 @@
 
 import {
   api, h, fmt, button, chips, toggles, popup, chartBase, chartIn, ema,
-  svgButton, line as line_, COLORS, CHART_INK, cleanup,
+  svgButton, line as line_, COLORS, CHART_INK, accentFill, cleanup,
 } from "../lib.js";
 import { liveStage } from "./live.js";
 
@@ -55,6 +55,15 @@ const REWARDS = [
   ["leak", "leak", "what being alive cost the population that window, as a negative"],
 ];
 
+// What can be drawn next to a gene, on its own axis on the right: the
+// reward per agent of the same windows, so a gene drifting and the reward
+// moving with it (or not) are read on one picture.
+const GENE_REWARD = [
+  ["off", "nothing", "the gene alone"],
+  ["env", "env reward", "what the world paid, per agent per episode"],
+  ["shaped", "shaped reward", "what the networks learned from, per agent per episode"],
+];
+
 export async function runView(node, worldId, { live = false } = {}) {
   const filter = { cohort: "all", min_steps: null, max_steps: null };
   const view = {
@@ -69,6 +78,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     refresh: 1000,
     genes: new Set(),
     stack: false,
+    geneReward: "env",
   };
 
   const charts = {};
@@ -122,6 +132,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     drawRewards(charts, rewardNode, rewards, view);
     drawLearning(charts, learningNode, learning, view);
     drawPopulation(charts, populationNode, rewards, view);
+    drawGenes(geneCharts, geneNode, state.geneData, view, figure, rewards);
 
     filterNote.textContent = rewards.filtered
       ? `${rewards.agents.reduce((sum, value) => sum + value, 0)} agent-windows kept`
@@ -153,7 +164,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     if (!view.genes.size) return;
 
     state.geneData = await api.genes(worldId, [...view.genes]);
-    drawGenes(geneCharts, geneNode, state.geneData, view, figure);
+    drawGenes(geneCharts, geneNode, state.geneData, view, figure, state.rewards);
   };
 
   // Two ways to read genes, and the switch above says which: one at a time
@@ -230,7 +241,7 @@ export async function runView(node, worldId, { live = false } = {}) {
     drawRewards(charts, rewardNode, state.rewards, view);
     drawLearning(charts, learningNode, state.learning, view);
     drawPopulation(charts, populationNode, state.rewards, view);
-    drawGenes(geneCharts, geneNode, state.geneData, view, figure);
+    drawGenes(geneCharts, geneNode, state.geneData, view, figure, state.rewards);
   }));
 
   parts.push(h("div", { class: "panel" }, [
@@ -277,6 +288,11 @@ export async function runView(node, worldId, { live = false } = {}) {
       "Genes",
       h("span", { class: "note" }, "averaged over the agents alive in each window"),
       h("span", { class: "spacer" }),
+      h("span", { class: "dim mono", style: "font-size:11px" }, "beside it"),
+      chips(GENE_REWARD, view.geneReward, (which) => {
+        view.geneReward = which;
+        drawGenes(geneCharts, geneNode, state.geneData, view, figure, state.rewards);
+      }),
       chips([["one", "switch"], ["many", "add a chart"]], view.stack ? "many" : "one", (how) => {
         view.stack = how === "many";
 
@@ -453,16 +469,11 @@ function rewardSeries(rewards, view) {
     ema(view.mode === "agent" ? perAgent(values, rewards.agents) : values, view.ema);
 
   const drawn = {
-    shaped: () => line_("shaped", scale(rewards.shaped), COLORS.orange, {
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: "rgba(224,139,62,.22)" },
-          { offset: 1, color: "rgba(224,139,62,0)" },
-        ]),
-      },
+    shaped: () => line_("shaped", scale(rewards.shaped), COLORS.accent, {
+      areaStyle: { color: accentFill(0.22) },
     }),
     env: () => line_("env", scale(rewards.env), COLORS.sage),
-    intrinsic: () => line_("curiosity", scale(rewards.intrinsic), COLORS.cyan),
+    intrinsic: () => line_("curiosity", scale(rewards.intrinsic), COLORS.graphite),
     leak: () => line_("leak", scale(rewards.leak || []), COLORS.crimson),
   };
 
@@ -489,13 +500,13 @@ function drawRewards(charts, node, rewards, view) {
         type: "slider",
         height: 20,
         bottom: 16,
-        borderColor: "#303334",
-        backgroundColor: "#181a1b",
-        fillerColor: "rgba(224,139,62,.14)",
-        dataBackground: { lineStyle: { color: "#474b4d" }, areaStyle: { color: "#26292a" } },
-        selectedDataBackground: { lineStyle: { color: COLORS.orange }, areaStyle: { color: "rgba(224,139,62,.2)" } },
-        handleStyle: { color: COLORS.orange, borderColor: "#a25f22" },
-        moveHandleStyle: { color: "#3d4042" },
+        borderColor: "#c9ced1",
+        backgroundColor: "#eceeef",
+        fillerColor: "rgba(18,138,163,.12)",
+        dataBackground: { lineStyle: { color: "#b5bbbf" }, areaStyle: { color: "#e1e4e6" } },
+        selectedDataBackground: { lineStyle: { color: COLORS.accent }, areaStyle: { color: "rgba(18,138,163,.18)" } },
+        handleStyle: { color: COLORS.accent, borderColor: "#0b6174" },
+        moveHandleStyle: { color: "#c9ced1" },
         textStyle: { color: CHART_INK.label },
       },
     ],
@@ -532,7 +543,7 @@ function drawLearning(charts, node, learning, view) {
       { ...base.yAxis, name: axisName("|td error|", view), position: "right", nameGap: 44, splitLine: { show: false } },
     ],
     series: [
-      line_("loss", ema(learning.loss, view.ema), COLORS.orange),
+      line_("loss", ema(learning.loss, view.ema), COLORS.accent),
       line_("|td error|", ema(learning.td_error, view.ema), COLORS.yellow, { yAxisIndex: 1 }),
     ],
   });
@@ -555,7 +566,7 @@ function drawPopulation(charts, node, rewards, view) {
     xAxis: { ...base.xAxis, data: rewards.episodes, name: "episode" },
     yAxis: { ...base.yAxis, name: axisName("agents alive", view) + " · births · deaths" },
     series: [
-      line_("agents", ema(rewards.agents, view.ema), COLORS.orange, { areaStyle: { color: "rgba(224,139,62,.1)" } }),
+      line_("agents", ema(rewards.agents, view.ema), COLORS.accent, { areaStyle: { color: "rgba(18,138,163,.1)" } }),
       { name: "births", type: "bar", data: rewards.births, itemStyle: { color: COLORS.sage }, barMaxWidth: 6 },
       { name: "deaths", type: "bar", data: rewards.deaths, itemStyle: { color: COLORS.crimson }, barMaxWidth: 6 },
     ],
@@ -567,7 +578,7 @@ function drawPopulation(charts, node, rewards, view) {
 // between 0 and 1 and a buffer size is ten thousand, and a chart that holds
 // both shows one flat line and one that is all noise.
 
-function drawGenes(charts, node, data, view, figure) {
+function drawGenes(charts, node, data, view, figure, rewards) {
   if (!data || !data.episodes.length) {
     node.replaceChildren(h("div", { class: "empty" }, "no births in this world yet"));
     return;
@@ -600,6 +611,8 @@ function drawGenes(charts, node, data, view, figure) {
     }));
   }
 
+  const reward = geneReward(data, view, rewards);
+
   for (const box of node.querySelectorAll(".chart")) {
     const gene = box.dataset.gene;
     let chart = charts.get(gene);
@@ -610,41 +623,68 @@ function drawGenes(charts, node, data, view, figure) {
     }
 
     const base = chartBase();
+    const series = [line_(gene, ema(data.series[gene], view.ema), COLORS.accent, {
+      areaStyle: { color: accentFill(0.16) },
+    })];
+    const yAxis = [{ ...base.yAxis, name: axisName(gene, view), scale: true }];
+
+    if (reward) {
+      series.push(line_(reward.name, reward.values, COLORS.sage, { yAxisIndex: 1 }));
+      yAxis.push({
+        ...base.yAxis,
+        name: axisName(`${reward.name} per agent`, view),
+        position: "right",
+        nameGap: 44,
+        scale: true,
+        splitLine: { show: false },
+      });
+    }
 
     chart.setOption({
       ...base,
-      legend: { show: false },
-      grid: { ...base.grid, left: 72, top: 26 },
+      legend: { ...base.legend, show: Boolean(reward) },
+      grid: { ...base.grid, left: 72, right: reward ? 64 : base.grid.right, top: reward ? 34 : 26 },
       dataZoom: [{ type: "inside" }],
       xAxis: { ...base.xAxis, data: data.episodes, name: "episode" },
-      yAxis: { ...base.yAxis, name: axisName(gene, view), scale: true },
+      yAxis,
       tooltip: {
         ...base.tooltip,
         formatter: (points) => {
           const at = data.episodes.indexOf(Number(points[0].axisValue));
 
-          return `episode ${points[0].axisValue}<br/>${gene} ${fmt.number(points[0].value, 5)}` +
-            `<br/><span style="color:${CHART_INK.label}">averaged over ${fmt.int(data.agents[at])} agents</span>`;
+          return [
+            `episode ${points[0].axisValue}`,
+            ...points.map((point) => `${point.marker} ${point.seriesName} ${fmt.number(point.value, point.seriesIndex ? 2 : 5)}`),
+            `<span style="color:${CHART_INK.label}">gene averaged over ${fmt.int(data.agents[at])} agents</span>`,
+          ].join("<br/>");
         },
       },
-      series: [line_(gene, ema(data.series[gene], view.ema), COLORS.orange, {
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: "rgba(224,139,62,.16)" },
-            { offset: 1, color: "rgba(224,139,62,0)" },
-          ]),
-        },
-      })],
-    });
+      series,
+    }, { replaceMerge: ["series", "yAxis"] });
   }
 }
 
+// The reward line a gene chart is drawn next to: per agent, put on the
+// gene's own episode axis, smoothed like everything else on the page. It
+// follows the filter at the top, the gene does not - the gene is always the
+// whole living population.
+function geneReward(data, view, rewards) {
+  if (view.geneReward === "off" || !rewards || !rewards.episodes.length) return null;
+
+  const per = perAgent(rewards[view.geneReward], rewards.agents);
+  const at = new Map(rewards.episodes.map((episode, index) => [episode, index]));
+  const values = data.episodes.map((episode) => (at.has(episode) ? per[at.get(episode)] : null));
+  const name = GENE_REWARD.find(([key]) => key === view.geneReward)[1];
+
+  return { name, values: ema(values, view.ema) };
+}
+
 // ---------------- where the agents are ----------------
-// One hue, dark to bright: a heat map answers "how much", and a rainbow
+// One hue, paper to deep: a heat map answers "how much", and a rainbow
 // would turn an amount into four different-looking things. The map is drawn
 // the way the world is watched live - y downwards, (0,0) top left.
 
-const HEAT_COLORS = ["#242627", "#34342b", "#664826", "#a2652b", "#e08b3e", "#f3c795"];
+const HEAT_COLORS = ["#eceeef", "#cfe5ea", "#93cfdc", "#45afc6", "#128aa3", "#0a5767"];
 
 export function heatOption(grid, size, { title } = {}) {
   const base = chartBase();
@@ -706,7 +746,7 @@ export function heatOption(grid, size, { title } = {}) {
       data,
       progressive: 0,
       itemStyle: { borderWidth: 0 },
-      emphasis: { itemStyle: { borderColor: "#e7ecef", borderWidth: 1 } },
+      emphasis: { itemStyle: { borderColor: "#15181a", borderWidth: 1 } },
     }],
   };
 }
@@ -825,7 +865,7 @@ function drawTree(node, note, family, worldId, view) {
 
   note.textContent = `${total} of ${family.nodes.length} agents · ` +
     `${family.nodes.filter((agent) => agent.alive).length} alive · ` +
-    `yellow = on the leaderboard · click one`;
+    `red = an agent, faint = dead · yellow = on the leaderboard · click one`;
 
   // nodeSize, not size: the spacing between two agents is fixed and the
   // DRAWING grows, so nodes never slide into each other however many there
@@ -875,10 +915,10 @@ function drawTree(node, note, family, worldId, view) {
   drawn.append("circle")
     .attr("r", (item) => (leaders.has(item.data.agent.id) ? 7 : 5)
       + Math.min(6, (item.data.agent.offspring || 0) * 1.5))
-    .attr("fill", (item) => {
-      if (leaders.has(item.data.agent.id)) return COLORS.yellow;
-      return item.data.agent.alive ? COLORS.orange : "#4e5254";
-    });
+    // Every agent is red, alive or dead - the dead are only fainter (see the
+    // stylesheet) - so a body stands out of a tree of thousands; the leaders
+    // are the one exception, in gold.
+    .attr("fill", (item) => (leaders.has(item.data.agent.id) ? COLORS.yellow : COLORS.crimson));
 
   drawn.append("text")
     .attr("y", -11)
@@ -1122,24 +1162,24 @@ function drawLife(node, agent) {
       },
     },
     series: [
-      line_("shaped", series.shaped, COLORS.orange, {
+      line_("shaped", series.shaped, COLORS.accent, {
         ...dots,
         markLine: {
           symbol: "none",
           silent: true,
           label: {
             formatter: "child",
-            color: COLORS.amber,
+            color: COLORS.crimson,
             fontSize: 10,
             fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
             position: "insideEndTop",
           },
-          lineStyle: { color: COLORS.amber, type: "dashed", width: 1 },
+          lineStyle: { color: COLORS.crimson, type: "dashed", width: 1 },
           data: marks.map((end) => ({ xAxis: end })),
         },
       }),
       line_("env", series.env, COLORS.sage, dots),
-      line_("curiosity", series.intrinsic, COLORS.cyan, dots),
+      line_("curiosity", series.intrinsic, COLORS.graphite, dots),
     ],
   });
 
@@ -1277,7 +1317,7 @@ function drawLineage(charts, node, line, picked, figure) {
     const mutated = links.filter((link) => (link.mutated || {})[gene]);
 
     const series = [
-      line_(gene, expressed, COLORS.orange, {
+      line_(gene, expressed, COLORS.accent, {
         symbol: "circle",
         symbolSize: 5,
         markLine: {
@@ -1314,8 +1354,8 @@ function drawLineage(charts, node, line, picked, figure) {
       });
 
       series.push(
-        line_("inherited allele", side(0), COLORS.cyan, { lineStyle: { width: 1, type: "dashed" } }),
-        line_("other allele", side(1), COLORS.steel, { lineStyle: { width: 1, type: "dashed" } }),
+        line_("inherited allele", side(0), COLORS.steel, { lineStyle: { width: 1, type: "dashed" } }),
+        line_("other allele", side(1), COLORS.gray, { lineStyle: { width: 1, type: "dashed" } }),
       );
     }
 

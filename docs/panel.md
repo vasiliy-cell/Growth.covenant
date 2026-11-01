@@ -39,7 +39,7 @@ processes and delete data.
 |---|---|---|
 | Worlds | `#/` | catalog of every world: label, species, sessions, size, population, whether it runs, whether it can be continued |
 | World | `#/world/<id>` | one world: details and rules, reward and learning charts (filterable by cohort - children / adults - and by lifespan), family tree, leaderboard, per-agent life and heat map, world heat map; actions: continue, keep (pin), rename, stop, archive, delete |
-| Compare | `#/compare` | several worlds side by side on one metric |
+| Compare | `#/compare` | several worlds side by side on one metric, or on one gene (mean of the living, with its start, end and change per world) |
 | Launch | `#/launch` | form: episodes, agents, species, seed, label, pin, repeat; the run queue and consoles |
 | Live | `#/live/<id>` | the map and bodies as the run writes them, with a speed control |
 
@@ -81,7 +81,7 @@ Some charts compute things that are not logged columns:
 | POST | `/api/worlds/{w}/continue` | queue a run from the newest checkpoint |
 | POST | `/api/worlds/{w}/archive` | tar.gz with a note, optionally delete |
 | DELETE | `/api/worlds/{w}` | delete the log folder (not while running) |
-| POST | `/api/compare` | compare worlds on a metric |
+| POST | `/api/compare` | compare worlds on a metric, or on a gene as `gene:<name>` |
 | GET | `/api/metrics` | available comparison metrics |
 | GET/POST | `/api/runs` | queue / launch |
 | GET | `/api/runs/{id}/world`, `/api/runs/{id}/console` | a launched run's world and console |

@@ -190,34 +190,42 @@ export function ema(values, span) {
 }
 
 // ---------------- charts ----------------
-// The panel's language, in chart form: hazard orange for the line you came
-// to read, ice cyan and steel for the frame around it, sage for reward,
-// crimson for death and penalties, yellow for a state to notice.
+// The panel's language, in chart form: cold cyan for the line you came to
+// read, graphite and steel for the lines next to it, grey for the frame,
+// green for reward, crimson for death, penalties and agents, gold for a
+// state to notice.
 
 export const COLORS = {
-  orange: "#e08b3e",
-  amber: "#f0aa63",
-  cyan: "#7ed4e6",
-  steel: "#557584",
-  sage: "#8ec4a3",
-  crimson: "#c8453c",
-  yellow: "#e6c34d",
-  gray: "#2f3a41",
+  accent: "#128aa3",
+  steel: "#4d6a85",
+  sage: "#3b8a5a",
+  crimson: "#b8352c",
+  yellow: "#c3940a",
+  gray: "#8c969c",
+  graphite: "#3a4146",
 };
 
 export const SERIES_COLORS = [
-  "#e08b3e", "#7ed4e6", "#8ec4a3", "#e6c34d", "#c8453c",
-  "#f0aa63", "#7f9aa8", "#b6a8e0", "#a5d6ff", "#e8cba6",
+  "#128aa3", "#b8352c", "#3b8a5a", "#c3940a", "#4d6a85",
+  "#7a5ea8", "#141617", "#d4772c", "#5fb3c4", "#9a8f84",
 ];
 
-// Grid, axis lines and labels: cold and quiet, so the series are the only
-// thing with colour in the box.
+// Grid, axis lines and labels: grey and quiet, so the series are the only
+// thing with colour in the box. Axis names keep the accent.
 export const CHART_INK = {
-  label: "#93a2ab",
-  axis: "#303334",
-  split: "#26292a",
-  name: "#7ed4e6",
+  label: "#5b656b",
+  axis: "#c9ced1",
+  split: "#e3e6e8",
+  name: "#0d7489",
 };
+
+// The fill under a main line: the accent, fading out downwards.
+export function accentFill(strength = 0.18) {
+  return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+    { offset: 0, color: `rgba(18,138,163,${strength})` },
+    { offset: 1, color: "rgba(18,138,163,0)" },
+  ]);
+}
 
 // Every axis in the panel is named: a chart that does not say what its
 // numbers are is a picture, not a measurement. `name` on an axis of this
@@ -232,11 +240,11 @@ export function chartBase() {
     grid: { left: 64, right: 26, top: 34, bottom: 52 },
     tooltip: {
       trigger: "axis",
-      backgroundColor: "#232526",
-      borderColor: "#3d4042",
+      backgroundColor: "#ffffff",
+      borderColor: "#c9ced1",
       borderWidth: 1,
-      textStyle: { color: "#e7ecef", fontSize: 11 },
-      axisPointer: { lineStyle: { color: "#4c5052" } },
+      textStyle: { color: "#15181a", fontSize: 11 },
+      axisPointer: { lineStyle: { color: "#aab0b4" } },
     },
     legend: {
       top: 6,
@@ -298,11 +306,10 @@ export function chartIn(node) {
 // comes out is vector, and a figure in a paper can be scaled to any size and
 // still have real text in it.
 //
-// The page is dark and paper is white, so the exported copy changes its
+// The page is grey and paper is white, so the exported copy changes its
 // BACKGROUND and nothing else about the data: the series keep the colours
-// they are read in here. What has to follow the background is the frame
-// around them - axes, labels, grid, legend - or it would be pale grey on
-// white and unreadable.
+// they are read in here. The frame around them - axes, labels, grid,
+// legend - is redrawn in plain black and grey, the way a paper prints it.
 
 const PAPER = {
   background: "#ffffff",

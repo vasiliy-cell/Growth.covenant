@@ -1,66 +1,67 @@
 /*
- * Deep colours, and one blurred light a long way behind them.
+ * A laboratory sheet: pale cold paper, solid cards, black ink.
  *
- * The page is a cold graphite surface with three wide blooms of colour
- * blurred into it - a light source behind the fog, never a filter over
- * anything that has to be read. The panels are DARKER than that surface and
- * solid: they read as cut into it rather than laid on top, and each one is
- * drawn with two rounded lines - a dark outer border and a faint cold
- * hairline just inside it.
+ * The page is a light grey surface with a couple of soft blooms of white in
+ * it - unevenness, not colour. The panels are a shade LIGHTER than that
+ * surface and solid, each drawn with two lines - a grey outer border and a
+ * white hairline just inside it, the way a card catches light.
  *
  * Colour is a language here, not decoration:
- *   - hazard orange is the only warm colour and always means something -
- *     press me, I am on, I am the number to read, I am an agent,
- *   - ice cyan and steel are the cold technical frame: chart grids, axis
- *     labels, small system text,
- *   - smoked sage is reward, rusted crimson is death or penalty, warning
- *     yellow is a state to notice.
+ *   - black is the thing to press: primary buttons are ink on paper,
+ *   - cold cyan is the only accent and always means something - I am on,
+ *     I am the number to read, I am the line you came for,
+ *   - steel is the technical frame: small system text, chart names,
+ *   - green is reward, crimson is death, penalty - and an agent on the
+ *     family tree - gold is a state to notice, and a leader.
  */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* The whole ladder sits well above black: the surface is a cold slate,
-     the cards on it are almost neutral grey a shade darker, and the deepest
-     thing on the page - an input, a console - is still grey. The only
-     tinted things are the light behind the page and the accents. */
-  --bg: #212425;
-  --panel: #1b1d1e;
-  --panel-2: #1f2122;
-  --inset: #181a1b;
-  --hover: #272a2b;
-  --border: #303334;
-  --border-strong: #3d4042;
-  --ring: rgba(170, 205, 220, .05);
-  --hairline: rgba(216, 224, 228, .06);
+  /* The whole ladder is paper: the surface is a cold light grey, the cards
+     on it a shade lighter, and the deepest thing on the page - an input, a
+     console - is a shade darker again. */
+  --bg: #e7e9ea;
+  --panel: #f6f7f7;
+  --panel-2: #eff1f2;
+  --inset: #eceeef;
+  --hover: #e4e7e9;
+  --border: #d9dddf;
+  --border-strong: #c9ced1;
+  --ring: rgba(255, 255, 255, .55);
+  --hairline: rgba(255, 255, 255, .8);
 
-  --text: #e7ecef;
-  --muted: #93a2ab;
-  --dim: #5c6870;
+  --text: #15181a;
+  --muted: #5b656b;
+  --dim: #959ea4;
 
-  /* Hazard amber seen through dust: warm enough to be the only signal on
-     the page, muted enough to sit next to cold greys without shouting. */
-  --accent: #e08b3e;
-  --accent-soft: #f0aa63;
-  --accent-deep: #a25f22;
-  --accent-wash: rgba(224, 139, 62, .14);
-  --accent-ink: #140a02;
-  --accent-edge: #55381c;
-  --accent-back: #191108;
+  /* Ink: what a primary button is filled with. */
+  --ink: #141617;
+  --ink-hover: #2a2e30;
 
-  --cyan: #7ed4e6;
-  --steel: #557584;
+  /* Cold cyan, deep enough to be read on paper: the only colour on the
+     page that is not data. */
+  --accent: #128aa3;
+  --accent-soft: #0d7489;
+  --accent-deep: #0b6174;
+  --accent-wash: rgba(18, 138, 163, .12);
+  --accent-ink: #ffffff;
+  --accent-edge: #a6d6e0;
+  --accent-back: #e1f1f4;
 
-  --sage: #8ec4a3;
-  --crimson: #c8453c;
-  --yellow: #e6c34d;
+  --cyan: #128aa3;
+  --steel: #4d6a85;
 
-  /* Crimson, lightened: the colour of a warning about to be read. */
-  --rose: #d9695f;
+  --sage: #3b8a5a;
+  --crimson: #b8352c;
+  --yellow: #c3940a;
+
+  /* Crimson, a shade darker: the colour of a warning about to be read. */
+  --rose: #a92e26;
 
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-  --radius: 9px;
+  --radius: 7px;
 
   /* Panels sit close together: the gap is a seam, not a margin. */
   --gap: 6px;
@@ -79,29 +80,24 @@ html, body {
 /*
  * The light IS the background, painted straight onto the root element.
  *
- * Nothing on the page can cover it and no stacking order can bury it - the
- * two ways this glow was invisible before. The blooms are enormous and soft,
- * which is what reads as blurred; a `filter: blur()` cannot touch a
- * background image anyway, and a blurred layer at a negative z-index sits
- * under the first background anybody gives the body.
- *
- * The light is nearly colourless - cool grey above, a heavier grey-black
- * pulling the bottom right down, and one small amber ember low on the left.
- * What it gives the page is UNEVENNESS, not colour.
+ * Nothing on the page can cover it and no stacking order can bury it. The
+ * blooms are enormous and soft: white above, a cooler grey pulling the
+ * bottom right down, and one faint breath of cyan low on the left. What it
+ * gives the page is UNEVENNESS, not colour.
  */
 html {
   background-color: var(--bg);
   background-image:
-    radial-gradient(62vmax 46vmax at 10% -8%, rgba(164, 186, 190, .16), transparent 62%),
-    radial-gradient(54vmax 42vmax at 94% 2%, rgba(150, 175, 195, .13), transparent 64%),
-    radial-gradient(50vmax 40vmax at 74% 98%, rgba(10, 14, 16, .5), transparent 66%),
-    radial-gradient(30vmax 24vmax at 4% 92%, rgba(224, 139, 62, .08), transparent 66%);
+    radial-gradient(62vmax 46vmax at 10% -8%, rgba(255, 255, 255, .75), transparent 62%),
+    radial-gradient(54vmax 42vmax at 94% 2%, rgba(250, 252, 253, .6), transparent 64%),
+    radial-gradient(50vmax 40vmax at 74% 98%, rgba(160, 170, 176, .22), transparent 66%),
+    radial-gradient(30vmax 24vmax at 4% 92%, rgba(18, 138, 163, .06), transparent 66%);
   background-attachment: fixed;
 }
 
 body { display: flex; flex-direction: column; overflow: hidden; background: transparent; }
 
-::selection { background: rgba(224, 139, 62, .32); }
+::selection { background: rgba(18, 138, 163, .22); }
 
 a { color: inherit; text-decoration: none; }
 
@@ -147,7 +143,7 @@ nav.tabs a {
 }
 
 nav.tabs a:hover { color: var(--cyan); background: var(--hover); }
-nav.tabs a.active { color: var(--accent-soft); background: #2c2f30; border-color: var(--border-strong); }
+nav.tabs a.active { color: var(--accent-soft); background: #ffffff; border-color: var(--border-strong); }
 
 .titlebar .status { justify-self: end; display: flex; gap: 8px; align-items: center; }
 
@@ -184,7 +180,7 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
   background: var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  box-shadow: 0 1px 2px rgba(20, 30, 35, .06);
   overflow: hidden;
 }
 
@@ -255,16 +251,16 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
   padding: 0 12px;
   font: 500 12px/1 var(--sans);
   color: var(--text);
-  background: #292c2d;
+  background: #ffffff;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  box-shadow: 0 1px 0 rgba(20, 30, 35, .04);
   cursor: pointer;
   white-space: nowrap;
 }
 
-.btn:hover { background: #333738; border-color: #4e5254; }
-.btn:active { background: #222526; }
+.btn:hover { background: #f3f5f6; border-color: #b5bbbf; }
+.btn:active { background: var(--inset); }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 .btn .icon { display: inline-flex; color: var(--steel); }
 .btn:hover .icon { color: var(--text); }
@@ -273,24 +269,26 @@ main { flex: 1 1 auto; overflow: auto; padding: 12px 16px 18px; }
 .btn.small { height: 28px; padding: 0 10px; font-size: 11px; }
 .btn.small.square { width: 28px; }
 
+/* The thing to press is ink, as on the sheet it imitates; cyan stays the
+   colour of state, not of action. */
 .btn.primary {
-  color: var(--accent-ink);
-  background: var(--accent);
-  border-color: var(--accent-deep);
+  color: #ffffff;
+  background: var(--ink);
+  border-color: var(--ink);
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 0 0 0 transparent;
+  box-shadow: none;
 }
 
-.btn.primary .icon { color: var(--accent-ink); }
-.btn.primary:hover { background: var(--accent-soft); }
+.btn.primary .icon { color: #ffffff; }
+.btn.primary:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
 
 .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
 .btn.ghost:hover { background: var(--hover); border-color: var(--border); }
 
-.btn.danger:hover { color: var(--rose); border-color: #5c2b28; background: #1e1211; }
+.btn.danger:hover { color: var(--rose); border-color: #e2b4b0; background: #fbefee; }
 .btn.danger:hover .icon { color: var(--rose); }
-.btn.danger.solid { color: #fff; background: #9d332c; border-color: var(--crimson); }
-.btn.danger.solid:hover { background: var(--crimson); }
+.btn.danger.solid { color: #fff; background: var(--crimson); border-color: var(--rose); }
+.btn.danger.solid:hover { background: var(--rose); }
 
 .btn.big { height: 40px; padding: 0 20px; font-size: 13px; }
 
@@ -311,7 +309,7 @@ input::placeholder { color: var(--dim); }
 input:focus, select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(224, 139, 62, .18);
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
 input[type="range"] { height: auto; padding: 0; border: none; background: transparent; accent-color: var(--accent); box-shadow: none; }
@@ -327,7 +325,7 @@ input.switch {
   width: 34px; height: 20px;
   padding: 0;
   border-radius: 999px;
-  background: #363a3b;
+  background: #d3d7da;
   border: 1px solid var(--border-strong);
   position: relative;
   cursor: pointer;
@@ -341,7 +339,7 @@ input.switch::after {
   top: 2px; left: 2px;
   width: 14px; height: 14px;
   border-radius: 50%;
-  background: #c9c9d1;
+  background: #ffffff;
   transition: transform .15s, background .15s;
 }
 
@@ -403,7 +401,7 @@ input.switch:checked::after { transform: translateX(14px); background: #fff; }
   cursor: pointer;
 }
 
-.chip:hover { color: var(--cyan); border-color: #53585a; }
+.chip:hover { color: var(--cyan); border-color: #b5bbbf; }
 .chip.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); font-weight: 600; }
 
 .facet { padding: 12px 14px; border-bottom: 1px solid var(--border); }
@@ -449,10 +447,10 @@ td.name .ellipsis { display: block; }
   z-index: 45;
   min-width: 190px;
   padding: 4px;
-  background: #26292a;
+  background: #ffffff;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
-  box-shadow: inset 0 0 0 1px var(--hairline), 0 12px 30px rgba(0, 0, 0, .6);
+  box-shadow: 0 12px 30px rgba(20, 30, 35, .14);
 }
 
 .menu-item {
@@ -491,8 +489,8 @@ td.name .ellipsis { display: block; }
 }
 
 .badge.live { color: var(--accent-soft); border-color: var(--accent-edge); background: var(--accent-back); }
-.badge.warn { color: var(--yellow); border-color: #4c4014; }
-.badge.bad { color: var(--rose); border-color: #5c2b28; }
+.badge.warn { color: var(--yellow); border-color: #e6d197; }
+.badge.bad { color: var(--rose); border-color: #e2b4b0; }
 
 
 
@@ -525,7 +523,7 @@ td.name .ellipsis { display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1c1e1f;
+  background: var(--panel-2);
 }
 
 .live-stage canvas {
@@ -552,19 +550,19 @@ td.name .ellipsis { display: block; }
 .tree { width: 100%; height: 560px; cursor: grab; }
 .tree:active { cursor: grabbing; }
 .tree svg { width: 100%; height: 100%; }
-.node circle { stroke: var(--bg); stroke-width: 2px; cursor: pointer; }
-.node.dead circle { opacity: .5; }
-.link { fill: none; stroke: #3f4345; stroke-width: 1.3px; }
+.node circle { stroke: var(--panel); stroke-width: 2px; cursor: pointer; }
+.node.dead circle { opacity: .6; }
+.link { fill: none; stroke: #c3c9cd; stroke-width: 1.3px; }
 
 .card {
   position: fixed;
   z-index: 40;
   min-width: 270px;
   max-width: 370px;
-  background: #232526;
+  background: #ffffff;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  box-shadow: inset 0 0 0 1px var(--hairline), 0 18px 44px rgba(0, 0, 0, .75);
+  box-shadow: 0 18px 44px rgba(20, 30, 35, .16);
   padding: 11px 13px;
   font: 11px/1.55 var(--mono);
   pointer-events: none;
@@ -611,7 +609,7 @@ td.name .ellipsis { display: block; }
   font: 600 10px var(--mono);
   letter-spacing: .4px;
   text-transform: uppercase;
-  background: #2c2f30;
+  background: #ffffff;
   border: 1px solid var(--border-strong);
 }
 
@@ -667,7 +665,7 @@ td.name .ellipsis { display: block; }
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(24, 26, 27, .55);
+  background: rgba(200, 205, 208, .5);
   backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
@@ -688,7 +686,7 @@ td.name .ellipsis { display: block; }
   border: 1px solid var(--border-strong);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px var(--ring), 0 30px 80px rgba(0, 0, 0, .8);
+  box-shadow: inset 0 0 0 1px var(--ring), 0 30px 80px rgba(20, 30, 35, .25);
 }
 
 /* The popup a family tree opens: a page, not a question. */
@@ -703,8 +701,8 @@ td.name .ellipsis { display: block; }
 
 .warn-box {
   color: var(--rose);
-  border: 1px solid #5c2b28;
-  background: #1b1110;
+  border: 1px solid #e2b4b0;
+  background: #fbefee;
   border-radius: 8px;
   padding: 11px 13px;
   margin-bottom: 14px;
@@ -716,8 +714,8 @@ pre.console {
   max-height: 240px;
   overflow: auto;
   font: 11px/1.55 var(--mono);
-  color: #c4c8ca;
-  background: #181a1b;
+  color: #2b3135;
+  background: var(--inset);
   border-top: 1px solid var(--border);
   white-space: pre-wrap;
 }
@@ -727,5 +725,5 @@ pre.console {
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #383c3d; border-radius: 10px; border: 2px solid var(--bg); }
-::-webkit-scrollbar-thumb:hover { background: #4a4f51; }
+::-webkit-scrollbar-thumb { background: #c4c9cc; border-radius: 10px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #aab0b4; }

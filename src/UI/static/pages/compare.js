@@ -33,7 +33,7 @@ export async function comparePage(root, step) {
   root.replaceChildren(page);
 
   if (step === "runs") page.append(...pickRuns(worlds));
-  if (step === "metrics") page.append(...pickMetrics(metrics));
+  if (step === "metrics") page.append(...pickMetrics(metrics, worlds));
   if (step === "charts") page.append(...(await charts(worlds, metrics)));
 }
 
@@ -112,8 +112,28 @@ function pickRuns(worlds) {
   ];
 }
 
-function pickMetrics(metrics) {
+// The genes of the picked runs, as metrics: `gene:<name>`, the same key the
+// server answers. A gene only one of the runs carries is still offered - the
+// others simply have no line on its chart.
+function geneMetrics(worlds) {
+  const picked = worlds.filter((world) => state.runs.includes(world.id));
+  const names = [...new Set(picked.flatMap((world) => world.gene_names || []))].sort();
+
+  return Object.fromEntries(names.map((name) => {
+    const carriers = picked.filter((world) => (world.gene_names || []).includes(name)).length;
+
+    return [`gene:${name}`, {
+      name,
+      description: "mean of the agents alive in each episode",
+      carriers: `${carriers} of ${picked.length} runs carry it`,
+    }];
+  }));
+}
+
+function pickMetrics(metrics, worlds) {
   const grid = h("div", { class: "cards" });
+  const geneGrid = h("div", { class: "cards" });
+  const genes = geneMetrics(worlds);
 
   const next = button({
     label: "Show charts",
@@ -122,28 +142,32 @@ function pickMetrics(metrics) {
     onclick: () => go(route.compare("charts")),
   });
 
+  const card = ([key, metric], meta) => {
+    const on = state.metrics.includes(key);
+
+    return h("div", {
+      class: `card-pick ${on ? "on" : ""}`,
+      onclick: () => {
+        state.metrics = on ? state.metrics.filter((m) => m !== key) : [...state.metrics, key];
+        remember();
+        draw();
+      },
+    }, [
+      h("div", { class: "row", style: "flex-wrap:nowrap" }, [
+        h("span", { class: "box" }),
+        h("span", { class: "title" }, metric.name),
+      ]),
+      h("div", { class: "hint" }, metric.description),
+      h("div", { class: "meta" }, meta),
+    ]);
+  };
+
   const draw = () => {
     next.disabled = !state.metrics.length;
 
-    grid.replaceChildren(...Object.entries(metrics).map(([key, metric]) => {
-      const on = state.metrics.includes(key);
-
-      return h("div", {
-        class: `card-pick ${on ? "on" : ""}`,
-        onclick: () => {
-          state.metrics = on ? state.metrics.filter((m) => m !== key) : [...state.metrics, key];
-          remember();
-          draw();
-        },
-      }, [
-        h("div", { class: "row", style: "flex-wrap:nowrap" }, [
-          h("span", { class: "box" }),
-          h("span", { class: "title" }, metric.name),
-        ]),
-        h("div", { class: "hint" }, metric.description),
-        h("div", { class: "meta" }, metric.higher_is_better ? "higher is better" : "lower is better"),
-      ]);
-    }));
+    grid.replaceChildren(...Object.entries(metrics).map((entry) =>
+      card(entry, entry[1].higher_is_better ? "higher is better" : "lower is better")));
+    geneGrid.replaceChildren(...Object.entries(genes).map((entry) => card(entry, entry[1].carriers)));
   };
 
   draw();
@@ -157,6 +181,13 @@ function pickMetrics(metrics) {
       next,
     ]),
     grid,
+    h("div", { class: "page-head", style: "margin-top:12px" }, [
+      h("h1", {}, "Genes"),
+      h("span", { class: "sub" }, Object.keys(genes).length
+        ? "how each gene drifted in each run"
+        : "none of the picked runs logged any genes"),
+    ]),
+    geneGrid,
   ];
 }
 
@@ -215,7 +246,7 @@ async function charts(worlds, metrics) {
         svgButton(`compare ${result.name}`, () => drawn.chart, () => figure),
       ]),
       h("div", { class: "body" }, node),
-      table(result, color),
+      result.gene ? geneTable(result, color) : table(result, color),
     ]);
   });
 
@@ -246,7 +277,9 @@ function drawChart(chart, result, smoothing, color) {
     xAxis: { ...base.xAxis, type: "value", name: "episode" },
     // Every axis says what it holds: this one is whichever metric the
     // comparison is about.
-    yAxis: { ...base.yAxis, name: smoothing > 1 ? `${result.name} · EMA ${smoothing}` : result.name },
+    // A gene lives far from zero (a learning rate, a buffer size), so its
+    // axis is fitted to the values instead of starting at nothing.
+    yAxis: { ...base.yAxis, name: smoothing > 1 ? `${result.name} · EMA ${smoothing}` : result.name, scale: Boolean(result.gene) },
     series: result.series.map((series) => {
       const values = ema(series.values, smoothing);
 
@@ -264,6 +297,48 @@ function drawChart(chart, result, smoothing, color) {
 }
 
 // ---------------- the numbers under a chart ----------------
+
+// The mean of the first and of the last tenth of a series: where it started
+// and where it ended up, each over enough episodes not to be one jump.
+function ends(values) {
+  const present = values.filter((value) => value !== null && value !== undefined);
+  const tenth = Math.max(1, Math.floor(present.length / 10));
+  const mean = (part) => (part.length ? part.reduce((sum, value) => sum + value, 0) / part.length : null);
+
+  return { start: mean(present.slice(0, tenth)), end: mean(present.slice(-tenth)) };
+}
+
+// A gene is not ranked - no value of it is "better" - so its table keeps the
+// runs in the order they were picked and says where the gene went.
+function geneTable(result, color) {
+  const digits = (value) => (value !== null && Math.abs(value) >= 100 ? 1 : 5);
+
+  return h("table", {}, [
+    h("thead", {}, h("tr", {}, [
+      h("th", {}, "Run"),
+      h("th", { class: "num" }, "Episodes"),
+      h("th", { class: "num", title: "average over the first 10% of the run's episodes" }, "start"),
+      h("th", { class: "num", title: "average over the last 10% of the run's episodes" }, "end"),
+      h("th", { class: "num", title: "end minus start" }, "change"),
+    ])),
+    h("tbody", {}, result.series.map((series) => {
+      const { start, end } = ends(series.values);
+      const change = start === null || end === null ? null : end - start;
+
+      return h("tr", {}, [
+        h("td", {}, h("span", { class: "row", style: "flex-wrap:nowrap" }, [
+          h("span", { class: "swatch", style: `background:${color(series.id)}` }),
+          series.label,
+          h("span", { class: "dim mono", style: "font-size:11px" }, `seed ${series.seed ?? "—"}`),
+        ])),
+        h("td", { class: "num" }, series.values.length ? fmt.int(series.episodes.length) : "no such gene"),
+        h("td", { class: "num" }, fmt.number(start, digits(start))),
+        h("td", { class: "num accent" }, fmt.number(end, digits(end))),
+        h("td", { class: "num" }, change === null ? "—" : `${change >= 0 ? "+" : ""}${fmt.number(change, digits(change))}`),
+      ]);
+    })),
+  ]);
+}
 
 function table(result, color) {
   // Every run starts as the same clueless newborn, so the run is judged by

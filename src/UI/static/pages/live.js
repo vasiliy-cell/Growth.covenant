@@ -12,12 +12,11 @@
 
 import { api, h, fmt, route, cleanup, every, button } from "../lib.js";
 
-// empty, food, danger - the panel's own language on the map: smoked sage
-// is what pays, rusted crimson is what hurts, and the agents on top of them
-// are the one warm colour in the interface. An empty cell is graphite, not
-// black: a black hole in the middle of the page would cut straight through
-// the fog everything else sits in.
-const CELLS = [[42, 45, 46], [142, 196, 163], [200, 69, 60]];
+// empty, food, danger - the panel's own language on the map: green is what
+// pays, crimson is what hurts, and the agents on top of them are the cold
+// cyan accent. An empty cell is pale grey, a shade under the paper the
+// page is printed on.
+const CELLS = [[226, 229, 231], [96, 170, 122], [200, 72, 62]];
 
 const SIZE = 520;
 const SPEEDS = [[5, "5/s"], [10, "10/s"], [30, "30/s"], [60, "60/s"], [0, "full speed"]];
@@ -220,12 +219,12 @@ class Player {
     const scale = canvas.width / this.size;
 
     context.imageSmoothingEnabled = false;
-    context.fillStyle = "#1c1e1f";
+    context.fillStyle = "#e2e5e7";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     if (this.mapKey) context.drawImage(this.map, 0, 0, canvas.width, canvas.height);
 
-    context.fillStyle = "#f0aa63";
+    context.fillStyle = "#128aa3";
 
     for (const [x, y] of this.positions(now).values()) {
       context.beginPath();

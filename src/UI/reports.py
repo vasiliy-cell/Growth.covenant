@@ -275,6 +275,7 @@ def catalog(logs_dir, store=None, live_dir=None):
             "deaths": reader.count("deaths"),
             "size": folder_size(reader.path),
             "genes": len(reader.genes),
+            "gene_names": list(reader.genes),
             "commit": reader.header.get("commit"),
             "population": population,
             "checkpoint": latest_checkpoint(reader, grouped),
@@ -1374,8 +1375,17 @@ METRICS = {
 }
 
 
+# A gene is compared as `gene:<name>`: the mean over the living, window by
+# window, exactly as one world's own gene chart draws it. A gene has no
+# better direction - it is watched, not ranked.
+GENE_METRIC = "gene:"
+
+
 def compare(logs_dir, worlds, metric):
     """One series per world, on the same axis: the episode."""
+    if metric.startswith(GENE_METRIC):
+        return compare_gene(logs_dir, worlds, metric[len(GENE_METRIC):])
+
     if metric not in METRICS:
         raise ValueError(f"Unknown metric {metric}")
 
@@ -1401,6 +1411,38 @@ def compare(logs_dir, worlds, metric):
         "name": name,
         "description": description,
         "higher_is_better": higher_is_better,
+        "series": series,
+    }
+
+
+def compare_gene(logs_dir, worlds, gene):
+    """
+    One gene across several worlds.
+
+    A world that never carried this gene comes back with an empty series
+    rather than an error: worlds of different species can be on one page.
+    """
+    series = []
+
+    for world in worlds:
+        reader = open_world(logs_dir, world)
+        found = genes(reader, [gene])
+
+        series.append({
+            "id": world,
+            "label": reader.label or reader.world_id,
+            "species": reader.header.get("species"),
+            "seed": (reader.sessions[0] if reader.sessions else {}).get("seed"),
+            "episodes": found["episodes"] if gene in found["series"] else [],
+            "values": found["series"].get(gene, []),
+        })
+
+    return {
+        "metric": f"{GENE_METRIC}{gene}",
+        "name": gene,
+        "description": "gene, mean of the agents alive in each episode",
+        "higher_is_better": None,
+        "gene": True,
         "series": series,
     }
 
