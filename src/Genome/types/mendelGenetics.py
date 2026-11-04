@@ -76,8 +76,10 @@ class MendelGeneticsSpecies:
                     mutated_genotype["hidden_layers"][i][0] = 1
                 if mutated_genotype["batch_size"][i][0] < 1:
                     mutated_genotype["batch_size"][i][0] = 10
-                if mutated_genotype["hidden_size"][i][0] < 0:
+                if mutated_genotype["hidden_size"][i][0] < 1:
                     mutated_genotype["hidden_size"][i][0] = 30
+                if mutated_genotype["target_update_freq"][i][0] < 1:
+                    mutated_genotype["target_update_freq"][i][0] = 1
 
         return mutated_genotype
 

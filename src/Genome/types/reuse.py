@@ -45,8 +45,10 @@ class reuse:
             genotype["hidden_layers"] = 1
         if genotype["batch_size"] < 1:
             genotype["batch_size"] = 10
-        if genotype["hidden_size"] < 0:
+        if genotype["hidden_size"] < 1:
             genotype["hidden_size"] = 30
+        if genotype["target_update_freq"] < 1:
+            genotype["target_update_freq"] = 1
 
         return genotype
 
@@ -103,8 +105,10 @@ class reuse:
             mutated_genotype["hidden_layers"] = 1
         if mutated_genotype["batch_size"] < 1:
             mutated_genotype["batch_size"] = 10
-        if mutated_genotype["hidden_size"] < 0:
+        if mutated_genotype["hidden_size"] < 1:
             mutated_genotype["hidden_size"] = 30
+        if mutated_genotype["target_update_freq"] < 1:
+            mutated_genotype["target_update_freq"] = 1
 
         return mutated_genotype
 
