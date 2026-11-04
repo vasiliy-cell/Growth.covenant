@@ -43,7 +43,7 @@ class reuse:
             genotype["buffer_size"] = genotype["min_buffer_size"]
         if genotype["hidden_layers"] < 0:
             genotype["hidden_layers"] = 1
-        if genotype["batch_size"] < 0:
+        if genotype["batch_size"] < 1:
             genotype["batch_size"] = 10
         if genotype["hidden_size"] < 0:
             genotype["hidden_size"] = 30
@@ -101,7 +101,7 @@ class reuse:
             mutated_genotype["buffer_size"] = mutated_genotype["min_buffer_size"]
         if mutated_genotype["hidden_layers"] < 0:
             mutated_genotype["hidden_layers"] = 1
-        if mutated_genotype["batch_size"] < 0:
+        if mutated_genotype["batch_size"] < 1:
             mutated_genotype["batch_size"] = 10
         if mutated_genotype["hidden_size"] < 0:
             mutated_genotype["hidden_size"] = 30
