@@ -25,6 +25,7 @@ If a page and the code disagree, the code is the experiment - fix the page.
 | [genome.md](genome.md) | Genes, the three species (clons, non_linear, mendel), mutation, phenotype, frozen genes |
 | [randomness.md](randomness.md) | The named rng streams, and why a run is reproducible |
 | [checkpoints.md](checkpoints.md) | Saving and continuing a whole run; rolling and pinned checkpoints; the model archive |
+| [probe.md](probe.md) | Snapshots of adults during a run, and measuring each one alone and frozen afterwards |
 | [logging.md](logging.md) | The log folder of a world, every table and column, and how to read it back |
 | [running.md](running.md) | How to start, continue and watch runs; command line flags; scripts; tests |
 | [panel.md](panel.md) | The local web panel: pages, what it reads, what it can change |

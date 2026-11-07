@@ -47,6 +47,15 @@ checkpoints:
   replay_every: 5         # every Nth checkpoint also carries the buffers
   keep: 5                 # runs kept in rolling/; pinned ones are forever
 
+# --- PROBE ---
+# Snapshots of living adults, measured later alone in a fresh copy of the
+# world with a frozen mind: scripts/probe.py. Read-only for the run itself.
+probe:
+  every_episodes: 0       # snapshot every N episodes, on the grid k*N (0 = off)
+  agents: null            # Q: distinct adults per snapshot
+  rescue_episodes: null   # fewer adults than Q: try once more this many episodes later
+  episodes: null          # P: how long each probe world runs, in episodes
+
 # --- REWARD SHAPING ---
 reward_shaping:
   food_bonus: 5           # added to the intrinsic reward on a step the world paid food

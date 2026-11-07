@@ -5,6 +5,7 @@ from src.persistence.checkpoint import Checkpoint
 from src.persistence.checkpoint_store import CheckpointStore
 from src.persistence.checkpoint_writer import CheckpointWriter
 from src.persistence.run_log import RunLog
+from src.probe.snapshot import PROBE_DIR, SNAPSHOTS_DIR, ProbeRecorder
 
 from src.Genome.types.reuse import reuse
 from src.utils.pacing import Pacer
@@ -221,6 +222,18 @@ def choose_pin(default=False):
     return answer.lower().startswith("y") if answer else default
 
 
+def choose_probe(default=False):
+    """
+    Whether the probe worlds run as soon as this run is over.
+
+    The snapshots are written either way; this only decides whether
+    scripts/probe.py is run for them now or left for later.
+    """
+    answer = ask("Run the probe worlds right after this run? [y/N]: ").strip()
+
+    return answer.lower().startswith("y") if answer else default
+
+
 def population_state(env, brains):
     """
     Where every living mind stands, for the end of a logging window.
@@ -275,7 +288,7 @@ def encode_observation(obs):
 
 def main(render_fn=None, episodes=None, seed=None, agent_count=None,
          species=None, resume=None, pin=None, label=None, series=None,
-         live_every=None, overrides=None, render=None):
+         live_every=None, overrides=None, render=None, probe=None):
     """
     resume:     path of a checkpoint to carry on, "" to force a new world,
                 None to ask.
@@ -289,6 +302,8 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     render:     steps per second to run at so the world can be WATCHED -
                 every step goes to live.json and the loop waits between
                 steps. 0 or None runs at full speed.
+    probe:      whether the probe worlds run right after this run (None
+                asks, when probe snapshots are on).
     """
     render = int(render or 0)
     config = apply_overrides(load_config(), overrides)
@@ -381,6 +396,11 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
     if pin is None:
         pin = choose_pin()
+
+    probing = int((config.get("probe") or {}).get("every_episodes") or 0) > 0
+
+    if probe is None:
+        probe = choose_probe() if probing else False
 
     # Minted once per run and shared by the whole population: every agent id
     # of this run is built on it, which is what keeps ids unique across all
@@ -503,6 +523,13 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     log.episode = record["run"]["episode"] if record is not None else 0
 
     print(f"LOG: {log.path} (session {log.session})")
+
+    # --- probe snapshots ---
+    # Read-only: a copy of a few adults every probe.every_episodes, from a
+    # stream of its own. None when they are off.
+    recorder = ProbeRecorder.from_config(
+        config, os.path.join(log.path, PROBE_DIR, SNAPSHOTS_DIR), rng
+    )
 
     if record is None:
         # The first population is born too. Without these rows a family
@@ -762,6 +789,22 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
 
                 window += 1
 
+                # Before the decay below: the minds exactly as the window
+                # that just closed saw them.
+                if recorder is not None:
+                    recorder.end_episode(
+                        episode=log.episode,
+                        step=step,
+                        env=env,
+                        brains=brains,
+                        run={
+                            "world_id": world_id,
+                            "seed": seed,
+                            "episode_length": episode_length,
+                        },
+                        config=config,
+                    )
+
                 print(
                     f"Episode {window}/{episodes} "
                     f"(world {summary['episode']}) | "
@@ -825,6 +868,13 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
     print(f"Saved {len(saved)} brains to {archive.directory}")
     print("Training finished")
 
+    if probe:
+        # Imported here and not at the top: the probe runner reads the
+        # observation encoding out of this very module.
+        from src.probe.runner import run_probes
+
+        run_probes(log.path)
+
 
 def parse_args():
     """
@@ -847,6 +897,9 @@ def parse_args():
     parser.add_argument("--pin", dest="pin", action="store_true", default=None,
                         help="keep this run's final checkpoint forever")
     parser.add_argument("--no-pin", dest="pin", action="store_false")
+    parser.add_argument("--probe", dest="probe", action="store_true", default=None,
+                        help="run the probe worlds right after this run")
+    parser.add_argument("--no-probe", dest="probe", action="store_false")
     parser.add_argument("--live-every", type=int, dest="live_every",
                         help="rewrite live.json every N steps (0 = off)")
     parser.add_argument("--render", type=int, metavar="STEPS_PER_SECOND",

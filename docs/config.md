@@ -161,6 +161,21 @@ file those saves would push every other run's checkpoint out.
 - **`keep`** - how many runs' newest checkpoints survive a prune; pinned
   ones are forever.
 
+## `probe`
+
+Snapshots of the population for measuring a mind apart from its crowd -
+see [probe.md](probe.md). Taking one reads the run and changes nothing in
+it: not the map, not a body, not a stream anybody else draws from.
+
+- **`every_episodes`** (N) - a snapshot every N episodes, always on the
+  grid `k*N`, so the x axis of a curve does not drift (0 = off).
+- **`agents`** (Q) - how many distinct living adults a snapshot holds.
+- **`rescue_episodes`** - fewer adults than Q: wait this many episodes
+  and try once more; then take everybody there is, and nobody if there is
+  nobody.
+- **`episodes`** (P) - how long each probe world runs, in episodes of
+  `run.episode_length` steps.
+
 ## `reward_shaping`
 
 What a mind learns from, on top of what the world pays.
