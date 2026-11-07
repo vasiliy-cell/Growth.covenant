@@ -320,9 +320,13 @@ class RunLog:
 
         # Everything a step decided, in the order it was decided - two runs
         # of one seed print the same digest, and the first window where
-        # they differ is where they diverged.
+        # they differ is where they diverged. The agent goes in as its
+        # index and not its id: the id carries the run id, which is new on
+        # every launch, so two launches of one seed never matched.
+        index = agent_id.rsplit("-", 1)[-1]
+
         self._fingerprint.update(
-            f"{step}|{agent_id}|{action}|{env_reward}|{shaped_reward}"
+            f"{step}|{index}|{action}|{env_reward}|{shaped_reward}"
             f"|{position[0]},{position[1]}".encode("utf-8")
         )
 

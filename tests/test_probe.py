@@ -63,8 +63,7 @@ def fingerprints(world):
 def steps(world):
     """
     Every step as the run took it. The agent id carries the run id, which
-    is new on every launch, so an agent is named by its index here - the
-    fingerprint hashes the whole id and differs between any two launches.
+    is new on every launch, so an agent is named by its index here.
     """
     table = world.steps()
     columns = ["step", "x", "y", "action", "env_reward", "shaped_reward", "energy"]
@@ -85,6 +84,15 @@ def test_snapshots_do_not_move_the_run(workdir):
     assert snapshots_of(without.path) == []
     assert len(snapshots_of(with_probe.path)) > 0
     assert steps(with_probe) == steps(without)
+    assert fingerprints(with_probe) == fingerprints(without)
+
+
+def test_two_launches_of_one_seed_print_the_same_fingerprints(workdir):
+    first = run_world(workdir / "first", every=0)
+    second = run_world(workdir / "second", every=0)
+
+    assert first.world_id != second.world_id
+    assert fingerprints(first) == fingerprints(second)
 
 
 def test_a_snapshot_holds_distinct_adults_on_the_grid(workdir):
