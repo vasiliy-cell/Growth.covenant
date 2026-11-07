@@ -32,8 +32,13 @@ class GridWorldEnv:
     permanent advantage.
     """
 
-    def __init__(self, size=8, rng=None, balance=None, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7, evolve=None):
+    def __init__(self, size=8, rng=None, balance=None, refill=None, agent_count=1, run_id=None, species_name=None, life=None, view_size=7, evolve=None, metabolism=True):
         self.size = size
+
+        # Energy, leak, aging, starvation and birth. Off only in a probe
+        # world (src/probe/), where a frozen mind is measured on the task
+        # alone: the cells still pay, nobody eats, starves or breeds.
+        self.metabolism = metabolism
 
         # Every stream of chance in this run (src/utils/rng.py). The world
         # asks it for named streams instead of sharing one: a fight over a
@@ -352,7 +357,8 @@ class GridWorldEnv:
             rewards[agent.agent_id] = self.world.get_reward(position)
             # A stomach holds only so much: what the world paid is added,
             # and whatever would go above the ceiling is not kept.
-            agent.energy = self.life.cap(agent.energy + rewards[agent.agent_id])
+            if self.metabolism:
+                agent.energy = self.life.cap(agent.energy + rewards[agent.agent_id])
             agent.total_reward += rewards[agent.agent_id]
 
             # good/bad cells turn empty once an agent touches them
@@ -361,10 +367,11 @@ class GridWorldEnv:
 
             # The cost of being alive, and it is personal: the older the
             # body, the dearer the tick (src/Agent/life.py).
-            agent.pay_leak()
+            if self.metabolism:
+                agent.pay_leak()
 
         # 4b. DEATH - starvation, once this tick's energy has settled.
-        deaths = self._reap()
+        deaths = self._reap() if self.metabolism else []
 
         # 4c. ONE TICK LIVED. Counted after the reaping and not before it,
         #     so a newborn is immortal for exactly life.max_childhood_steps
@@ -374,7 +381,7 @@ class GridWorldEnv:
             agent.grow_older()
 
         # 4d. BIRTH - energy-gated, on what is left alive.
-        births = self._reproduce()
+        births = self._reproduce() if self.metabolism else []
 
         # 5. REFILL - the world tops itself up once per TICK, however many
         #    agents there are, so world.refill.every keeps meaning what it

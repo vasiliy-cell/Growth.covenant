@@ -113,6 +113,7 @@ class RunLog:
         rng_agents_every=100,
         live_dir=None,
         live_every=20,
+        probe=None,
     ):
         self.path = self.folder_for(directory, world_id, label, series)
         os.makedirs(self.path, exist_ok=True)
@@ -160,6 +161,9 @@ class RunLog:
                 "created_at": time.time(),
                 "episode_length": episode_length,
                 "series": series,
+                # A probe world says where its one agent came from: the
+                # world, the snapshot and the agent (src/probe/runner.py).
+                "probe": probe,
                 "species": species,
                 "genes": sorted(gene_names),
                 "config": config,
