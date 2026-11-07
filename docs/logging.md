@@ -104,7 +104,7 @@ of its last logged step and epsilon/beta are empty.
 | `updates`, `mean_loss`, `mean_td_error` | gradient updates in the window; `mean_td_error` is the mean of absolute per-update values |
 | `mean_epsilon`, `mean_curiosity_beta` | over living minds |
 | `non_empty_ratio` | share of the map holding food or danger |
-| `fingerprint` | rolling hash of every step logged so far |
+| `fingerprint` | chain hash of every step this world has logged so far, carried through checkpoints |
 
 The runner prints this row to the terminal at every window.
 

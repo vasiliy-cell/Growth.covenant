@@ -521,6 +521,10 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
         ),
     )
     log.episode = record["run"]["episode"] if record is not None else 0
+    # The same chain of steps goes on, so a resumed world prints the
+    # fingerprints the uninterrupted one would have. A checkpoint from
+    # before the chain was saved starts a new one.
+    log.fingerprint = record["run"].get("fingerprint") if record is not None else None
 
     print(f"LOG: {log.path} (session {log.session})")
 
@@ -581,6 +585,7 @@ def main(render_fn=None, episodes=None, seed=None, agent_count=None,
                     "step": step,
                     "episode": log.episode,
                     "episode_length": episode_length,
+                    "fingerprint": log.fingerprint,
                 },
                 config=config,
                 with_replay=with_replay,

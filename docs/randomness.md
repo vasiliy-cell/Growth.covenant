@@ -78,6 +78,8 @@ should rely on them.
 - Across machines or on GPU: "almost", not guaranteed, even with
   `run.deterministic: true` (which calls
   `torch.use_deterministic_algorithms(True, warn_only=True)`).
-- The `fingerprint` column of `episodes/population` is a rolling hash of
-  every logged step. Same seed → same fingerprints; the first window where
-  two runs differ is where they diverged.
+- The `fingerprint` column of `episodes/population` is a chain hash of
+  every logged step (agents named by index, not by id). Same seed → same
+  fingerprints; the first window where two runs differ is where they
+  diverged. A checkpoint carries the chain, so a resumed world prints the
+  fingerprints the uninterrupted one would have.

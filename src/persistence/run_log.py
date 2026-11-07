@@ -202,7 +202,9 @@ class RunLog:
         self.episode = 0
         self.first_step = None
         self.last_step = None
-        self._fingerprint = hashlib.blake2b(digest_size=8)
+        # The chain so far, as a digest: a fresh world starts it empty and a
+        # continued one picks it up from its checkpoint (see fingerprint).
+        self._fingerprint = b""
         self._start_window(time.time())
 
         self._write_header()
@@ -323,12 +325,19 @@ class RunLog:
         # they differ is where they diverged. The agent goes in as its
         # index and not its id: the id carries the run id, which is new on
         # every launch, so two launches of one seed never matched.
+        #
+        # A chain and not one running hash: each row is hashed together
+        # with the digest before it, so the whole state is those 8 bytes -
+        # a checkpoint carries them and a resumed world goes on with the
+        # same chain instead of starting a new one.
         index = agent_id.rsplit("-", 1)[-1]
 
-        self._fingerprint.update(
-            f"{step}|{index}|{action}|{env_reward}|{shaped_reward}"
-            f"|{position[0]},{position[1]}".encode("utf-8")
-        )
+        self._fingerprint = hashlib.blake2b(
+            self._fingerprint
+            + f"{step}|{index}|{action}|{env_reward}|{shaped_reward}"
+            f"|{position[0]},{position[1]}".encode("utf-8"),
+            digest_size=8,
+        ).digest()
 
     def _count_step(self, step, agent_id, env_reward, intrinsic_reward, shaped_reward):
         if self.first_step is None:
@@ -627,7 +636,7 @@ class RunLog:
             "mean_epsilon": sum(epsilons) / len(epsilons) if epsilons else None,
             "mean_curiosity_beta": sum(betas) / len(betas) if betas else None,
             "non_empty_ratio": non_empty_ratio,
-            "fingerprint": self._fingerprint.hexdigest(),
+            "fingerprint": self.fingerprint,
         }
 
         self.tables["episode_population"].append(summary)
@@ -638,6 +647,16 @@ class RunLog:
         self._start_window(now)
 
         return summary
+
+    @property
+    def fingerprint(self):
+        """The chain of every step logged in this world so far, as hex."""
+        return self._fingerprint.hex()
+
+    @fingerprint.setter
+    def fingerprint(self, value):
+        """Picks the chain up where a checkpoint left it (None: start)."""
+        self._fingerprint = bytes.fromhex(value) if value else b""
 
     @property
     def window_reward(self):

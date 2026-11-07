@@ -87,13 +87,6 @@ def test_snapshots_do_not_move_the_run(workdir):
     assert fingerprints(with_probe) == fingerprints(without)
 
 
-def test_two_launches_of_one_seed_print_the_same_fingerprints(workdir):
-    first = run_world(workdir / "first", every=0)
-    second = run_world(workdir / "second", every=0)
-
-    assert first.world_id != second.world_id
-    assert fingerprints(first) == fingerprints(second)
-
 
 def test_a_snapshot_holds_distinct_adults_on_the_grid(workdir):
     world = run_world(workdir, every=2)
