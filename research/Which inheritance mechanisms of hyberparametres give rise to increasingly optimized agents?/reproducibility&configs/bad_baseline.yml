@@ -1,4 +1,17 @@
 # =====================================================================
+#  BAD BASELINE - a deliberately worsened copy of good_baseline.yml, for
+#  the two-level comparison. It is good_baseline.yml with exactly three
+#  gene means degraded (everything else identical):
+#    gamma        0.99 -> 0.50   (myopic: barely plans past the next step)
+#    hidden_size  64   -> 40     (smaller brain)
+#    buffer_size  10000-> 1000   (shorter memory)
+#  This "g50h40" point was the most-worsened config that still SURVIVED
+#  in the edge search (seed 1290435116): adults learn at ~35-40% of the
+#  good baseline's rate and enter adulthood ~44% lower on reward, yet the
+#  population recovers to the world's carrying capacity by ~episode 300.
+#  Survival confirmed on one seed only (s01) - verify more before relying
+#  on "always survives".
+#
 #  Every setting of a run. One line per key on purpose - what each one
 #  means, and why it is that value, is written in docs/config.md.
 #
@@ -115,8 +128,8 @@ genome:
 
     # --- DQN TARGETS ---
     gamma:                        # discount factor
-      mean: 0.99
-      scale: 0.001
+      mean: 0.50
+      scale: 0.2
       type: float
     target_update_freq:           # updates between two target-net syncs
       mean: 200
@@ -125,7 +138,7 @@ genome:
 
     # --- NETWORK SHAPE ---
     hidden_size:
-      mean: 64
+      mean: 40
       scale: 8
       type: int
     hidden_layers:
@@ -135,7 +148,7 @@ genome:
 
     # --- MEMORY --- (one transition per tick, so these are ticks of history)
     buffer_size:                  # how far back this mind remembers
-      mean: 10000
+      mean: 1000
       scale: 2000
       type: int
     batch_size:                   # how much it revisits per update

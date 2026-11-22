@@ -10,9 +10,14 @@
 #
 #   <dest-root>/<dest-subdir>/seed-<seed>/   (run.json, steps/, ...)
 #
-# idx -> seed comes from this project's own fixed, ordered seed list
-# (seeds.sh), not from guessing or re-deriving it: label s07 IS seeds.sh
-# index 7, always, by construction (run_pass.sh never reorders it).
+# The seed comes straight out of each world's own run.json
+# (sessions[0].seed) - not from re-deriving it via the world's "-sNN" label
+# against some fixed seed list. That used to be seeds.sh's 15-seed array,
+# which silently went out of bounds (bash -u killed the whole ship loop,
+# hours into an unattended run) the day a pass used more than 15 seeds
+# (seeds_30.sh's 30/15/10-seed batches). run.json is authoritative and
+# always matches whatever seed actually ran, so there is nothing left to
+# get out of sync.
 #
 #   ./scripts/pipeline/fetch_results.sh --pass 1 --name good_baseline \
 #       --dest-subdir baseline \
@@ -45,8 +50,6 @@ done
   exit 1
 }
 
-source "$REPO_ROOT/scripts/pipeline/seeds.sh"
-
 # --series is authoritative when given (pass 2's good/bad legs reuse the
 # same NAME on both legs, so --pass/--name alone cannot tell them apart).
 # --pass/--name alone still works for pass 1, where NAME is unique already.
@@ -63,9 +66,16 @@ mkdir -p "$TARGET_DIR"
 
 sync_one() {
   local world="$1" src="$2"
-  local idx="${world##*-s}"
-  idx=$((10#$idx))   # 10#: strip a leading zero without bash reading "08" as invalid octal
-  local seed="${SEEDS[$((idx - 1))]}"
+  local seed
+  if [[ -n "$HOST" ]]; then
+    seed="$(ssh "${SSH_OPTS[@]}" "$HOST" "grep -o '\"seed\": [0-9]*' '$src/run.json' | head -1 | grep -o '[0-9]*'" 2>/dev/null)"
+  else
+    seed="$(grep -o '"seed": [0-9]*' "$src/run.json" 2>/dev/null | head -1 | grep -o '[0-9]*')"
+  fi
+  if [[ -z "$seed" ]]; then
+    echo "  !! $world: could not read seed from run.json - skipping" >&2
+    return 1
+  fi
   local final_dir="$TARGET_DIR/seed-${seed}"
   local world_id="${world%%_*}"   # everything before the first "_" - the run's own id, not the label
   local marker="$final_dir/.fetched_world_id"

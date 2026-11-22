@@ -3,7 +3,7 @@
 > are actually required before adaptive behaviour, evolution, and
 > communication appear in artificial agents on their own.
 
-**Status:** Stage 3 — artificial life / multi-agent evolution (in progress)
+**Status:** Stage 4 — world Complexity, rust(in progress)
 
 # OPUS MAGNUM COSMOGONICUM
 
@@ -67,26 +67,9 @@ Each research stage follows the same shape:
 
 Full disclosure, since this matters for how the results should be read.
 
-I use AI assistants (primarily Claude) in this project for exactly two things:
+I used Claude and Codex to assist with coding, discuss hypotheses and methodological and statistical questions, check calculations, translate and edit the manuscript, and prepare the final layout. I reviewed the AI-assisted material, developed the main research design, formulated the hypotheses, wrote most of the code, conducted the experiments, and analyzed and interpreted the results. I made the final decisions about the implementation, methodology, and conclusions, and take responsibility for the methods, results, and claims presented in this work.
 
-- **generating some chunks of code**
-- **spelling and grammar checks** in text.
-
-That is the whole list. Specifically, AI does **not**:
-
-- design experiments or choose hypotheses;
-- decide the architecture of the system or of the genome schemes;
-- write papers, reports, or research conclusions;
-- interpret results.
-
-Every line of generated code or text is read and understood by me before it enters the
-repository. Nothing goes in that I could not have written myself and cannot
-explain. The research design, the reasoning behind it, and the conclusions are
-mine.
-
-This is verifiable, not just a claim: Claude appears as a separate contributor
-in the commit history, so anyone can check line by line which parts were
-written with AI assistance and which I wrote by hand.
+This is partly reflected in the commit history, where Claude is credited on AI-assisted commits. These records document some of the AI involvement.
 
 ---
 
@@ -194,10 +177,22 @@ recorded in that run's log files — so any run can be reproduced from its logs.
 https://github.com/user-attachments/assets/dd9c73c2-4c0d-42ac-b3ff-7ee9cf9fd6ef
 
 
+## Research Results
 
-## research Results
+### Stage 3
 
-*(nothing published yet — Stage 3 in progress)*
+non_linear (BLX-α-style reproduction) performs better than clons and the Mendel-inspired system in mean probe-score.
+I also observe the ordering non_linear > mendel > clons, but the evidence is not strong enough to establish the full ranking confidently.
+Survival is less clear. Based on the observed survival rates, clons has the highest survival rate, though this difference remains uncertain.
+See the full study for details:
+research/Which inheritance mechanisms of hyberparametres give rise to increasingly optimized agents?
+
+#### Reproducibility
+The research folder contains `reproducibility.md` with the information needed to reproduce the experiments.
+
+The raw logs are available as `research_logs.zip`, attached to release **v5.0.1**. Download and extract the archive, then use `panel.sh` to explore the logs and plot the results.
+
+**Experiment code commit:** `c85f5122e6a52c61f9eebf87cc9bcded1af2dfd8`
 
 
 ### **PROJECT ENDING**

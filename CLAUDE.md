@@ -59,6 +59,22 @@ answer is not a yes.
 - Keep responsibilities where they belong: the world owns map rules, the env
   owns the step loop, the brain owns learning, the logger owns log format.
 
+### Results — show them, do not interpret them
+Interpreting results is the author's job, not the assistant's: it is the
+research itself, and an interpretation from the assistant is not always
+correct.
+
+- When asked for a table, a number, a plot or any other piece of data,
+  **output exactly that and stop.** No commentary, no conclusions, no
+  "this suggests...", no "interesting that...", no ranking of what is better.
+- Do not draw conclusions about the experiment (what a result means, why
+  agents behave a certain way, what to try next) unless the user explicitly
+  asks for an interpretation.
+- Factual remarks about the data itself (a column is empty, a run crashed
+  before the window, the numbers come from different seeds) are fine when
+  they are needed to read the result correctly - state them as plain facts,
+  not as findings.
+
 ## Architecture (what matters when changing things)
 
 ### One continuous run, no episodes in the world

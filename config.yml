@@ -51,10 +51,10 @@ checkpoints:
 # Snapshots of living adults, measured later alone in a fresh copy of the
 # world with a frozen mind: scripts/probe.py. Read-only for the run itself.
 probe:
-  every_episodes: 0       # snapshot every N episodes, on the grid k*N (0 = off)
-  agents: null            # Q: distinct adults per snapshot
-  rescue_episodes: null   # fewer adults than Q: try once more this many episodes later
-  episodes: null          # P: how long each probe world runs, in episodes
+  every_episodes: 100       # snapshot every N episodes, on the grid k*N (0 = off)
+  agents: 5            # Q: distinct adults per snapshot
+  rescue_episodes: 20   # fewer adults than Q: try once more this many episodes later
+  episodes: 20          # P: how long each probe world runs, in episodes
 
 # --- REWARD SHAPING ---
 reward_shaping:
@@ -125,7 +125,7 @@ genome:
     # --- DQN TARGETS ---
     gamma:                        # discount factor
       mean: 0.99
-      scale: 0.001
+      scale: 0.2
       type: float
     target_update_freq:           # updates between two target-net syncs
       mean: 200
