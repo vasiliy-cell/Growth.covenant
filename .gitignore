@@ -63,3 +63,6 @@ temp_data/
 
 # --- AI working files: spec, tasks, progress (never committed) ---
 .ai/
+
+# --- Pipeline automation scripts (local only, not part of the methodology) ---
+scripts/pipeline/
